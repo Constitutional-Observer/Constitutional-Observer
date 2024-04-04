@@ -1,0 +1,184 @@
+```{python}
+    import pandas as pd
+
+# scrape from 
+link = "https://www.constitutionofindia.net/wp-json/wp/v2/debates?per_page=100&page="
+
+debates = pd.DataFrame()
+
+for i in range(1, 3):
+    print(link + str(i))
+    linkTemp = link + str(i)
+    debates = pd.concat([debates,pd.read_json(linkTemp)])
+
+debate_para_url = "https://www.constitutionofindia.net/wp-json/wp/v2/debate_paragraphs?debates="
+
+
+```
+
+
+```{python}
+debateContent = pd.DataFrame()
+
+for index, row in debates.iterrows():
+    tempdf = pd.DataFrame()
+    i = 1
+    #loop until it returns a 400
+    while True:
+        try:
+            tempdf = pd.concat([tempdf, pd.read_json(debate_para_url + str(row['id'])+"&per_page=100&page="+ str(i))])
+            i = i + 1
+        except:
+            break
+        tempdf['debate_id'] = row['id']
+        tempdf['name'] = row['name']
+        debateContent = pd.concat([debateContent, tempdf])
+
+    print(len(debateContent))
+```
+
+```{python}
+
+speakers = pd.DataFrame()
+
+speakers_api = "https://www.constitutionofindia.net/wp-json/wp/v2/speaker"
+
+i = 1
+while True:
+    try:
+        temp = pd.read_json(speakers_api + "?per_page=100&page=" + str(i))
+        speakers = pd.concat([speakers, temp[["id", "name", "link"]]])
+        i = i + 1
+        print(i)
+    except:
+        break
+
+```
+
+```{python}
+import ast
+
+# merge debates and speakers
+
+debates = pd.read_csv("./data/constituent-assembly/debates.csv")
+speakers = pd.read_csv("./data/constituent-assembly/speakers.csv")
+
+
+debates = debates[
+    [
+        "id",
+        "date",
+        "link",
+        "title",
+        "content",
+        "speaker",
+        "speaker_referred",
+        "country",
+        "articles",
+        "debates",
+        "debate_id",
+        "name",
+    ]
+]
+
+debates["speakers"] = debates["speaker"].apply(lambda x: ast.literal_eval(x))
+
+
+def get_speakers(x):
+    print(x)
+    try:
+        temp = [speakers[speakers["id"] == i]["name"].values[0] for i in x]
+        return (
+            str(temp)
+            .replace("[", "")
+            .replace("]", "")
+            .replace("'", "")
+            .replace('"', "")
+        )
+
+    except:
+        return ""
+
+
+## Replace the number in the list with the name of the speaker
+debates["speaker_name"] = debates["speakers"].apply(lambda x: get_speakers(x))
+
+debates["speaker_referred_name"] = debates["speaker_referred"].apply(
+    lambda x: get_speakers(x)
+)
+
+debates.to_csv("./data/constituent-assembly/debates.csv", index=False)
+
+```
+
+
+```{python}
+from datasets import Dataset
+
+# correct and match speakers in the dataset
+constituentDebatesEmbeddings = Dataset.load_from_disk(
+    "./data/constituent-assembly/debates-embeddings"
+)
+
+temp = constituentDebatesEmbeddings.to_pandas()
+
+debates["speakers"] = debates["speaker"].apply(lambda x: ast.literal_eval(x))
+
+
+def get_speakers(x):
+    print(x)
+    try:
+        temp = [speakers[speakers["id"] == i]["name"].values[0] for i in x]
+        return (
+            str(temp)
+            .replace("[", "")
+            .replace("]", "")
+            .replace("'", "")
+            .replace('"', "")
+        )
+
+    except:
+        return ""
+
+
+## Replace the number in the list with the name of the speaker
+debates["speaker_name"] = debates["speakers"].apply(lambda x: get_speakers(x))
+
+debates["speaker_referred_name"] = debates["speaker_referred"].apply(
+    lambda x: get_speakers(x)
+)
+
+Dataset.from_pandas(debates).save_to_disk(
+    "./data/constituent-assembly/debates-embeddings")
+```
+
+```{python}
+import pandas as pd
+sabha = pd.read_json("./data/sabha/17th_Questions_wText.json")
+
+## in each 'questionAnswer', remove all other language characters
+
+sabha['questionAnswer'] = sabha['questionAnswer'].str.replace(r'[^\x00-\x7F]+', ' ')
+
+```
+
+
+# Scrape Supreme Court docs matching keyword search on constitutional rights
+
+```{python}
+
+import pandas as pd
+import requests
+import bs4 as bs
+import os
+
+
+webpage = requests.get("https://indiankanoon.org/search/?addlq=constitutional+rights&formInput=doctypes%3Asupremecourt&pagenum=").content
+
+for i in range(0, 41):
+    soup = bs.BeautifulSoup(webpage, "html.parser")
+
+    # filter by class and get links
+    results = soup.find('div', {"class":})
+print(links)
+```
