@@ -15,7 +15,6 @@ export const actions = {
     let courts = await fetch(
       "http://127.0.0.1:8000/courts/?query=" + data["query"] + '"'
     );
-    console.log(courts);
     return {
       debates: await debates.json(),
       hwdb: await hwdb.json(),

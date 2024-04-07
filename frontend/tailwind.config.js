@@ -1,6 +1,6 @@
 // @ts-check
 import { join } from "path";
-
+import forms from "@tailwindcss/forms";
 // 1. Import the Skeleton plugin
 import { skeleton } from "@skeletonlabs/tw-plugin";
 
@@ -29,5 +29,6 @@ export default {
     skeleton({
       themes: { preset: ["crimson"] },
     }),
+    forms,
   ],
 };
