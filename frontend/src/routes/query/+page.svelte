@@ -115,6 +115,9 @@
 
 <!-- Main content -->
 <style lang="postcss">
+  .title-bg {
+    @apply sticky top-2  w-80 pt-4 mb-3 rounded text-2xl text-black font-bold bg-primaryLight;
+  }
   .scroll-container {
     @apply snap-y  overflow-y-auto overflow-x-hidden my-10 px-2;
   }

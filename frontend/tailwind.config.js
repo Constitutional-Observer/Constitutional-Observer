@@ -20,15 +20,11 @@ export default {
       colors: {
         primary: "#c3b091",
         primaryLight: "#f0e9da",
+        primaryDark: "#bdc391",
         secondary: "#c39791",
         tertiary: "#bdc391",
       },
     },
   },
-  plugins: [
-    skeleton({
-      themes: { preset: ["crimson"] },
-    }),
-    forms,
-  ],
+  plugins: [skeleton],
 };

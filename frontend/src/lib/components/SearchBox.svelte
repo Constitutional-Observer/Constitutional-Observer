@@ -33,7 +33,6 @@
 
   function clearOptions(e) {
     e.preventDefault();
-
     $query = "";
     box1selected = [];
     box2selected = [];
@@ -41,13 +40,35 @@
     box4selected = [];
     box5selected = [];
   }
-  $: console.log(
-    box1selected,
-    box2selected,
-    box3selected,
-    box4selected,
-    box5selected
-  );
+
+  onMount(() => {
+    if ($query) {
+      // split into words and make list
+      let words = $query.split(" ");
+
+      // if word is in check list add it
+      for (let i = 0; i < words.length; i++) {
+        console.log(words[i]);
+        switch (words[i]) {
+          case box1.includes(words[i]):
+            box1selected = [...box1selected, words[i]];
+            break;
+          case box2.includes(words[i]):
+            box2selected = [...box2selected, words[i]];
+            break;
+          case box3.includes(words[i]):
+            box3selected = [...box3selected, words[i]];
+            break;
+          case box4.includes(words[i]):
+            box4selected = [...box4selected, words[i]];
+            break;
+          case box5.includes(words[i]):
+            box5selected = [...box5selected, words[i]];
+            break;
+        }
+      }
+    }
+  });
 </script>
 
 <div class="w-full grid mt-3 px-1">
