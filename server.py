@@ -127,4 +127,4 @@ def getCourts():
     return samples_df.to_dict(orient="records")
 
 
-app.run(port=8000)
+app.run(host="0.0.0.0")
