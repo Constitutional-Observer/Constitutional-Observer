@@ -1,5 +1,4 @@
 import pandas as pd
-from tabulate import tabulate
 import re
 from transformers import AutoTokenizer, AutoModel
 import torch
