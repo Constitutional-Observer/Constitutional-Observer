@@ -67,27 +67,28 @@ def getDebates():
     samples_df["content"] = samples_df["content"].apply(
         lambda x: re.sub("{'rendered':", "", x)
     )
+    samples_df = samples_df[samples_df["scores"] > 35]
     return samples_df.to_dict(orient="records")
 
 
-@app.route("/hwdb/", methods=["GET"])
-def getHwdb():
-    args = request.args
-    query = args.get("query")
-    question_embedding = get_embeddings([query]).cpu().detach().numpy()
+# @app.route("/hwdb/", methods=["GET"])
+# def getHwdb():
+#     args = request.args
+#     query = args.get("query")
+#     question_embedding = get_embeddings([query]).cpu().detach().numpy()
 
-    scores, samples_df = hwdfEmbeddings.get_nearest_examples(
-        "embeddings", question_embedding, k=5
-    )
+#     scores, samples_df = hwdfEmbeddings.get_nearest_examples(
+#         "embeddings", question_embedding, k=5
+#     )
 
-    del question_embedding
-    gc.collect()
+#     del question_embedding
+#     gc.collect()
 
-    samples_df = pd.DataFrame.from_dict(samples_df)
-    samples_df["scores"] = scores
-    samples_df.sort_values("scores", ascending=False, inplace=True)
+#     samples_df = pd.DataFrame.from_dict(samples_df)
+#     samples_df["scores"] = scores
+#     samples_df.sort_values("scores", ascending=False, inplace=True)
 
-    return samples_df.to_dict(orient="records")
+#     return samples_df.to_dict(orient="records")
 
 
 @app.route("/sabha/", methods=["GET"])
@@ -105,6 +106,7 @@ def getSabha():
     samples_df = pd.DataFrame.from_dict(samples_df)
     samples_df["scores"] = scores
     samples_df.sort_values("scores", ascending=False, inplace=True)
+    samples_df = samples_df[samples_df["scores"] > 35]
     return samples_df.to_dict(orient="records")
 
 
@@ -123,8 +125,9 @@ def getCourts():
     samples_df = pd.DataFrame.from_dict(samples_df)
     samples_df["scores"] = scores
     samples_df.sort_values("scores", ascending=False, inplace=True)
-    print(samples_df)
+    samples_df = samples_df[samples_df["scores"] > 35]
     return samples_df.to_dict(orient="records")
 
 
-# app.run(host="0.0.0.0", ssl_context='adhoc')
+if __name__ == "__main__":
+    app.run()
