@@ -9,7 +9,7 @@ export const actions = {
       apiLink = "http://127.0.0.1:5000/";
     } else {
       // if production
-      apiLink = "https://constitutional-observer.adhavansivaraj.xyz/";
+      apiLink = "https://constitutional-observer-backend.adhavansivaraj.xyz/";
     }
     // if production
 
