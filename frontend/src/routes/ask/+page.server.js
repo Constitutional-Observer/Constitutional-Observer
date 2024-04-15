@@ -5,7 +5,7 @@ export const actions = {
 
     let apiLink = "";
     // if local
-    if (process.env.NODE_ENV === "development") {
+    if (import.meta.env.MODE === "development") {
       apiLink = "http://127.0.0.1:5000/";
     } else {
       // if production
