@@ -81,7 +81,7 @@
   <section class="h-parent">
     <!-- Central search-->
     <!-- <div id="blur" class="blur-lg center-box w-full !w-2/6 h-1/4 !bg-primary"></div> -->
-    <form class="text-left" method="post" action="query?/query">
+    <form class="text-left" method="post" action="ask/?/query">
       <SearchBox></SearchBox>
     </form>
   </section>

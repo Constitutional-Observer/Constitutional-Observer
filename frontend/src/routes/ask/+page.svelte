@@ -132,6 +132,6 @@
     @apply flex-wrap;
   }
   main {
-    @apply md:w-3/4 max-h-screen w-full mx-auto;
+    @apply md:mx-auto max-h-screen w-[90%] mx-auto;
   }
 </style>
