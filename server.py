@@ -68,6 +68,7 @@ def getDebates():
         lambda x: re.sub("{'rendered':", "", x)
     )
     samples_df = samples_df[samples_df["scores"] > 35]
+    samples_df.drop(columns=["embeddings"], inplace=True)
     return samples_df.to_dict(orient="records")
 
 
@@ -107,6 +108,7 @@ def getSabha():
     samples_df["scores"] = scores
     samples_df.sort_values("scores", ascending=False, inplace=True)
     samples_df = samples_df[samples_df["scores"] > 35]
+    samples_df.drop(columns=["embeddings"], inplace=True)
     return samples_df.to_dict(orient="records")
 
 
@@ -126,6 +128,7 @@ def getCourts():
     samples_df["scores"] = scores
     samples_df.sort_values("scores", ascending=False, inplace=True)
     samples_df = samples_df[samples_df["scores"] > 35]
+    samples_df.drop(columns=["embeddings"], inplace=True)
     return samples_df.to_dict(orient="records")
 
 
