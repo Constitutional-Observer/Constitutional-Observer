@@ -11,7 +11,7 @@ export const actions = {
       // if production
       apiLink = "https://constitutional-observer-backend.adhavansivaraj.xyz/";
     }
-
+    apiLink = "https://constitutional-observer-backend.adhavansivaraj.xyz/";
     return {
       streamed: {
         debates: await (
@@ -24,11 +24,11 @@ export const actions = {
             apiLink + "/sabha/?query=" + encodeURIComponent(data["query"])
           )
         ).json(),
-        courts: await (
-          await fetch(
-            apiLink + "/courts/?query=" + encodeURIComponent(data["query"])
-          )
-        ).json(),
+        // courts: await (
+        //   await fetch(
+        //     apiLink + "/courts/?query=" + encodeURIComponent(data["query"])
+        //   )
+        // ).json(),
       },
     };
   },

@@ -13,7 +13,7 @@
 <main class="relative">
   <!-- Main content -->
 
-  <div class="grid gap-2 grid-cols-4 h-screen bg-primaryLight text-black">
+  <div class="grid gap-2 grid-cols-5 h-screen bg-primaryLight text-black">
     <section class="relative scroll-container my-10">
       <div class="absolute top-1/3 left-1/7">
         <h1 id="central-text">
@@ -40,7 +40,7 @@
       </div>
     </section>
     {#if form?.streamed?.debates?.length > 0}
-      <section class="scroll-container">
+      <section class="scroll-container col-span-2">
         <h2 class="title-bg">Constituent Assembly Debates</h2>
         <Accordion>
           {#each form.streamed.debates as debate, index (debate)}
@@ -63,7 +63,7 @@
     {/if}
 
     {#if form?.streamed?.sabha?.length > 0}
-      <section class="scroll-container">
+      <section class="scroll-container col-span-2">
         <h2 class="title-bg">Lok Sabha Questions</h2>
         <Accordion>
           {#each form.streamed.sabha as sabha, index (sabha)}
@@ -85,7 +85,7 @@
         </Accordion>
       </section>
     {/if}
-    {#if form?.streamed?.courts?.length > 0}
+    <!-- {#if form?.streamed?.courts?.length > 0}
       <section class="scroll-container">
         <h2 class="title-bg">SC and HC judgements</h2>
 
@@ -95,7 +95,7 @@
               <svelte:fragment slot="lead"
                 >{@html judgement.title}
                 {@html judgement.author}
-                <!-- {@html sabha.Name} from {@html sabha.Constituency} in  -->
+               
               </svelte:fragment>
 
               <svelte:fragment slot="summary">
@@ -109,7 +109,7 @@
           {/each}
         </Accordion>
       </section>
-    {/if}
+    {/if} -->
   </div>
 </main>
 
@@ -122,7 +122,7 @@
     @apply snap-y  overflow-y-auto overflow-x-hidden my-10 px-2;
   }
   :global(.accordion-lead) {
-    @apply font-bold pb-2;
+    @apply font-bold pb-2 w-full;
   }
 
   :global(.accordion-summary) {
