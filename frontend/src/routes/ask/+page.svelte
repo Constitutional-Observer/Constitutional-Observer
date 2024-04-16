@@ -39,11 +39,11 @@
         </form>
       </div>
     </section>
-    {#if form?.debates?.length > 0}
+    {#if form?.streamed?.debates?.length > 0}
       <section class="scroll-container">
         <h2 class="title-bg">Constituent Assembly Debates</h2>
         <Accordion>
-          {#each form.debates as debate, index (debate)}
+          {#each form.streamed.debates as debate, index (debate)}
             <AccordionItem class="card">
               <svelte:fragment slot="lead">
                 {@html debate.speaker_name} on {@html new Date(
@@ -62,11 +62,11 @@
       </section>
     {/if}
 
-    {#if form?.sabha?.length > 0}
+    {#if form?.streamed?.sabha?.length > 0}
       <section class="scroll-container">
         <h2 class="title-bg">Lok Sabha Questions</h2>
         <Accordion>
-          {#each form.sabha as sabha, index (sabha)}
+          {#each form.streamed.sabha as sabha, index (sabha)}
             <AccordionItem class="card">
               <svelte:fragment slot="lead"
                 >{@html sabha.Title}
@@ -85,12 +85,12 @@
         </Accordion>
       </section>
     {/if}
-    {#if form?.courts?.length > 0}
+    {#if form?.streamed?.courts?.length > 0}
       <section class="scroll-container">
         <h2 class="title-bg">SC and HC judgements</h2>
 
         <Accordion>
-          {#each form.courts as judgement, index (judgement)}
+          {#each form.streamed.courts as judgement, index (judgement)}
             <AccordionItem class="card">
               <svelte:fragment slot="lead"
                 >{@html judgement.title}

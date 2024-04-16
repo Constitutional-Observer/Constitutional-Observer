@@ -11,32 +11,25 @@ export const actions = {
       // if production
       apiLink = "https://constitutional-observer-backend.adhavansivaraj.xyz/";
     }
-    // if production
-
-    let debates = await fetch(
-      apiLink + "debates/?query='" + data["query"] + "'"
-    );
-
-    // let hwdb = await fetch(
-    //   apiLink + "/hwdb/?query='" + data["query"] + "'"
-    // ).json();
-    // hwdb = await hwdb;
-    let sabha = await fetch(apiLink + "/sabha/?query='" + data["query"] + "'");
-
-    let courts = await fetch(
-      apiLink + "/courts/?query='" + data["query"] + "'"
-    );
-
-    debates = await debates.json();
-    courts = await courts.json();
-    sabha = await sabha.json();
-
-    // parse through each df and share only if score>70\
 
     return {
-      debates: debates,
-      sabha: sabha,
-      courts: courts,
+      streamed: {
+        debates: await (
+          await fetch(
+            apiLink + "debates/?query=" + encodeURIComponent(data["query"])
+          )
+        ).json(),
+        sabha: await (
+          await fetch(
+            apiLink + "/sabha/?query=" + encodeURIComponent(data["query"])
+          )
+        ).json(),
+        courts: await (
+          await fetch(
+            apiLink + "/courts/?query=" + encodeURIComponent(data["query"])
+          )
+        ).json(),
+      },
     };
   },
 };
