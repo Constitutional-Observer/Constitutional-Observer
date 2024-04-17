@@ -11,7 +11,7 @@ export const actions = {
       // if production
       apiLink = "https://constitutional-observer-backend.adhavansivaraj.xyz/";
     }
-    apiLink = "https://constitutional-observer-backend.adhavansivaraj.xyz/";
+
     return {
       streamed: {
         debates: await (
