@@ -19,15 +19,15 @@ app = Flask(__name__)
 constituentDebatesEmbeddings = Dataset.load_from_disk(
     "./data/constituent-assembly/debates-embeddings"
 ).add_faiss_index(column="embeddings")
-hwdfEmbeddings = Dataset.load_from_disk("./data/hwdb/hwdb-embeddings").add_faiss_index(
-    column="embeddings"
-)
+# hwdfEmbeddings = Dataset.load_from_disk("./data/hwdb/hwdb-embeddings").add_faiss_index(
+#     column="embeddings"
+# )
 sabhaQuestionsEmbeddings = Dataset.load_from_disk(
     "./data/sabha/sabha-embeddings-english-2"
 ).add_faiss_index(column="embeddings")
-courtJudgementsEmbeddings = Dataset.load_from_disk(
-    "./data/court-judgements/supreme-court-embeddings"
-).add_faiss_index(column="embeddings")
+# courtJudgementsEmbeddings = Dataset.load_from_disk(
+#     "./data/court-judgements/supreme-court-embeddings"
+# ).add_faiss_index(column="embeddings")
 
 
 def cls_pooling(model_output):
@@ -55,7 +55,7 @@ def getDebates():
     question_embedding = get_embeddings([query]).cpu().detach().numpy()
 
     scores, samples = constituentDebatesEmbeddings.get_nearest_examples(
-        "embeddings", question_embedding, k=5
+        "embeddings", question_embedding, k=10
     )
 
     del question_embedding
@@ -64,11 +64,9 @@ def getDebates():
     samples_df = pd.DataFrame.from_dict(samples)
     samples_df["scores"] = scores
     samples_df.sort_values("scores", ascending=False, inplace=True)
-    samples_df["content"] = samples_df["content"].apply(
-        lambda x: re.sub("{'rendered':", "", x)
-    )
-    samples_df = samples_df[samples_df["scores"] > 35]
+    samples_df = samples_df[samples_df["scores"] > 15]
     samples_df.drop(columns=["embeddings"], inplace=True)
+
     return samples_df.to_dict(orient="records")
 
 
@@ -107,29 +105,29 @@ def getSabha():
     samples_df = pd.DataFrame.from_dict(samples_df)
     samples_df["scores"] = scores
     samples_df.sort_values("scores", ascending=False, inplace=True)
-    samples_df = samples_df[samples_df["scores"] > 35]
+    samples_df = samples_df[samples_df["scores"] > 15]
     samples_df.drop(columns=["embeddings"], inplace=True)
     return samples_df.to_dict(orient="records")
 
 
-@app.route("/courts/", methods=["GET"])
-def getCourts():
-    args = request.args
-    query = args.get("query")
-    question_embedding = get_embeddings([query]).cpu().detach().numpy()
+# @app.route("/courts/", methods=["GET"])
+# def getCourts():
+#     args = request.args
+#     query = args.get("query")
+#     question_embedding = get_embeddings([query]).cpu().detach().numpy()
 
-    scores, samples_df = courtJudgementsEmbeddings.get_nearest_examples(
-        "embeddings", question_embedding, k=10
-    )
+#     scores, samples_df = courtJudgementsEmbeddings.get_nearest_examples(
+#         "embeddings", question_embedding, k=10
+#     )
 
-    del question_embedding
-    gc.collect()
-    samples_df = pd.DataFrame.from_dict(samples_df)
-    samples_df["scores"] = scores
-    samples_df.sort_values("scores", ascending=False, inplace=True)
-    samples_df = samples_df[samples_df["scores"] > 35]
-    samples_df.drop(columns=["embeddings"], inplace=True)
-    return samples_df.to_dict(orient="records")
+#     del question_embedding
+#     gc.collect()
+#     samples_df = pd.DataFrame.from_dict(samples_df)
+#     samples_df["scores"] = scores
+#     samples_df.sort_values("scores", ascending=False, inplace=True)
+#     samples_df = samples_df[samples_df["scores"] > 35]
+#     samples_df.drop(columns=["embeddings"], inplace=True)
+#     return samples_df.to_dict(orient="records")
 
 
 if __name__ == "__main__":

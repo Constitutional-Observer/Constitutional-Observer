@@ -13,10 +13,10 @@
 <main class="relative">
   <!-- Main content -->
 
-  <div class="grid gap-2 grid-cols-5 h-screen bg-primaryLight text-black">
+  <div class="grid gap-20 grid-cols-5 h-screen text-black">
     <section class="relative scroll-container my-10">
       <div class="absolute top-1/3 left-1/7">
-        <h1 id="central-text">
+        <h1 class="text-6xl text-bold">
           {$query}
         </h1>
         <form
@@ -24,11 +24,11 @@
           method="post"
           action="?/query"
         >
-          <div class="w-3/4">
+          <div class="w-3/4 flex">
             <input
               type="text"
               name="query"
-              class="p-1 w-full text-gray-200"
+              class="p-1 mr-2 w-full text-gray-300 selection:bg-primary selection:text-black"
               bind:value={$query}
             />
             <button
@@ -133,5 +133,8 @@
   }
   main {
     @apply md:mx-auto max-h-screen w-[90%] mx-auto;
+  }
+  :global(body) {
+    @apply bg-primaryLight;
   }
 </style>

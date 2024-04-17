@@ -182,3 +182,53 @@ for i in range(0, 41):
     results = soup.find('div', {"class":})
 print(links)
 ```
+
+## clean up sabha 
+```{python}
+# open arrow file
+import re
+from datasets import Dataset
+
+# correct and match speakers in the dataset
+sabha = Dataset.load_from_disk("./data/sabha/sabha-embeddings-english-2/").to_pandas()
+
+sabha = sabha[
+    sabha["questionAnswer"].apply(
+        lambda x: bool(re.findall(r"[a-zA-Z]+", x))
+        & (len(re.findall(r"[a-zA-Z]+", x)) >= 100)
+    )
+]
+
+
+## Remove GOVERNMENT OF INDIA and escape characters
+
+sabha["questionAnswer"] = (
+    sabha["questionAnswer"]
+    .str.replace(r"GOVERNMENT OF INDIA", " ")
+    .str.replace(r"[^\x00-\x7F]+", " ")
+    .str.replace(r"\n", "<br>")
+)
+
+Dataset.from_pandas(sabha).save_to_disk("data/sabha/sabha-embeddings-english-3")
+```
+
+## clean up CA
+```{python}
+import re
+from datasets import Dataset
+
+ca = Dataset.load_from_disk("./data/constituent-assembly/debates-embeddings").to_pandas()
+
+ca['content'] = (
+    ca["content"]
+    .str.replace(r"\n', 'protected': False}", "")
+    .str.replace(r"\n", "<br>")
+    .str.replace(r"{'rendered':", "")
+    .str.replace(r"\xa0", " ")
+    .str.replace(r"'", "")
+)
+
+# Check for duplicatelse
+ca = ca.drop_duplicates(subset=["content"])
+Dataset.from_pandas(ca).save_to_disk("./data/constituent-assembly/debates-embeddings-2")
+```
