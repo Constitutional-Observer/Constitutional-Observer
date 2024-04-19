@@ -4,3 +4,4 @@ data/sabha/activity/**
 venv/
 data/sabha/testog.csv
 data/sabha/test.csv
+data/
