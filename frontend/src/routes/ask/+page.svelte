@@ -28,7 +28,7 @@
             <input
               type="text"
               name="query"
-              class="p-1 mr-2 w-full text-gray-300 selection:bg-primary selection:text-black"
+              class="p-1 mr-2 w-full text-gray-300"
               bind:value={$query}
             />
             <button
@@ -37,11 +37,13 @@
             >
           </div>
         </form>
+        <a href="/" class="underline pt-5">Go back</a>
       </div>
     </section>
     {#if form?.streamed?.debates?.length > 0}
       <section class="scroll-container col-span-2">
         <h2 class="title-bg">Constituent Assembly Debates</h2>
+        <p>The Constituent Assembly met between 1947 and 1949.</p>
         <Accordion>
           {#each form.streamed.debates as debate, index (debate)}
             <AccordionItem class="card">
@@ -116,13 +118,13 @@
 <!-- Main content -->
 <style lang="postcss">
   .title-bg {
-    @apply sticky top-2  w-80 pt-4 mb-3 rounded text-2xl text-black font-bold bg-primaryLight;
+    @apply sticky top-2  w-80 pt-4 mb-10 rounded text-4xl text-black font-bold bg-primaryLight;
   }
   .scroll-container {
     @apply snap-y  overflow-y-auto overflow-x-hidden my-10 px-2;
   }
   :global(.accordion-lead) {
-    @apply font-bold pb-2 w-full;
+    @apply font-bold text-xl pb-2 w-full;
   }
 
   :global(.accordion-summary) {
@@ -131,10 +133,14 @@
   :global(.accordion-control) {
     @apply flex-wrap;
   }
+  :global(.accordion-panel) {
+    @apply text-balance;
+  }
   main {
     @apply md:mx-auto max-h-screen w-[90%] mx-auto;
   }
-  :global(body) {
-    @apply bg-primaryLight;
+
+  :global(input[type="text"]) {
+    @apply selection:bg-primary selection:text-black;
   }
 </style>

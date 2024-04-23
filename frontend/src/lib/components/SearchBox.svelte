@@ -1,6 +1,7 @@
 <script>
   import { query } from "$lib/stores";
   import { onMount } from "svelte";
+  import { text1, text2 } from "$lib/text.js";
   import MainSearch from "./MainSearch.svelte";
 
   let box1 = ["Who", "What", "When", "Where", "Why", "How"],
@@ -26,6 +27,18 @@
   let box5 = ["pray", "feed", "eat", "speak", "love", "know"],
     box5selected = [];
 
+  let box6 = [
+      "government",
+      "state",
+      "language",
+      "union",
+      "people",
+      "constitution",
+      "love",
+      "poems",
+    ],
+    box6selected = [];
+
   function onchange(text) {
     $query = $query + " " + text;
     $query = $query;
@@ -39,6 +52,7 @@
     box3selected = [];
     box4selected = [];
     box5selected = [];
+    box6selected = [];
   }
 
   onMount(() => {
@@ -71,11 +85,21 @@
   });
 </script>
 
+<!-- <div class="grid grid-cols-8">
+  <div class="w-80 col-span-2">
+    <p class="text-xl text-left py-5">ask from these</p>
+    {#each text1.slice(0, 4) as option}
+      <button class="text-left text-xl" on:click={() => onchange(option)}>
+        {option}</button
+      >
+    {/each}
+  </div>
+</div> -->
 <div class="w-full grid mt-3 px-1">
-  <div class="flex flex-row bg-primary p-2 text-black">
+  <section class="flex flex-row bg-primary p-2">
     <input
       type="text"
-      class="form-input w-full"
+      class="form-input text-xl w-full p-3"
       name="query"
       bind:value={$query}
     />
@@ -87,34 +111,42 @@
       class="bg-primary w-20 text-white my-3 px-2 py-1 rounded-md"
       on:click={clearOptions}>Clear</button
     >
-  </div>
+  </section>
 
-  <div class="grid grid-cols-5">
-    <div>
-      {#each box1 as option}
-        <input
-          type="checkbox"
-          id={option}
-          bind:group={box1selected}
-          value={option}
-          on:change={() => onchange(option)}
-        />
-        <label for={option}>{option}</label>
-      {/each}
-    </div>
-    <div>
-      {#each box2 as option}
-        <input
-          type="checkbox"
-          id={option}
-          bind:group={box2selected}
-          value={option}
-          on:change={() => onchange(option)}
-        />
-        <label for={option}>{option}</label>
-      {/each}
-    </div>
-    <div>
+  <section class="py-2 px-0 grid">
+    <div class="col-span-5">
+      <p class="text-xl text-center py-5">
+        You can select from these options as well
+      </p>
+      <div class="grid grid-cols-4 gap-2">
+        <div class="q-opt-box">
+          <h4>How do we begin the question?</h4>
+          {#each box1 as option}
+            <input
+              type="checkbox"
+              id={option}
+              bind:group={box1selected}
+              value={option}
+              on:change={() => onchange(option)}
+            />
+            <label for={option}>{option}</label>
+          {/each}
+        </div>
+        <div class="q-opt-box">
+          <h4>How strong should the question be?</h4>
+          {#each box2 as option}
+            <input
+              type="checkbox"
+              id={option}
+              bind:group={box2selected}
+              value={option}
+              on:change={() => onchange(option)}
+            />
+            <label for={option}>{option}</label>
+          {/each}
+        </div>
+        <!-- <div class="q-opt-box">
+      <h4></h4>
       {#each box3 as option}
         <input
           type="checkbox"
@@ -125,35 +157,58 @@
         />
         <label for={option}>{option}</label>
       {/each}
+    </div> -->
+        <div class="q-opt-box">
+          <h4>Who does it affect?</h4>
+          {#each box4 as option}
+            <input
+              type="checkbox"
+              id={option}
+              bind:group={box4selected}
+              value={option}
+              on:change={() => onchange(option)}
+            />
+            <label for={option}>{option}</label>
+          {/each}
+        </div>
+        <div class="q-opt-box">
+          <h4>What can we do?</h4>
+          {#each box5 as option}
+            <input
+              type="checkbox"
+              id={option}
+              bind:group={box5selected}
+              value={option}
+              on:change={() => onchange(option)}
+            />
+            <label for={option}>{option}</label>
+          {/each}
+        </div>
+        <div class="q-opt-box">
+          <h4>Who has the power to affect?</h4>
+          {#each box6 as option}
+            <input
+              type="checkbox"
+              id={option}
+              bind:group={box6selected}
+              value={option}
+              on:change={() => onchange(option)}
+            />
+            <label for={option}>{option}</label>
+          {/each}
+        </div>
+      </div>
     </div>
-    <div>
-      {#each box4 as option}
-        <input
-          type="checkbox"
-          id={option}
-          bind:group={box4selected}
-          value={option}
-          on:change={() => onchange(option)}
-        />
-        <label for={option}>{option}</label>
-      {/each}
-    </div>
-    <div>
-      {#each box5 as option}
-        <input
-          type="checkbox"
-          id={option}
-          bind:group={box5selected}
-          value={option}
-          on:change={() => onchange(option)}
-        />
-        <label for={option}>{option}</label>
-      {/each}
-    </div>
-  </div>
+  </section>
 </div>
 
 <style lang="postcss">
+  .q-opt-box h4 {
+    @apply text-2xl pb-4 pt-2 text-center;
+  }
+  .q-opt-box {
+    @apply bg-primary m-1 rounded-lg p-5;
+  }
   input[type="checkbox"] {
     border: 0;
     clip: rect(0 0 0 0);
@@ -168,13 +223,14 @@
   input[type="checkbox"] + label {
     @apply cursor-pointer;
     @apply text-center;
+    @apply text-black/60 text-xl;
   }
 
   input[type="checkbox"]:checked + label {
-    @apply text-primary font-bold;
+    @apply text-black font-bold;
   }
 
   input[type="checkbox"]:focus + label {
-    @apply text-primary font-bold;
+    @apply text-black font-bold;
   }
 </style>
