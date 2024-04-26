@@ -12,24 +12,24 @@ export const actions = {
       apiLink = "https://constitutional-observer-backend.adhavansivaraj.xyz/";
     }
 
+    async function debates() {
+      let resp = await fetch(
+        apiLink + "debates/?query=" + encodeURIComponent(data["query"])
+      );
+      return await resp.json();
+    }
+
+    async function sabha() {
+      let resp = await fetch(
+        apiLink + "/sabha/?query=" + encodeURIComponent(data["query"])
+      );
+
+      return await resp.json();
+    }
+
     return {
-      streamed: {
-        debates: await (
-          await fetch(
-            apiLink + "debates/?query=" + encodeURIComponent(data["query"])
-          )
-        ).json(),
-        sabha: await (
-          await fetch(
-            apiLink + "/sabha/?query=" + encodeURIComponent(data["query"])
-          )
-        ).json(),
-        // courts: await (
-        //   await fetch(
-        //     apiLink + "/courts/?query=" + encodeURIComponent(data["query"])
-        //   )
-        // ).json(),
-      },
+      debates: structuredClone(await debates()), // debates(),
+      sabha: structuredClone(await sabha()), // sabha(),
     };
   },
 };
