@@ -120,7 +120,7 @@
       </p>
       <div class="grid grid-cols-4 gap-2">
         <div class="q-opt-box">
-          <h4>How do we begin the question?</h4>
+          <h4>How can you begin the question?</h4>
           {#each box1 as option}
             <input
               type="checkbox"
@@ -133,7 +133,7 @@
           {/each}
         </div>
         <div class="q-opt-box">
-          <h4>How strong should the question be?</h4>
+          <h4>Should it be suggestive?</h4>
           {#each box2 as option}
             <input
               type="checkbox"
@@ -159,7 +159,7 @@
       {/each}
     </div> -->
         <div class="q-opt-box">
-          <h4>Who does it affect?</h4>
+          <h4>Who do you think it affects?</h4>
           {#each box4 as option}
             <input
               type="checkbox"
@@ -172,7 +172,7 @@
           {/each}
         </div>
         <div class="q-opt-box">
-          <h4>What can we do?</h4>
+          <h4>What can they do?</h4>
           {#each box5 as option}
             <input
               type="checkbox"
@@ -185,7 +185,7 @@
           {/each}
         </div>
         <div class="q-opt-box">
-          <h4>Who has the power to affect?</h4>
+          <h4>Who do you think can affect lives?</h4>
           {#each box6 as option}
             <input
               type="checkbox"

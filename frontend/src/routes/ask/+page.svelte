@@ -73,7 +73,10 @@
           {#each questions as question, index (question)}
             <AccordionItem class="card">
               <svelte:fragment slot="lead"
-                >{@html question.Title}
+                >{@html question.Representative} to {@html question[
+                  "Ministry or Category"
+                ]}, about
+                <h4>{@html question.Title}</h4>
                 <!-- {@html sabha.Name} from {@html sabha.Constituency} in  -->
               </svelte:fragment>
 
