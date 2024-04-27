@@ -8,9 +8,9 @@
 <main class="relative">
   <!-- Main content -->
 
-  <div class="grid gap-20 grid-cols-5 h-screen text-black">
-    <section class="relative scroll-container my-10">
-      <div class="absolute top-1/3 left-1/7">
+  <div class="md:grid gap-20 md:grid-cols-5 h-screen text-black">
+    <section class="md:relative scroll-container my-10">
+      <div class="md:absolute top-1/3 left-1/7">
         <h1 class="text-6xl text-bold">
           {$query}
         </h1>
@@ -39,7 +39,7 @@
     {#await form.debates}
       Loading...
     {:then debates}
-      <section class="scroll-container col-span-2">
+      <section class="scroll-container col-span-1 md:col-span-2">
         <h2 class="title-bg">Constituent Assembly Debates</h2>
         <p>The Constituent Assembly met between 1947 and 1949.</p>
         <Accordion>
@@ -67,7 +67,7 @@
     {#await form.sabha}
       Loading...
     {:then questions}
-      <section class="scroll-container col-span-2">
+      <section class="scroll-container col-span-1 md:col-span-2">
         <h2 class="title-bg">Lok Sabha Questions</h2>
         <Accordion>
           {#each questions as question, index (question)}

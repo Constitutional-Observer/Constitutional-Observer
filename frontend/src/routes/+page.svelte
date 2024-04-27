@@ -26,7 +26,7 @@
 <dialog
   bind:this={dialog}
   on:close={() => (dialog = false)}
-  class="bg-primary rounded-xl w-1/4 shadow-2xl backdrop:bg-black/20 backdrop:backdrop-blur-sm"
+  class="bg-primary rounded-xl w-full md:w-1/4 shadow-2xl backdrop:bg-black/20 backdrop:backdrop-blur-sm"
 >
   <h1 class="p-5 text-2xl">Disclaimer</h1>
   <div class="pl-5 pr-10 py-3">
@@ -52,7 +52,7 @@
 
 <main class="relative">
   <section class="relative">
-    <div class="md:px-[10%] pt-[15vh] mb-20 text-black/70 w-5/6">
+    <div class="px-10 md:px-[10%] pt-[15vh] mb-20 text-black/70 w-5/6">
       <p class="text-2xl">Welcome to the</p>
 
       <h1 class="text-7xl pb-8">Constitutional <br />Discourses Observer</h1>
@@ -68,12 +68,12 @@
   </section>
 
   <section
-    class="text-left tracking-wide py-20 md:px-[20%] max-h-screen overflow-hidden"
+    class="px-10 text-left tracking-wide py-20 md:px-[20%] max-h-screen overflow-hidden text-2xl md:text-4xl"
   >
     <div class="pb-20 max-h-[50vh]">
       {#each text1.slice(idx1, idx1 + 5) as text (text)}
         <div
-          class="text-4xl text-black/50 py-5"
+          class="text-black/50 py-5"
           in:fly|global={{ y: 10, duration: 1000 }}
           out:fade|global
         >
@@ -85,7 +85,7 @@
     <div class="max-h-[50vh]">
       {#each text2.slice(idx2, idx2 + 5) as text (text)}
         <div
-          class="text-4xl text-black/50 py-5"
+          class="text-black/50 py-5"
           in:fly|global={{ y: 10, duration: 1000 }}
           out:fade|global
         >

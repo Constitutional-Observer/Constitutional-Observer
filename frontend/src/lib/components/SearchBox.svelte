@@ -118,7 +118,7 @@
       <p class="text-xl text-center py-5">
         You can select from these options as well
       </p>
-      <div class="grid grid-cols-4 gap-2">
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-2">
         <div class="q-opt-box">
           <h4>How can you begin the question?</h4>
           {#each box1 as option}
