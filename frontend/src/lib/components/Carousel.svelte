@@ -18,58 +18,54 @@
     elemCarousel.scroll(x, 0);
   }
 
-  let images = [
-    {
-      link: "/stage1-1.jpeg",
-      type: "image",
-      caption:
-        "On 13 December 1946, the Constituent Assembly formally commenced its task of framing the Constitution of India. Jawaharlal Nehru moved the Objectives Resolution, which aimed to declare India as an Independent Sovereign Republic and create a Constitution to govern its future. The Resolution established general principles to guide the work of the Constituent Assembly. On January 22, 1947, the Constituent Assembly adopted the Resolution",
-    },
-    {
-      link: "/loksabha-fight.jpeg",
-      type: "image",
-      caption:
-        "The Lok Sabha, constitutionally the House of the People, is the lower house of India's bicameral Parliament, with the upper house being the Rajya Sabha. Members of the Lok Sabha are elected by an adult universal suffrage and a first-past-the-post system to represent their respective constituencies, and they hold their seats for five years or until the body is dissolved by the President on the advice of the council of ministers. The house meets in the Lok Sabha Chambers of the Parliament House, New Delhi. ",
-    },
-    { link: "/stage1-1.jpeg", type: "image", caption: "Constituent Assembly" },
-  ];
+  export let contents;
 </script>
 
-<section class="md:mx-[10%]">
-  <div class=" p-4 grid grid-cols-[auto_1fr_auto] gap-4 items-center">
+<section class="md:mx-[7%]">
+  <div class="grid grid-cols-[auto_1fr_auto] gap-5 place-items-center">
     <button
       type="button"
-      class="btn-icon variant-filled bg-primary"
+      class="btn-icon variant-filled bg-primary align-middle"
       on:click={carouselLeft}
     >
     </button>
 
     <div
       bind:this={elemCarousel}
-      class="snap-x snap-mandatory w-full scroll-smooth flex overflow-x-auto"
+      class="snap-x scroll-smooth text-black/50 flex overflow-x-hidden items-center w-full"
     >
-      {#each images as image}
-        <fig class="snap-center flex w-full h-full object-cover">
-          <figcaption class="w-[40%] pr-10">
-            {image.caption}
-          </figcaption>
-          {#if image.type === "image"}
-            <img
-              class=" col-span-4 max-w-[50vw] w-[1024px] h-full"
-              src={image.link}
-              alt={image.caption}
-              loading="lazy"
-            />
-          {:else}
-            <video
-              class=" col-span-4 max-w-[50vw] w-[1024px] h-full"
-              src={image.link}
-              alt={image.caption}
-              loading="lazy"
-            />
-          {/if}
-        </fig>
-      {/each}
+      {#if contents.type === "text"}
+        {#each contents.content as section}
+          <div class="snap-center flex-none w-full">
+            {#each section as p}
+              <p class="text-md py-5">
+                {p}
+              </p>
+            {/each}
+          </div>
+        {/each}
+      {:else}
+        <!-- <fig class="snap-center flex w-full h-full object-cover">
+            <figcaption class="w-[40%] pr-10">
+              {element.caption}
+            </figcaption>
+            {#if image.type === "image"}
+              <img
+                class=" col-span-4 max-w-[50vw] w-[1024px] h-full"
+                src={element.link}
+                alt={element.caption}
+                loading="lazy"
+              />
+            {:else}
+              <video
+                class=" col-span-4 max-w-[50vw] w-[1024px] h-full"
+                src={element.link}
+                alt={element.caption}
+                loading="lazy"
+              />
+            {/if}
+          </fig> -->
+      {/if}
     </div>
 
     <button
