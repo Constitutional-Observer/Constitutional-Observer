@@ -47,15 +47,15 @@
             {#each debates as debate, index (debate)}
               <AccordionItem class="card">
                 <svelte:fragment slot="lead">
-                  {@html debate.speaker_name} on {@html new Date(
+                  {debate.speaker_name} on {new Date(
                     debate.date
                   ).toDateString()}
                 </svelte:fragment>
                 <svelte:fragment slot="summary"
-                  >{@html debate.content.substring(0, 100)}</svelte:fragment
+                  >{debate.content.substring(0, 100)}</svelte:fragment
                 >
                 <svelte:fragment slot="content"
-                  >{@html debate.content}</svelte:fragment
+                  >{debate.content}</svelte:fragment
                 >
               </AccordionItem>
             {/each}
@@ -74,19 +74,19 @@
             {#each questions as question, index (question)}
               <AccordionItem class="card">
                 <svelte:fragment slot="lead"
-                  >{@html question.Representative} to {@html question[
+                  >{question.Representative} to {question[
                     "Ministry or Category"
                   ]}, about
-                  <h4>{@html question.Title}</h4>
-                  <!-- {@html sabha.Name} from {@html sabha.Constituency} in  -->
+                  <h4>{question.Title}</h4>
+                  <!-- {sabha.Name} from {sabha.Constituency} in  -->
                 </svelte:fragment>
 
                 <svelte:fragment slot="summary">
-                  {@html question.questionAnswer.substring(0, 100)}
+                  {question.questionAnswer.substring(0, 100)}
                 </svelte:fragment>
 
                 <svelte:fragment slot="content">
-                  {@html question.questionAnswer}
+                  {question.questionAnswer}
                 </svelte:fragment>
               </AccordionItem>
             {/each}
@@ -103,17 +103,17 @@
           {#each form.streamed.courts as judgement, index (judgement)}
             <AccordionItem class="card">
               <svelte:fragment slot="lead"
-                >{@html judgement.title}
-                {@html judgement.author}
+                >{judgement.title}
+                {judgement.author}
                
               </svelte:fragment>
 
               <svelte:fragment slot="summary">
-                {@html judgement.cleaned_paras.substring(0, 100)}
+                {judgement.cleaned_paras.substring(0, 100)}
               </svelte:fragment>
 
               <svelte:fragment slot="content"
-                >{@html judgement.cleaned_paras}</svelte:fragment
+                >{judgement.cleaned_paras}</svelte:fragment
               >
             </AccordionItem>
           {/each}
