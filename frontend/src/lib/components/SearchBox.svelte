@@ -1,8 +1,6 @@
 <script>
   import { query } from "$lib/stores";
   import { onMount } from "svelte";
-  import { text1, text2 } from "$lib/text.js";
-  import MainSearch from "./MainSearch.svelte";
 
   let box1 = ["Who", "What", "When", "Where", "Why", "How"],
     box1selected = [];
