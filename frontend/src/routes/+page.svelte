@@ -1,101 +1,42 @@
 <script>
-  import { text } from "$lib/text.js";
-
   import MainSearch from "$lib/components/MainSearch.svelte";
   import Footer from "$lib/components/Footer.svelte";
-  import { onMount } from "svelte";
+  import WarningDialog from "$lib/components/WarningDialog.svelte";
 
+  import { text } from "$lib/text.js";
   import Carousel from "$lib/components/Carousel.svelte";
-
-  let dialog;
-
-  onMount(() => {
-    dialog.showModal();
-  });
+  import Title from "$lib/components/Title.svelte";
 </script>
 
-<dialog
-  bind:this={dialog}
-  on:close={() => (dialog = false)}
-  class="bg-primary rounded-xl w-full md:w-1/4 shadow-2xl backdrop:bg-black/20 backdrop:backdrop-blur-sm"
->
-  <h1 class="p-5 text-2xl">Disclaimer</h1>
-  <div class="pl-5 pr-10 py-3">
-    Alpha version disclaimer: You have probably received this link for review.
-    As this is a work in progress, please note: layout and interactive features
-    are subject to change. The search results may not be accurate.
-
-    <br /><br />
-    <i
-      >This project is open to critical feedback and suggestions. Please email
-      at adhavan.sivaraj16@gmail.com with "Constitutional-Observer" as the
-      subject line</i
-    >
-
-    <div>
-      <button
-        class="p-3 my-5 bg-primaryLight rounded-lg"
-        on:click={() => dialog.close()}>Close</button
-      >
-    </div>
-  </div>
-</dialog>
+<WarningDialog />
 
 <main class="relative">
-  <section class="relative">
-    <div
-      class="text-center px-10 md:px-[10%] pt-[15vh] mb-20 text-black/70 w-full"
-    >
-      <p class="text-2xl">Welcome to the</p>
-
-      <h1 class="text-7xl pb-8">Constitutional <br />Discourses Observer</h1>
-      <div class="text-pretty text-2xl mx-10">
-        What did the members of the Constituent Assembly debate about? How does
-        the Lok Sabha talk about it now? How have they affected the collective
-        lives of the nation?
-        <br />
-        <div class="mt-2">
-          <button class="bg-primary px-3 py-2 rounded"
-            ><a href="/#ask-a-question" class="underline">Ask a question.</a
-            ></button
-          >
-          <button class="bg-primary px-3 py-2 rounded">
-            <a href="/about" class="underline">Learn more.</a>
-          </button>
-        </div>
-      </div>
-    </div>
-  </section>
-
   <section
-    class="px-10 text-left tracking-wide py-20 md:px-[20%] max-h-screen overflow-hidden text-2xl md:text-4xl"
+    id="landing"
+    class="text-left tracking-wide overflow-hidden grid grid-cols-2 md:grid-cols-4 grid-flow-row-dense gap-x-2
+   relative"
   >
-    <Carousel contents={{ type: "text", content: text }} />
-    <!-- <div class="pb-20 max-h-[50vh] bg-primary p-5 rounded-lg text-white">
-      {#each text1.slice(idx1, idx1 + 5) as text (text)}
-        <div
-          class="text-black/50 py-5"
-          in:fly|global={{ y: 10, duration: 1000 }}
-          out:fade|global
-        >
-          {text}
-        </div>
-      {/each}
-    </div>
+    <section
+      class="absolute top-[10%] md:top-[55%] left-1/2 translate-x-[-50%] translate-y-[-50%] mx-auto w-2/3 md:2/7 text-bold"
+    >
+      <div id="title">
+        <Title />
+      </div>
+      <p class="relative text-center">Scroll down</p>
+    </section>
 
-    <div class="max-h-[50vh] mt-10 bg-primary p-5 rounded-lg text-white">
-      {#each text2.slice(idx2, idx2 + 5) as text (text)}
-        <div
-          class="text-black/50 py-5"
-          in:fly|global={{ y: 10, duration: 1000 }}
-          out:fade|global
-        >
-          {text}
-        </div>
-      {/each}
-    </div> -->
+    {#each text as section}
+      <div
+        class="text-2xl md:text-2.5xl block text-pretty text-bold text-black/40 self-start"
+      >
+        {#each section as p}
+          <p class="py-1">
+            {p}
+          </p>
+        {/each}
+      </div>
+    {/each}
   </section>
-
   <section class="py-40">
     <MainSearch />
   </section>
@@ -107,11 +48,13 @@
   @import url("https://fonts.googleapis.com/css2?family=IM+Fell+English&display=swap");
 
   main {
-    @apply md:w-3/4 w-full md:px-[15%];
     background-image: url("/Constitution_of_India_preamble_3.webp");
-    @apply w-screen bg-fixed md:bg-cover;
+    background-repeat: no-repeat;
     background-position: center;
-    background-repeat: repeat-y;
+    background-size: cover;
+    @apply px-[5%] md:px-[10%] md:mx-auto bg-fixed;
+
+    background-position: center;
   }
 
   .card {
@@ -134,5 +77,18 @@
 
   :global(input[type="text"]) {
     @apply selection:bg-primary selection:text-black;
+  }
+
+  #title {
+    @apply relative py-5 backdrop-opacity-50 bg-primaryLight/100;
+
+    border-radius: 10px;
+    box-shadow:
+      0 0px 4vw 4vw #f0e9da,
+      inset 0 0 5vw 5vw #f0e9da;
+  }
+
+  #landing {
+    @apply md:mx-auto px-[4%] md:px-[11%] md:py-5;
   }
 </style>

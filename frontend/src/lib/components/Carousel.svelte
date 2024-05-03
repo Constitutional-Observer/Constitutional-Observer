@@ -1,4 +1,6 @@
 <script>
+  import { onMount } from "svelte";
+
   let elemCarousel;
 
   function carouselLeft() {
@@ -18,18 +20,16 @@
     elemCarousel.scroll(x, 0);
   }
 
+  // auto scroll every 5 seconds
+  onMount(() => {
+    setInterval(carouselLeft, 5000);
+  });
+
   export let contents;
 </script>
 
 <section class="md:mx-[7%]">
   <div class="grid grid-cols-[auto_1fr_auto] gap-5 place-items-center">
-    <button
-      type="button"
-      class="btn-icon variant-filled bg-primary align-middle"
-      on:click={carouselLeft}
-    >
-    </button>
-
     <div
       bind:this={elemCarousel}
       class="snap-x scroll-smooth text-black/50 flex overflow-x-hidden items-center w-full"
@@ -38,7 +38,7 @@
         {#each contents.content as section}
           <div class="snap-center flex-none w-full">
             {#each section as p}
-              <p class="text-md py-5">
+              <p class="text-5xl py-5">
                 {p}
               </p>
             {/each}
@@ -70,7 +70,7 @@
 
     <button
       type="button"
-      class="btn-icon variant-filled bg-primary"
+      class="btn-icon variant-filled bg-primary/40"
       on:click={carouselRight}
     >
     </button>
