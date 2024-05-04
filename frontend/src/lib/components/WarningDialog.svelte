@@ -13,11 +13,6 @@
   on:close={() => (dialog = false)}
   class="bg-primary rounded-xl w-full md:w-1/4 shadow-2xl backdrop:bg-black/20 backdrop:backdrop-blur-sm"
 >
-  <h1 class="text-3xl text-red-500 p-5">
-    Warning: The server that makes the search feature run has been disabled due
-    to malicious activity. Please wait for the server to be re-enabled (in a few
-    hours)
-  </h1>
   <h1 class="p-5 text-2xl">Disclaimer</h1>
   <div class="pl-5 pr-10 py-3">
     Alpha version disclaimer: You have probably received this link for review.
