@@ -9,7 +9,7 @@
 
 <slot />
 
-<style>
+<style lang="postcss">
   .size-disclaimer {
     @apply text-left  z-50 text-red-700 p-10 bg-primary md:hidden;
   }

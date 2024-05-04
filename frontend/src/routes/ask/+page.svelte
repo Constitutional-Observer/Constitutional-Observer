@@ -8,8 +8,8 @@
 <main class="relative">
   <!-- Main content -->
   {#key form}
-    <div class="md:grid gap-20 md:grid-cols-5 h-screen text-black">
-      <section class="md:relative scroll-container my-10">
+    <div class="md:grid gap-5 md:grid-cols-8 h-screen text-black">
+      <section class="md:relative scroll-container my-10 col-span-2">
         <div class="md:absolute top-1/3 left-1/7">
           <h1 class="text-6xl text-bold">
             {$query}
@@ -40,22 +40,40 @@
       {#await form.debates}
         Loading...
       {:then debates}
-        <section class="scroll-container col-span-1 md:col-span-2">
-          <h2 class="title-bg">Constituent Assembly Debates</h2>
-          <p>The Constituent Assembly met between 1947 and 1949.</p>
+        <section class="scroll-container col-span-1 md:col-span-3">
+          <section class="title">
+            <h2 class="title-bg">Constituent Assembly Debates</h2>
+            <p>
+              The Constituent Assembly met between 1947 and 1949. Lorem ipsum
+              dolor sit amet. Lorem, ipsum dolor sit amet consectetur
+              adipisicing elit. Sint cumque similique aliquid necessitatibus
+              ducimus labore quidem optio fugit nihil ut commodi reiciendis
+              dolores ad ab quod, error consequuntur dolorum iure! Lorem ipsum
+            </p>
+          </section>
+
           <Accordion>
             {#each debates as debate, index (debate)}
               <AccordionItem class="card">
                 <svelte:fragment slot="lead">
-                  {debate.speaker_name} on {new Date(
-                    debate.date
-                  ).toDateString()}
-                </svelte:fragment>
-                <svelte:fragment slot="summary"
-                  >{debate.content.substring(0, 100)}</svelte:fragment
+                  <blockquote
+                    class="text-2xl px-3 py-1 blockquote !font-semibold !border-l-[3px] !non-italic text-black/90"
+                  >
+                    {@html debate.content.substring(0, 200) + " ..."}
+                  </blockquote></svelte:fragment
                 >
+                <svelte:fragment slot="summary">
+                  <h4>
+                    {#if debate.speaker_name}
+                      {debate.speaker_name}
+                    {:else}
+                      Unknown speaker
+                    {/if}
+                  </h4>
+                  <span>on {new Date(debate.date).toDateString()}</span>
+                </svelte:fragment>
                 <svelte:fragment slot="content"
-                  >{debate.content}</svelte:fragment
+                  >{@html debate.content}</svelte:fragment
                 >
               </AccordionItem>
             {/each}
@@ -68,21 +86,39 @@
       {#await form.sabha}
         Loading...
       {:then questions}
-        <section class="scroll-container col-span-1 md:col-span-2">
-          <h2 class="title-bg">Lok Sabha Questions</h2>
+        <section class="scroll-container col-span-1 md:col-span-3">
+          <section class="title">
+            <h2 class="title-bg">Lok Sabha Questions</h2>
+            <p>
+              The combined question and answers of the last 15 years has dolor
+              sit amet. Lorem, ipsum dolor sit amet consectetur adipisicing
+              elit. Sint cumque similique aliquid necessitatibus ducimus labore
+              quidem optio fugit nihil ut commodi reiciendis dolores ad ab quod,
+              error consequuntur dolorum iure! Lorem ipsum
+            </p>
+          </section>
           <Accordion>
             {#each questions as question, index (question)}
               <AccordionItem class="card">
-                <svelte:fragment slot="lead"
-                  >{question.Representative} to {question[
-                    "Ministry or Category"
-                  ]}, about
-                  <h4>{question.Title}</h4>
+                <svelte:fragment slot="lead">
+                  <h4 class="text-2xl pr-3 py-1 text-black/90">
+                    {question.Title}
+                  </h4>
+                  <small>
+                    by {question.Representative} to Ministry of {question[
+                      "Ministry or Category"
+                    ]}</small
+                  >
+
                   <!-- {sabha.Name} from {sabha.Constituency} in  -->
                 </svelte:fragment>
 
                 <svelte:fragment slot="summary">
-                  {question.questionAnswer.substring(0, 100)}
+                  Read the question and answer at this link: <a
+                    href={question.link}
+                    target="_blank">Link</a
+                  >
+                  <!-- {question.questionAnswer.substring(0, 100)} -->
                 </svelte:fragment>
 
                 <svelte:fragment slot="content">
@@ -95,40 +131,24 @@
       {:catch}
         <p>Something went wrong</p>
       {/await}
-      <!-- {#if form?.streamed?.courts?.length > 0}
-      <section class="scroll-container">
-        <h2 class="title-bg">SC and HC judgements</h2>
-
-        <Accordion>
-          {#each form.streamed.courts as judgement, index (judgement)}
-            <AccordionItem class="card">
-              <svelte:fragment slot="lead"
-                >{judgement.title}
-                {judgement.author}
-               
-              </svelte:fragment>
-
-              <svelte:fragment slot="summary">
-                {judgement.cleaned_paras.substring(0, 100)}
-              </svelte:fragment>
-
-              <svelte:fragment slot="content"
-                >{judgement.cleaned_paras}</svelte:fragment
-              >
-            </AccordionItem>
-          {/each}
-        </Accordion>
-      </section>
-    {/if} -->
     </div>
   {/key}
 </main>
 
 <!-- Main content -->
 <style lang="postcss">
+  .title,
   .title-bg {
-    @apply sticky top-2  w-80 pt-4 mb-10 rounded text-4xl text-black font-bold bg-primaryLight;
+    @apply sticky top-0 w-full rounded;
   }
+
+  .title {
+    @apply p-4 pt-6 mb-10 bg-primary;
+  }
+  .title-bg {
+    @apply text-4xl text-black pb-4 font-bold;
+  }
+
   .scroll-container {
     @apply snap-y  overflow-y-auto overflow-x-hidden my-10 px-2;
   }
@@ -151,5 +171,33 @@
 
   :global(input[type="text"]) {
     @apply selection:bg-primary selection:text-black;
+  }
+
+  a::after {
+    content: "↗";
+  }
+  a {
+    @apply text-blue-800;
+  }
+  :global(.accordion-item, .accordion-item > button) {
+    @apply rounded-lg;
+  }
+
+  :global(.accordion-control[aria-expanded="true"]) {
+    @apply bg-primary/80;
+  }
+
+  :global(.accordion-control[aria-expanded="true"]:hover) {
+    @apply bg-primary/40;
+  }
+
+  :global(.accordion-item) {
+    @apply bg-primary/10;
+  }
+  :global(.accordion-item:hover) {
+    @apply bg-primary/40;
+  }
+  :global(.accordion-panel[aria-hidden="false"]) {
+    @apply bg-primary/40;
   }
 </style>

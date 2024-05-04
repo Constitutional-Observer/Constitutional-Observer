@@ -21,6 +21,7 @@
   }
 
   function scrollDown() {
+    clearInterval(refreshIntervalId);
     document
       .getElementById("ask-a-question")
       .scrollIntoView({ behavior: "smooth", block: "start" });
