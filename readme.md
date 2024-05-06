@@ -1,69 +1,63 @@
-## Abstract
-
-What are the arguments that have made India a Secular Republic? There are thoughts and arguments that have allowed the creation of what is modern India: They have come from the visions of the leaders of the Freedom struggle, and those who opposed those visions; These have come from those who wrote the Constitution and those who fought to change it. These continue to come from the visions of our elected leaders and from dissidents who fight for rights denied. 
-
-This platform will allow for a researcher to question many of these groups, the question will be posed to an available corpus of documented debates and statements. And the most relevant answers (paragraphs relevant to the question) will be presented. 
 
 
-## Long note
+# Building Constitutional Values
 
-The digital is where I had set my microscope on, attempting to look at the many facets of sensationalist, immediate news. Strong imagery, be it in the form of news, speech or media stokes imaginations that are acutely sharp and exist as an established tool to instigate in the nation — it exists a tool for arson.
+Medium: Web platform and Print installation
 
-There may be this imaginary front-line, where independent media attempts to fight dis-facts with facts, narratives with  realities and develop evidence against this emergent arsonist — the amalgamation of the many ills of society. The front-line, however, attempts to deal with decades of forged beliefs with plain and simple sheet metal. Facts are one-dimensioned warriors when your opponent has operated across time, multi-dimensionally – with many blacksmiths.
-
-So to begin to stop looking at just the immediate, I take a step back, what do people use to defend themselves? There is an important distinction here — the media front-line may report to defend, but only serves as information for action. [^1] Whereas, those who offer dissident perspectives through protest and approaching the Courts do so as active citizens [^2]. These perspectives, those that have changed history and those that might are those that I wish to represent with contrast. 
-
-## What are the kind of questions one could ask?
-
-An ideal question, for the sake of a semantically meaningful response from the search engine, should consider both the value of the question  and the presence of keywords that are relevant to the question. 
-
-The subject and object could be entities related to the nation, in the nation, or the nation itself. The verb becomes the topic of discussion, it could be:
-- Prayer, religion, god
-- land rights
-- gender based rights
-- freedom of speech, (with regards to religion, sedition etc)
-- Based on interpretation of laws (Electoral Bonds, Trusts etc)
-- rights of indigenous communities
-- tax laws
-
-Ideally it could also be placed on events that happen in the present and things that have happened in the past
-- Pre 1950 to include opinions from the CA debates
-- Post could include Supreme Court and other relevant judements
-- Present day could be derived from the transcripts of the sitting LokSabha and of the Courts
+Adhavan, 2024
 
 
-Keywords: []
+How do people, as citizens, question the government? Holding the government accountable is one of the primary parliamentary roles of the opposition. However, as common citizens, we do not know much of how the Parliament functions. The realities of our democracy means there are always people who are ignored, sidelined, pushed, reduced and small-cased. What protects their rights?
 
-1. Who should the nation pray to?
-	1. Which sovereign shall the nation pray to 
-	2. What divine rights does the state have?
-	3. Should the/a nation pray
-2. Who should govern the states?
-3. Why should reservation exist?
-	1. Who must not get reservation?
-4. Who is an anti-national? Who is communal (from the era of the CA debates)? Who is not nationalist? Intellectual History, contextualise the questions to the times…there is a history to language
-5. Who should the taxes go to?
-6. Who must educate our children?
-7. Should we be democratic like the USA?
-8. What language does the state speak?
-9. What language does the government speak?
-10. What can the public know? 
-11. How can I criticise a religion?
-12. Where should our population be?
-13. Who is a citizen?
-14. Who/ what are the depressed classes?
-	1. Why are the depressed classes depressed?
-	2. What are the hurdles of the depressed classes?
-15. What can the government make law about?
-16. Who does the laws affect?
-17. What can the Supreme Court say? Who can it speak to?
-18. How may order be brought upon?
-19. How may peace be brought upon?
-20. How may unity be brought upon the citizens of India?
-	1. How may unity be brought upon
-	2. How may we unity
-	3. National integration
-	4. னி எதர்க்கும் கவலை படாதே கன்னா ல்லில்ல
+Those being marginalised exist across a spectrum. There are grave threats to their lives, and there is a slow erosion of their rights. The erosion may be in many ways: In marriage laws, in their right to drink water, in the lack of food availability or in their right to pray.
 
-[^1]: There is of course the argument to be made that in this gloomy era information is also action…
-[^2]: As the constitutional scholar, Rohit De, writes of his experiences at the archives of the Supreme Court of India — there is an over representation of minority communities as petitioners. 
+How have the makers of the Constitution dealt with these? How does the Parliament deal with it? How do people come together to demand?  This exhibit explores the making of these questions: What should we question? And how best do we begin questioning? The experiences woven into the web-platform allow you to do that — Question more, Question deeply. 
+
+
+
+
+## Abstract for the interface
+
+What are the arguments that have made India a Secular Republic? There are thoughts and arguments that have allowed the creation of what is modern India: They have come from the visions of the leaders of the Freedom struggle, and those who opposed those visions; These have come from those who wrote the Constitution and those who fought to change it. These continue to come from the visions of our elected leaders and from dissidents who fight for rights denied.
+
+This platform will allow for a visitor to question many of these groups, the question will be posed to an available corpus of documented debates and statements. And the most relevant answers (paragraphs relevant to the question) will be presented.
+
+![Homepage](./assets/homepage.png)
+
+![View of search results](./assets/resultspage.png)
+
+## Technical overview
+
+1. Data from constitutionofindia.net and over 3 Lakh LokSabha questions from the last 15 years have been scraped and cleaned.
+2. These questions are then used to create text embeddings that serve as the basis for the semantic search engine.
+3. The text embeddings are then used to answer questions.
+
+## Repository Structure
+
+This is a monorepo containing data preparation scripts, frontend and backend code.
+
+1. Data preparation scripts are in the `scripts` folder
+   1. `create_embeddings.qmd` contains the code to create text embeddings that serve as the basis of the semantic search engine
+   2. `scrape.qmd` contains the code to scrape the data (from multiple sources)
+2. `frontend` hosts the Sveltekit frontend
+3. `server.py` hosts the Flask server
+4. `wsgi.py` hosts the WSGI server start point
+
+## How to develop
+
+1. `cd frontend && yarn run dev ` will start the frontend development server.
+2. `python3 server.py` will start a local Flask server on port 5000.
+
+## Roadmap
+
+### Immediate concerns
+
+1. Immersive landing page experience into the Constituent Assembly Debates
+2. More interesting and simpler ways to add context to search results
+
+
+## Data sources and acknowlegements
+
+1. Constituent Assembly Debates have been sourced from the work of [Constitutionofindia.net](https://www.constitutionofindia.net/). The data was conveniently sourced from their site in the required format due to their efforts. Constitution of India is a project by the [Center for Law and Policy Research, Bangalore](https://clpr.org.in).
+
+2. Lok Sabha Questions have been scraped from over 3 lakh PDFs downloaded from [sansad.in](sansad.in) and other sources, made possible by the work of Vonter at the [india-representatives-watch repository](https://github.com/Vonter/india-representatives-activity/). It is distributed under the ODbL lisence. That repository is sourced from [PRS India](https://prsindia.org).
