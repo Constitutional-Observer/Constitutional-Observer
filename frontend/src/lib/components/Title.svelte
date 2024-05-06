@@ -1,6 +1,6 @@
 <script>
   import { query } from "$lib/stores";
-  import { text } from "$lib/text.js";
+  import { questions } from "$lib/text.js";
   import { onMount } from "svelte";
 
   let refreshIntervalId;
@@ -12,12 +12,7 @@
 
   function periodicRefresh() {
     // random from text
-    $query =
-      text[Math.floor(Math.random() * text.length)][
-        Math.floor(
-          Math.random() * text[Math.floor(Math.random() * text.length)].length
-        )
-      ];
+    $query = questions[0][Math.floor(Math.random() * questions[0].length)];
   }
 
   function scrollDown() {
@@ -33,11 +28,11 @@
 </script>
 
 <section class="relative">
-  <div class="text-center text-black/70 w-full">
+  <div class="text-center text-black/90 w-full">
     <h1 class="text-3xl md:text-5xl font-bold pb-8">
       Constitutional <br />Discourses Observer
     </h1>
-    <div class="text-pretty md:text-2xl text-black/50 w-3/4 mx-auto">
+    <div class="text-pretty md:text-2xl text-black/80 w-3/4 mx-auto">
       What did the members of the Constituent Assembly debate about? How does
       the Lok Sabha talk about it now? How have they affected the collective
       lives of the nation?

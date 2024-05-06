@@ -1,0 +1,19 @@
+```{python}
+# Open an svg file and get all text elements with no formatting
+from lxml import etree
+
+svg = etree.parse("/mnt/1E8E60448E601695/Vault/Areas/SMI/Sem-8/outcome/questions.svg")
+
+textL = []
+for element in svg.findall(".//{http://www.w3.org/2000/svg}text"):
+    # print the text
+    textL.append("".join(element.itertext()))
+
+# save to file in data
+
+with open(
+    "/mnt/1E8E60448E601695/Vault/Areas/SMI/Sem-8/outcome/questions.txt", "w"
+) as f:
+    for item in textL:
+        f.write("%s\n" % item)
+```

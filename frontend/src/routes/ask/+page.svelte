@@ -5,6 +5,9 @@
   export let form;
 </script>
 
+<svelte:head>
+  <title>Ask a question: Constitutional Observer</title>
+</svelte:head>
 <main class="relative">
   <!-- Main content -->
   {#key form}
@@ -73,7 +76,7 @@
                   <span>on {new Date(debate.date).toDateString()}</span>
                 </svelte:fragment>
                 <svelte:fragment slot="content"
-                  >{@html debate.content}</svelte:fragment
+                  >{debate.content}</svelte:fragment
                 >
               </AccordionItem>
             {/each}

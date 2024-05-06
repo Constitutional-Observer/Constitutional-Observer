@@ -190,7 +190,7 @@ import re
 from datasets import Dataset
 
 # correct and match speakers in the dataset
-sabha = Dataset.load_from_disk("./data/sabha/sabha-embeddings-english-2/").to_pandas()
+sabha = Dataset.load_from_disk("./data/sabha/sabha-embeddings-english-3/").to_pandas()
 
 sabha = sabha[
     sabha["questionAnswer"].apply(
@@ -209,26 +209,33 @@ sabha["questionAnswer"] = (
     .str.replace(r"\n", "<br>")
 )
 
-Dataset.from_pandas(sabha).save_to_disk("data/sabha/sabha-embeddings-english-3")
+Dataset.from_pandas(sabha).save_to_disk("data/sabha/sabha-embeddings-english-4")
 ```
 
 ## clean up CA
 ```{python}
 import re
 from datasets import Dataset
+from html_sanitizer import Sanitizer
 
-ca = Dataset.load_from_disk("./data/constituent-assembly/debates-embeddings").to_pandas()
-
-ca['content'] = (
-    ca["content"]
-    .str.replace(r"\n', 'protected': False}", "")
-    .str.replace(r"\n", "<br>")
-    .str.replace(r"{'rendered':", "")
-    .str.replace(r"\xa0", " ")
-    .str.replace(r"'", "")
+sanitizer = Sanitizer(
+    {
+        "tags": ["a"],
+        "attributes": {},
+        "empty": set(),
+        "separate": set()
+    }
 )
 
-# Check for duplicatelse
-ca = ca.drop_duplicates(subset=["content"])
+ca = Dataset.load_from_disk(
+    "./data/constituent-assembly/debates-embeddings"
+).to_pandas()
+
+ca.drop(columns=["__index_level_0__"], inplace=True)
+
+ca["content"] = ca["content"].apply(lambda x: sanitizer.sanitize(x))
+
+# # Check for duplicatelse
+#ca = ca.drop_duplicates(subset=["content"])
 Dataset.from_pandas(ca).save_to_disk("./data/constituent-assembly/debates-embeddings-2")
 ```

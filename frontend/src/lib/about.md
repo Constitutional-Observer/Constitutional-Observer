@@ -6,16 +6,4 @@ Those being marginalised exist across a spectrum. There are grave threats to the
 
 How have the makers of the Constitution dealt with these? How does the Parliament deal with it? How do people come together to demand? This exhibit explores the making of these questions: What should we question? And how best do we begin questioning? The experiences woven into the web-platform allow you to do that — Question more, Question deeply.
 
-## Background
-
-### What is the Constituent Assembly ?
-
-### How does the Lok Sabha function?
-
-### Constitutitional morality in today's discourse
-
-## Technical bits
-
-### How is it not a simple search?
-
-### Why should it not simply be a search engine?
+This section is under construction.
