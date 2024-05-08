@@ -62,7 +62,7 @@
                   <blockquote
                     class="text-2xl px-3 py-1 blockquote !font-semibold !border-l-[3px] !non-italic text-black/90"
                   >
-                    {@html debate.content.substring(0, 200) + " ..."}
+                    {debate.content.substring(0, 200) + " ..."}
                   </blockquote></svelte:fragment
                 >
                 <svelte:fragment slot="summary">
