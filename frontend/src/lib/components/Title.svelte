@@ -5,14 +5,16 @@
 
   let refreshIntervalId;
 
+  let placeholderQuestion;
+
   function clearOptions(e) {
-    $query = "";
+    placeholderQuestion = "";
     clearInterval(refreshIntervalId);
   }
 
   function periodicRefresh() {
     // random from text
-    $query =
+    placeholderQuestion =
       questions[0][0][Math.floor(Math.random() * questions[0][0].length)];
   }
 
@@ -21,6 +23,8 @@
     document
       .getElementById("ask-a-question")
       .scrollIntoView({ behavior: "smooth", block: "start" });
+
+    $query = placeholderQuestion;
   }
 
   onMount(() => {
@@ -44,7 +48,7 @@
           type="text"
           class="form-input text-xl w-full px-3 py-2"
           name="query"
-          bind:value={$query}
+          bind:value={placeholderQuestion}
           on:mouseover={() => clearInterval(refreshIntervalId)}
           autofocus
         />
