@@ -3,37 +3,70 @@
   import Footer from "$lib/components/Footer.svelte";
   import WarningDialog from "$lib/components/WarningDialog.svelte";
 
-  import { text } from "$lib/text.js";
-  import Carousel from "$lib/components/Carousel.svelte";
   import Title from "$lib/components/Title.svelte";
+  import { questions } from "$lib/text.js";
+  import { onMount } from "svelte";
+
+  let questionsDiv;
+
+  // Randomly highlight spans in the questionsDiv
+
+  function highlightSpans() {
+    // Get all spans in the questionsDiv
+    const spans = questionsDiv.querySelectorAll("span");
+
+    // find 30 random spans
+    const randomSpans = [];
+    for (let i = 0; i < 70; i++) {
+      const randomIndex = Math.floor(Math.random() * spans.length);
+      randomSpans.push(spans[randomIndex]);
+    }
+
+    for (let i = 0; i < randomSpans.length; i++) {
+      randomSpans[i].classList.add(
+        "underline",
+        "font-semibold",
+        "decoration-2",
+        "text-black/60"
+      );
+    }
+  }
+
+  onMount(() => {
+    highlightSpans();
+  });
 </script>
+
+<svelte:head>
+  <title>Constitutional Observer</title>
+</svelte:head>
 
 <WarningDialog />
 
+<section
+  class="absolute top-[10%] md:top-[70%] left-1/2 translate-x-[-50%] translate-y-[-50%] mx-auto w-2/4 md:2/7 text-bold z-20"
+>
+  <div id="title">
+    <Title />
+  </div>
+  <p class="relative text-center">Scroll down</p>
+</section>
 <main class="relative">
   <section
     id="landing"
-    class="text-left tracking-wide overflow-hidden grid grid-cols-2 md:grid-cols-4 grid-flow-row-dense gap-x-2
+    class="text-left tracking-wide grid grid-cols-1 gap-x-2
    relative"
+    bind:this={questionsDiv}
   >
-    <section
-      class="absolute top-[10%] md:top-[55%] left-1/2 translate-x-[-50%] translate-y-[-50%] mx-auto w-2/3 md:2/7 text-bold"
-    >
-      <div id="title">
-        <Title />
-      </div>
-      <p class="relative text-center">Scroll down</p>
-    </section>
-
-    {#each text as section}
-      <div
-        class="text-2xl md:text-2.5xl block text-pretty text-bold text-black/40 self-start"
-      >
-        {#each section as p}
-          <p class="py-1">
-            {p}
-          </p>
-        {/each}
+    {#each questions as section}
+      <div class="text-2xl md:text-2.5xl text-bold text-black/50 flex flex-col">
+        <p class="px-2 leading-2 text-justify w-full leading-[4rem] my-0">
+          {#each section as stanza}
+            {#each stanza as p}
+              <span class="pr-2 text-justify">{p}</span>
+            {/each}
+          {/each}
+        </p>
       </div>
     {/each}
   </section>
@@ -80,7 +113,7 @@
   }
 
   #title {
-    @apply relative py-5 backdrop-opacity-50 bg-primaryLight/100;
+    @apply relative py-5 pt-8 backdrop-opacity-50 bg-primaryLight/100;
 
     border-radius: 10px;
     box-shadow:

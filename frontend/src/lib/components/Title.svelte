@@ -12,7 +12,8 @@
 
   function periodicRefresh() {
     // random from text
-    $query = questions[0][Math.floor(Math.random() * questions[0].length)];
+    $query =
+      questions[0][0][Math.floor(Math.random() * questions[0][0].length)];
   }
 
   function scrollDown() {
