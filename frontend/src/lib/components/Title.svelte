@@ -5,7 +5,7 @@
 
   let refreshIntervalId;
 
-  let placeholderQuestion;
+  let placeholderQuestion = "Who should the nation pray to?";
 
   function clearOptions(e) {
     placeholderQuestion = "";
