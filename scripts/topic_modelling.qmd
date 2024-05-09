@@ -1,0 +1,82 @@
+```{python}
+from bertopic import BERTopic
+from bertopic.representation import KeyBERTInspired
+topic_model = BERTopic.load("MaartenGr/BERTopic_Wikipedia")
+import pandas as pd
+from datasets import Dataset
+import numpy as np
+ 
+ 
+representation_model = KeyBERTInspired()
+topic_model = BERTopic(representation_model=representation_model,language="english", calculate_probabilities=True, verbose=True)
+df = Dataset.load_from_disk(
+    "./data/sabha/sabha-embeddings-english-3"
+).to_pandas()
+```
+
+## cleanup
+```{python}
+import re 
+import logging 
+import pandas as pd
+from datasets import Dataset
+
+df = Dataset.load_from_disk(
+    "./data/sabha/sabha-embeddings-english-3"
+).to_pandas()
+
+df = df[df["questionAnswer"].apply(lambda x: len(re.findall(r"[a-zA-Z]+", x)) >= 200)]
+
+def separateQandA(x):
+    result = re.search( r"(.*)Answer(.*)", x['questionAnswer'], flags=re.M|re.I|re.DOTALL  )
+    
+    if not result: #and x != x:
+        logging.warning(f"Not found ")
+        return "", ""
+    else: 
+        logging.info(f"Found")
+
+    try: 
+        question = result[0] if result else ""
+        answer = result[1] if result else ""
+
+    except Exception as e:
+        logging.warning(e)
+        logging.warning(x)
+        return "", ""
+
+    return question, answer
+
+df['Question'], df['Answer'] = df.apply(separateQandA, axis=1)
+
+
+```
+ 
+
+```{python}
+ 
+sample = df["questionAnswer"].reset_index(drop=True)
+ 
+topic, prob = topic_model.fit_transform(list(sample))
+topic_model.get_topic_info()
+```
+
+```{python}
+topic_model.visualize_documents(sample)
+```
+
+
+
+```{python}
+from transformers import pipeline
+ 
+summarizer = pipeline("summarization", model="Falconsai/text_summarization")
+ 
+sample = df.sample(300)["content"].to_list()
+ 
+maxLen = int((len(sample[30]))/5)
+minLen = int(len(sample[30])/10)
+value = summarizer(sample[30], max_length=maxLen, min_length= minLen, do_sample=False)
+ 
+print(value[0]["summary_text"] , sample[30])
+```
