@@ -1,8 +1,14 @@
 <script>
   import { query } from "$lib/stores";
   import { Accordion, AccordionItem } from "@skeletonlabs/skeleton";
+  import { invalidateAll } from "$app/navigation";
+  import { page } from "$app/stores";
 
-  export let form;
+  export let data;
+  let form;
+  $: form = data;
+
+  let loading = false;
 </script>
 
 <svelte:head>
@@ -19,8 +25,11 @@
           </h1>
           <form
             class="opacity-50 hover:opacity-100 transition-all"
-            method="post"
-            action="?/query"
+            on:submit={(event) => {
+              $page.url.searchParams.set("query", $query);
+              invalidateAll();
+            }}
+            autofocus
           >
             <div class="w-3/4 flex">
               <input
@@ -37,6 +46,9 @@
             </div>
           </form>
           <a href="/" class="underline pt-5">Go back</a>
+          {#if loading}
+            <span>Loading...</span>
+          {/if}
         </div>
       </section>
 

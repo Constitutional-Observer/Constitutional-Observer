@@ -1,7 +1,10 @@
 <script>
   import { query } from "$lib/stores";
   import SearchBox from "./SearchBox.svelte";
-  import { enhance } from "$app/forms";
+
+  import { goto } from "$app/navigation";
+
+  let loading = false;
 </script>
 
 <main class="landing px-[20%]">
@@ -24,8 +27,15 @@
   </div>
   <section class="h-parent">
     <!-- Central search-->
-    <!-- <div id="blur" class="blur-lg center-box w-full !w-2/6 h-1/4 !bg-primary"></div> -->
-    <form class="text-left" method="post" action="ask/?/query">
+    <form
+      class="text-left"
+      method="post"
+      on:submit={(event) => {
+        event.preventDefault();
+        loading = true;
+        goto("/ask/?query=" + encodeURIComponent($query));
+      }}
+    >
       <SearchBox></SearchBox>
     </form>
   </section>
