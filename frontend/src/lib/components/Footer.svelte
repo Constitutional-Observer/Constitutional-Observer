@@ -1,10 +1,15 @@
 <footer class="grid grid-cols-3 gap-x-10">
   <div>
     <p>
-      This project is open source and will be made available publicly in the
-      near future. This project contains data obtained from
-      constitutionofindia.net and sansad.in and is being being used for
-      non-commercial purposes.
+      Constituent Assembly Debates have been sourced from the work of
+      Constitutionofindia.net. The data was conveniently sourced from their site
+      in the required format due to their efforts. Constitution of India is a
+      project by the Center for Law and Policy Research, Bangalore.
+
+      <br /> <br />Lok Sabha Questions have been scraped from over 3 lakh PDFs
+      downloaded from sansad.in and other sources, made possible by the work of
+      Vonter at the india-representatives-watch repository. It is distributed
+      under the ODbL lisence. That repository is sourced from PRS India.
     </p>
   </div>
   <div>
