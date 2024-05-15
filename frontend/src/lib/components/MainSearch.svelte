@@ -1,13 +1,13 @@
 <script>
   import { query } from "$lib/stores";
   import SearchBox from "./SearchBox.svelte";
-
+  import { ProgressRadial } from "@skeletonlabs/skeleton";
   import { goto } from "$app/navigation";
 
   let loading = false;
 </script>
 
-<main class="landing px-[20%]">
+<main class="landing md:px-[20%]">
   <h2
     id="ask-a-question"
     class="text-3xl md:text-4xl font-bold text-center py-5"
@@ -36,7 +36,7 @@
         goto("/ask/?query=" + encodeURIComponent($query));
       }}
     >
-      <SearchBox></SearchBox>
+      <SearchBox {loading}></SearchBox>
     </form>
   </section>
 </main>
@@ -44,6 +44,21 @@
 <!-- Central search-->
 
 <style lang="postcss">
+  .anim-progress-bar {
+    transform-origin: 0% 50%;
+    animation: anim-progress-bar 2s infinite linear;
+  }
+  @keyframes anim-progress-bar {
+    0% {
+      transform: translateX(50%) scaleX(0.5);
+    }
+    50% {
+      transform: translateX(0) scaleX(0.5);
+    }
+    100% {
+      transform: translateX(50%) scaleX(0.5);
+    }
+  }
   .landing {
     @apply mx-auto md:justify-self-end text-center;
   }

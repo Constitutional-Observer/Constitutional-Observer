@@ -43,10 +43,11 @@
       lives of the nation?
       <br />
       <p class="underline py-3">Ask a question, a simple one.</p>
-      <section class="flex flex-row bg-primary p-2 m-3">
+      <section class="flex flex-row bg-primary p-2 md:m-3">
         <input
           type="text"
-          class="form-input text-xl w-full px-3 py-2"
+          class="form-input text-xl w-full px-3 py-2 resize-none"
+          wrap="soft"
           name="query"
           bind:value={placeholderQuestion}
           on:mouseover={() => clearInterval(refreshIntervalId)}

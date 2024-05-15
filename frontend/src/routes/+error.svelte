@@ -3,8 +3,8 @@
   import Footer from "$lib/components/Footer.svelte";
 </script>
 
-<main class="h-[70vh] grid place-content-center md:px-[10%]">
-  <div class="w-2/6">
+<main class="md:h-[70vh] grid place-content-center md:px-[10%]">
+  <div class="w-full pl-5 pr-10 md:w-2/6">
     <h1 class="text-3xl">
       Thank you for visiting the Constitutional Discourses Observer, but the <bold
         class="font-semibold"
@@ -16,7 +16,7 @@
       again.
     </h2>
   </div>
-  <code class="preformatter pt-10 w-1/2"
+  <code class="preformatter pt-10 pl-5 pr-10 md:px-0 w-full md:w-1/2"
     >If this error persists, please contact at adhavan [dot] sivaraj16 [at]
     gmail [dot] com with "Constitutional-Observer-Error" as the subject line. <br
     />{$page.status}

@@ -44,23 +44,25 @@
 <WarningDialog />
 
 <section
-  class="absolute top-[10%] md:top-[70%] left-1/2 translate-x-[-50%] translate-y-[-50%] mx-auto w-2/4 md:2/7 text-bold z-20"
+  class="absolute top-[70%] md:top-[70%] left-1/2 translate-x-[-50%] translate-y-[-50%] mx-auto w-full md:w-auto md:w-2/7 text-bold z-20"
 >
   <div id="title">
     <Title />
+    <p class="relative text-center py-5">Scroll</p>
   </div>
-  <p class="relative text-center">Scroll down</p>
 </section>
 <main class="relative">
   <section
     id="landing"
     class="text-left tracking-wide grid grid-cols-1 gap-x-2
-   relative"
+   relative px-10"
     bind:this={questionsDiv}
   >
     {#each questions as section}
-      <div class="text-2xl md:text-2.5xl text-bold text-black/50 flex flex-col">
-        <p class="px-2 leading-2 text-justify w-full leading-[4rem] my-0">
+      <div class="text-xl md:text-2xl text-bold text-black/50 flex flex-col">
+        <p
+          class="leading-[1.8rem] text-justify w-full leading-[2.5rem] md:leading-[4rem] my-0"
+        >
           {#each section as stanza}
             {#each stanza as p}
               <span class="pr-2 text-justify">{p}</span>
@@ -85,7 +87,7 @@
     background-repeat: no-repeat;
     background-position: center;
     background-size: cover;
-    @apply px-[5%] md:px-[10%] md:mx-auto bg-fixed;
+    @apply px-[5%] md:px-[10%] md:mx-auto md:bg-fixed;
 
     background-position: center;
   }
@@ -113,7 +115,7 @@
   }
 
   #title {
-    @apply relative py-5 pt-8 backdrop-opacity-50 bg-primaryLight/100;
+    @apply relative py-[20%] md:py-5 pt-8 backdrop-opacity-50 bg-primaryLight/100;
 
     border-radius: 10px;
     box-shadow:
