@@ -4,7 +4,8 @@
   import WarningDialog from "$lib/components/WarningDialog.svelte";
 
   import Title from "$lib/components/Title.svelte";
-  import { questions } from "$lib/text.js";
+  import Carousel from "$lib/components/Carousel.svelte";
+  import { questions, images } from "$lib/text.js";
   import { onMount } from "svelte";
 
   let questionsDiv;
@@ -32,9 +33,9 @@
     }
   }
 
-  onMount(() => {
-    highlightSpans();
-  });
+  // onMount(() => {
+  //   highlightSpans();
+  // });
 </script>
 
 <svelte:head>
@@ -43,16 +44,21 @@
 
 <WarningDialog />
 
-<section
-  class="absolute top-[10%] md:top-[70%] left-1/2 translate-x-[-50%] translate-y-[-50%] mx-auto w-2/4 md:2/7 text-bold z-20"
->
-  <div id="title">
-    <Title />
-  </div>
-  <p class="relative text-center">Scroll down</p>
-</section>
 <main class="relative">
-  <section
+  <section class="relative">
+    <div class="md:absolute top-0 h-full md:top-[10%]">
+      <div
+        class="md:sticky md:top-2/4 w-full md:w-2/6 md:-translate-y-2/4 h-screen md:h-auto z-20"
+      >
+        <div id="title">
+          <Title />
+        </div>
+      </div>
+    </div>
+    <Carousel contents={images}></Carousel>
+  </section>
+
+  <!-- <section
     id="landing"
     class="text-left tracking-wide grid grid-cols-1 gap-x-2
    relative"
@@ -69,7 +75,7 @@
         </p>
       </div>
     {/each}
-  </section>
+  </section> -->
   <section class="py-40">
     <MainSearch />
   </section>
@@ -113,14 +119,8 @@
   }
 
   #title {
-    @apply relative py-5 pt-8 backdrop-opacity-50 bg-primaryLight/100;
-
-    border-radius: 10px;
-    box-shadow:
-      0 0px 4vw 4vw #f0e9da,
-      inset 0 0 5vw 5vw #f0e9da;
+    @apply relative py-7 px-5 backdrop-opacity-50 bg-primaryLight/90;
   }
-
   #landing {
     @apply md:mx-auto px-[4%] md:px-[11%] md:py-5;
   }

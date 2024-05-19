@@ -33,17 +33,17 @@
 </script>
 
 <section class="relative">
-  <div class="text-center text-black/90 w-full">
+  <div class="text-left text-black/90 w-full px-2">
     <h1 class="text-3xl md:text-5xl font-bold pb-8">
       Constitutional <br />Discourses Observer
     </h1>
-    <div class="text-pretty md:text-2xl text-black/80 w-3/4 mx-auto">
+    <div class="text-pretty md:text-2xl text-black/80 w-full">
       What did the members of the Constituent Assembly debate about? How does
       the Lok Sabha talk about it now? How have they affected the collective
       lives of the nation?
       <br />
       <p class="underline py-3">Ask a question, a simple one.</p>
-      <section class="flex flex-row bg-primary p-2 m-3">
+      <section class="flex flex-row bg-primary p-2">
         <input
           type="text"
           class="form-input text-xl w-full px-3 py-2"

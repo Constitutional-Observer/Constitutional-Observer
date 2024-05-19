@@ -149,14 +149,15 @@ export let images = [
   {
     link: "/stage1-1.jpeg",
     type: "image",
+    title: "What was the Constituent Assembly?",
     caption:
       "On 13 December 1946, the Constituent Assembly formally commenced its task of framing the Constitution of India. Jawaharlal Nehru moved the Objectives Resolution, which aimed to declare India as an Independent Sovereign Republic and create a Constitution to govern its future. The Resolution established general principles to guide the work of the Constituent Assembly. On January 22, 1947, the Constituent Assembly adopted the Resolution",
   },
   {
     link: "/loksabha-fight.jpeg",
     type: "image",
+    title: "What does the Lok Sabha do?",
     caption:
       "The Lok Sabha, constitutionally the House of the People, is the lower house of India's bicameral Parliament, with the upper house being the Rajya Sabha. Members of the Lok Sabha are elected by an adult universal suffrage and a first-past-the-post system to represent their respective constituencies, and they hold their seats for five years or until the body is dissolved by the President on the advice of the council of ministers. The house meets in the Lok Sabha Chambers of the Parliament House, New Delhi. ",
   },
-  { link: "/stage1-1.jpeg", type: "image", caption: "Constituent Assembly" },
 ];

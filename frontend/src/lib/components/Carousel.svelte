@@ -8,7 +8,7 @@
       elemCarousel.scrollLeft === 0
         ? elemCarousel.clientWidth * elemCarousel.childElementCount // loop
         : elemCarousel.scrollLeft - elemCarousel.clientWidth; // step left
-    elemCarousel.scroll(x, 0);
+    elemCarousel.scroll({ left: x, top: 0, behavior: "smooth" });
   }
 
   function carouselRight() {
@@ -17,22 +17,22 @@
       elemCarousel.scrollWidth - elemCarousel.clientWidth
         ? 0 // loop
         : elemCarousel.scrollLeft + elemCarousel.clientWidth; // step right
-    elemCarousel.scroll(x, 0);
+    elemCarousel.scroll({ left: x, top: 0, behavior: "smooth" });
   }
 
-  // auto scroll every 5 seconds
-  onMount(() => {
-    setInterval(carouselLeft, 5000);
-  });
+  // // auto scroll every 5 seconds
+  // onMount(() => {
+  //   setInterval(carouselRight, 5000);
+  // });
 
   export let contents;
 </script>
 
-<section class="md:mx-[7%]">
-  <div class="grid grid-cols-[auto_1fr_auto] gap-5 place-items-center">
+<section class="md:mx-[9%]">
+  <div class="relative">
     <div
       bind:this={elemCarousel}
-      class="snap-x scroll-smooth text-black/50 flex overflow-x-hidden items-center w-full"
+      class="snap-x h-auto flex flex-col scroll-smooth text-black/50 flex overflow-x-hidden items-center w-full"
     >
       {#if contents.type === "text"}
         {#each contents.content as section}
@@ -45,34 +45,42 @@
           </div>
         {/each}
       {:else}
-        <!-- <fig class="snap-center flex w-full h-full object-cover">
-            <figcaption class="w-[40%] pr-10">
-              {element.caption}
+        {#each contents as element, index (element)}
+          <fig class="relative h-screen w-full snap-center snap-y">
+            <!--  -->
+            <figcaption
+              class="absolute right-0 {index % 2
+                ? 'top-20'
+                : 'bottom-20'} z-10 bg-primaryLight/90 text-pretty w-full md:w-[40%] p-10"
+            >
+              <h2 class="text-2xl pb-10">{@html element.title}</h2>
+              {@html element.caption}
             </figcaption>
-            {#if image.type === "image"}
+            {#if element.type === "image"}
               <img
-                class=" col-span-4 max-w-[50vw] w-[1024px] h-full"
+                class="max-w-none h-[50vh] md:h-screen object-cover brightness-[70%] saturate-50 overflow-hidden"
                 src={element.link}
                 alt={element.caption}
                 loading="lazy"
               />
             {:else}
               <video
-                class=" col-span-4 max-w-[50vw] w-[1024px] h-full"
+                class="max-w-none col-span-4 max-w-[50vw] w-[1024px] h-full"
                 src={element.link}
                 alt={element.caption}
                 loading="lazy"
               />
             {/if}
-          </fig> -->
+          </fig>
+        {/each}
       {/if}
     </div>
-
+    <!-- 
     <button
       type="button"
-      class="btn-icon variant-filled bg-primary/40"
+      class="btn-icon absolute right-0 top-1/2 z-20 variant-filled bg-primary/90"
       on:click={carouselRight}
     >
-    </button>
+    </button> -->
   </div>
 </section>
