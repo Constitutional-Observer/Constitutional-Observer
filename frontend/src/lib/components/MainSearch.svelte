@@ -3,29 +3,30 @@
   import SearchBox from "./SearchBox.svelte";
 
   import { goto } from "$app/navigation";
+  import TitleWithNav from "./TitleWithNav.svelte";
 
+  import Carousel from "./Carousel.svelte";
+  import { questions, images } from "$lib/text.js";
   let loading = false;
 </script>
 
-<main class="landing px-[20%]">
-  <h2
-    id="ask-a-question"
-    class="text-3xl md:text-4xl font-bold text-center py-5"
-  >
-    Ask a question
-  </h2>
-  <div class="v-parent">
-    <p class="md:text-2xl text-black/40">
-      What are the arguments that have made India a Secular Republic? There are
-      thoughts and arguments that have allowed the creation of what is modern
-      India: They have come from the visions of the leaders of the Freedom
-      struggle, and those who opposed those visions; These have come from those
-      who wrote the Constitution and those who fought to change it. These
-      continue to come from the visions of our elected leaders and from
-      dissidents who fight for rights denied.
-    </p>
-  </div>
-  <section class="h-parent">
+<main class="landing lg:grid lg:grid-cols-10 gap-6 h-[80vh]">
+  <section class=" md:col-span-6 lg:col-span-4 self-center">
+    <TitleWithNav
+      title="Ask a Question"
+      subtitle="Imagine questions to the Constituent Assembly and the Lok Sabha that would give you a snapshot of the thinking of the times. Questions like:"
+    >
+      <Carousel
+        contents={{
+          type: "textCarousel",
+          text: questions,
+          caption: " ",
+          title: "How do we ask questions that do not have singular answers?",
+        }}
+      ></Carousel>
+    </TitleWithNav>
+  </section>
+  <section class=" col-span-6 lg:col-span-6 self-center">
     <!-- Central search-->
     <form
       class="text-left"
@@ -44,21 +45,4 @@
 <!-- Central search-->
 
 <style lang="postcss">
-  .landing {
-    @apply mx-auto md:justify-self-end text-center;
-  }
-  .v-parent {
-    @apply overflow-hidden px-10 md:px-[15%] md:bg-contain text-justify;
-    /* background-image: url("/inner_border_2.webp"); */
-
-    background-repeat: no-repeat;
-    background-position: center;
-  }
-  .h-parent {
-    @apply overflow-hidden py-20;
-    /* background-image: url("/inner_border_2.webp"); */
-    /* 
-    background-repeat: no-repeat;
-    background-position: center; */
-  }
 </style>

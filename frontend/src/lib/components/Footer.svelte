@@ -1,4 +1,4 @@
-<footer class="grid grid-cols-3 gap-x-10">
+<footer class="relative grid grid-cols-3 gap-x-10">
   <div>
     <p>
       Constituent Assembly Debates have been sourced from the work of

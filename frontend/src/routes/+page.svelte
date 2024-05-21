@@ -6,36 +6,6 @@
   import Title from "$lib/components/Title.svelte";
   import Carousel from "$lib/components/Carousel.svelte";
   import { questions, images } from "$lib/text.js";
-  import { onMount } from "svelte";
-
-  let questionsDiv;
-
-  // Randomly highlight spans in the questionsDiv
-
-  function highlightSpans() {
-    // Get all spans in the questionsDiv
-    const spans = questionsDiv.querySelectorAll("span");
-
-    // find 30 random spans
-    const randomSpans = [];
-    for (let i = 0; i < 70; i++) {
-      const randomIndex = Math.floor(Math.random() * spans.length);
-      randomSpans.push(spans[randomIndex]);
-    }
-
-    for (let i = 0; i < randomSpans.length; i++) {
-      randomSpans[i].classList.add(
-        "underline",
-        "font-semibold",
-        "decoration-2",
-        "text-black/60"
-      );
-    }
-  }
-
-  // onMount(() => {
-  //   highlightSpans();
-  // });
 </script>
 
 <svelte:head>
@@ -45,17 +15,34 @@
 <WarningDialog />
 
 <main class="relative">
-  <section class="relative">
-    <div class="md:absolute top-0 h-full md:top-[10%]">
+  <section class="relative z-20">
+    <div class="md:absolute top-0 md:h-full md:top-[10%] z-20">
       <div
-        class="md:sticky md:top-2/4 w-full md:w-2/6 md:-translate-y-2/4 h-screen md:h-auto z-20"
+        class="md:sticky md:top-1/6 w-full md:w-1/2 lg:w-2/6 h-screen md:h-auto"
       >
-        <div id="title">
-          <Title />
-        </div>
+        <Title />
       </div>
     </div>
-    <Carousel contents={images}></Carousel>
+    <figure class="absolute top-0 md:relative md:mx-[9%]">
+      <figcaption
+        class="absolute top-2/4 mr-2 right-0
+} z-10 drop-shadow-2xl border-2 border-primary bg-primaryLight/90 text-black/80 text-pretty w-full md:w-[40%] lg:w-[30%] p-5"
+      >
+        On 13 December 1946, the Constituent Assembly formally commenced its
+        task of framing the Constitution of India. Jawaharlal Nehru moved the
+        Objectives Resolution, which aimed to declare India as an Independent
+        Sovereign Republic and create a Constitution to govern its future. On
+        January 26, 1950, the Constituent Assembly adopted the Constitution of
+        India
+      </figcaption>
+      <img
+        src="/stage1-1.jpeg"
+        class="w-full h-screen object-cover brightness-[70%] saturate-50 overflow-hidden"
+        alt="stage1"
+        loading="lazy"
+      />
+    </figure>
+    <!-- <Carousel contents={images[0]}></Carousel> -->
   </section>
 
   <!-- <section
@@ -76,16 +63,14 @@
       </div>
     {/each}
   </section> -->
-  <section class="py-40">
+  <!-- <section class="py-40">
     <MainSearch />
-  </section>
+  </section> -->
 </main>
 
 <Footer />
 
 <style lang="postcss">
-  @import url("https://fonts.googleapis.com/css2?family=IM+Fell+English&display=swap");
-
   main {
     background-image: url("/Constitution_of_India_preamble_3.webp");
     background-repeat: no-repeat;
@@ -118,9 +103,6 @@
     @apply selection:bg-primary selection:text-black;
   }
 
-  #title {
-    @apply relative py-7 px-5 backdrop-opacity-50 bg-primaryLight/90;
-  }
   #landing {
     @apply md:mx-auto px-[4%] md:px-[11%] md:py-5;
   }

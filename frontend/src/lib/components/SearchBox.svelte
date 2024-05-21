@@ -101,22 +101,18 @@
       name="query"
       bind:value={$query}
     />
-    <button
-      type="submit"
-      class="bg-primary w-20 text-white my-3 px-2 py-1 rounded-md">Ask</button
-    >
-    <button
-      class="bg-primary w-20 text-white my-3 px-2 py-1 rounded-md"
-      on:click={clearOptions}>Clear</button
+    <button type="submit" class="bg-black/30 w-20 text-white mx-1">Ask</button>
+    <button class="bg-black/30 w-20 text-white" on:click={clearOptions}
+      >Clear</button
     >
   </section>
 
   <section class="py-2 px-0 grid">
-    <div class="col-span-5">
+    <div class="lg:col-span-5">
       <p class="text-xl text-center py-5">
         You can select from these options as well
       </p>
-      <div class="grid grid-cols-2 md:grid-cols-4 gap-2">
+      <div class="grid grid-cols-2 lg:grid-cols-5 gap-2">
         <div class="q-opt-box">
           <h4>How can you begin the question?</h4>
           {#each box1 as option}
