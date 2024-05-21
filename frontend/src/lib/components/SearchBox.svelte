@@ -2,6 +2,7 @@
   import { query } from "$lib/stores";
   import { onMount } from "svelte";
 
+  export let loading = false;
   let box1 = ["Who", "What", "When", "Where", "Why", "How"],
     box1selected = [];
 
@@ -94,17 +95,31 @@
   </div>
 </div> -->
 <div class="w-full grid mt-3 px-1">
-  <section class="flex flex-row bg-primary p-2">
-    <input
-      type="text"
-      class="form-input text-xl w-full p-3"
-      name="query"
-      bind:value={$query}
-    />
-    <button type="submit" class="bg-black/30 w-20 text-white mx-1">Ask</button>
-    <button class="bg-black/30 w-20 text-white" on:click={clearOptions}
-      >Clear</button
-    >
+  <section class=" ">
+    <div class="flex flex-row bg-primary p-2">
+      <input
+        type="text"
+        class="form-input text-xl w-full p-3 h-auto"
+        name="query"
+        disabled={loading}
+        bind:value={$query}
+      />
+      <button
+        type="submit"
+        class="bg-primary w-20 text-white my-3 px-2 py-1 rounded-md"
+        disabled={loading}>Ask</button
+      >
+      <button
+        class="bg-primary w-20 text-white my-3 px-2 py-1 rounded-md"
+        on:click={clearOptions}
+        disabled={loading}>Clear</button
+      >
+    </div>
+    {#if loading}
+      <span class="text-xl text-center mx-auto"
+        >loading<span class="loader">...</span></span
+      >
+    {/if}
   </section>
 
   <section class="py-2 px-0 grid">
@@ -197,6 +212,65 @@
 </div>
 
 <style lang="postcss">
+  button,
+  input[type="text"] {
+    @apply disabled:opacity-60 disabled:cursor-not-allowed disabled:cursor-default;
+  }
+  .loader {
+    width: 180px; /* control the size */
+    aspect-ratio: 8/5;
+    --_g: no-repeat radial-gradient(#000 68%, #0000 71%);
+    -webkit-mask: var(--_g), var(--_g), var(--_g);
+    -webkit-mask-size: 50% 40%;
+    @apply bg-primaryLight;
+    animation: load 2s infinite;
+  }
+
+  @keyframes load {
+    0% {
+      -webkit-mask-position:
+        0% 0%,
+        50% 0%,
+        100% 0%;
+    }
+    16.67% {
+      -webkit-mask-position:
+        0% 100%,
+        50% 0%,
+        100% 0%;
+    }
+    33.33% {
+      -webkit-mask-position:
+        0% 100%,
+        50% 100%,
+        100% 0%;
+    }
+    50% {
+      -webkit-mask-position:
+        0% 100%,
+        50% 100%,
+        100% 100%;
+    }
+    66.67% {
+      -webkit-mask-position:
+        0% 0%,
+        50% 100%,
+        100% 100%;
+    }
+    83.33% {
+      -webkit-mask-position:
+        0% 0%,
+        50% 0%,
+        100% 100%;
+    }
+    100% {
+      -webkit-mask-position:
+        0% 0%,
+        50% 0%,
+        100% 0%;
+    }
+  }
+
   .q-opt-box h4 {
     @apply text-2xl pb-4 pt-2 text-center;
   }

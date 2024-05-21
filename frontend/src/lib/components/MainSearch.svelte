@@ -1,7 +1,7 @@
 <script>
   import { query } from "$lib/stores";
   import SearchBox from "./SearchBox.svelte";
-
+  import { ProgressRadial } from "@skeletonlabs/skeleton";
   import { goto } from "$app/navigation";
   import TitleWithNav from "./TitleWithNav.svelte";
 
@@ -37,7 +37,7 @@
         goto("/ask/?query=" + encodeURIComponent($query));
       }}
     >
-      <SearchBox></SearchBox>
+      <SearchBox {loading}></SearchBox>
     </form>
   </section>
 </main>

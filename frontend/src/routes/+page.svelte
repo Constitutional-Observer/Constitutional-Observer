@@ -48,12 +48,14 @@
   <!-- <section
     id="landing"
     class="text-left tracking-wide grid grid-cols-1 gap-x-2
-   relative"
+   relative px-10"
     bind:this={questionsDiv}
   >
     {#each questions as section}
-      <div class="text-2xl md:text-2.5xl text-bold text-black/50 flex flex-col">
-        <p class="px-2 leading-2 text-justify w-full leading-[4rem] my-0">
+      <div class="text-xl md:text-2xl text-bold text-black/50 flex flex-col">
+        <p
+          class="leading-[1.8rem] text-justify w-full leading-[2.5rem] md:leading-[4rem] my-0"
+        >
           {#each section as stanza}
             {#each stanza as p}
               <span class="pr-2 text-justify">{p}</span>
@@ -76,7 +78,7 @@
     background-repeat: no-repeat;
     background-position: center;
     background-size: cover;
-    @apply px-[5%] md:px-[10%] md:mx-auto bg-fixed;
+    @apply px-[5%] md:px-[10%] md:mx-auto md:bg-fixed;
 
     background-position: center;
   }

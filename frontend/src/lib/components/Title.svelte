@@ -52,7 +52,8 @@
       <section class="flex flex-row mt-10 bg-primary p-2">
         <input
           type="text"
-          class="form-input text-xl w-full px-3 py-2"
+          class="form-input text-xl w-full px-3 py-2 resize-none"
+          wrap="soft"
           name="query"
           bind:value={placeholderQuestion}
           on:mouseover={() => clearInterval(refreshIntervalId)}

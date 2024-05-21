@@ -72,13 +72,7 @@
       <section class="scroll-container col-span-1 md:col-span-3">
         <section class="title">
           <h2 class="title-bg">Constituent Assembly Debates</h2>
-          <p>
-            The Constituent Assembly met between 1947 and 1949. Lorem ipsum
-            dolor sit amet. Lorem, ipsum dolor sit amet consectetur adipisicing
-            elit. Sint cumque similique aliquid necessitatibus ducimus labore
-            quidem optio fugit nihil ut commodi reiciendis dolores ad ab quod,
-            error consequuntur dolorum iure! Lorem ipsum
-          </p>
+          <p>The Constituent Assembly met between 1947 and 1949.</p>
         </section>
 
         <Accordion>
@@ -117,11 +111,8 @@
         <section class="title">
           <h2 class="title-bg">Lok Sabha Questions</h2>
           <p>
-            The combined question and answers of the last 15 years has dolor sit
-            amet. Lorem, ipsum dolor sit amet consectetur adipisicing elit. Sint
-            cumque similique aliquid necessitatibus ducimus labore quidem optio
-            fugit nihil ut commodi reiciendis dolores ad ab quod, error
-            consequuntur dolorum iure! Lorem ipsum
+            The combined question and answers of the last 15 years is available
+            here
           </p>
         </section>
         <Accordion>
