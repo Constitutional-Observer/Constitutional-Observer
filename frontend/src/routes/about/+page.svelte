@@ -2,6 +2,7 @@
   import { TableOfContents, tocCrawler } from "@skeletonlabs/skeleton";
   import { marked } from "marked";
   import source from "$lib/about.md?raw";
+  import TitleWithNav from "../../lib/components/TitleWithNav.svelte";
   import Footer from "$lib/components/Footer.svelte";
   let toc;
 </script>
@@ -9,28 +10,24 @@
 <svelte:head>
   <title>About</title>
 </svelte:head>
-
-<section class="bg-primaryLight mx-5">
-  <div class="md:px-[15%] pt-[15vh] mb-20 text-black/70 w-5/6">
-    <a href="/"
-      ><h1 class="text-5xl">About: Constitutional Discourses Observer</h1></a
+<main
+  class="grid grid-cols-10 place-items-start pb-[30vh] gap-10 bg-primaryLight"
+>
+  <section class="col-span-7 lg:col-span-4 self-start lg:sticky top-6">
+    <TitleWithNav
+      title="About: Constitutional Discourses Observer"
+      subtitle="This is a guide to understanding the project, the vision forward, and serves as a quick overview."
     >
-    <div class="text-pretty text-xl">
-      This is a guide to understanding the project, the vision forward, and
-      serves as a quick overview.
-      <br />
-      <a href="/" class="underline">Go back</a>
-    </div>
-  </div>
-</section>
-<main class="grid grid-cols-10 place-items-start pb-[30vh] gap-10">
-  <TableOfContents
-    class="md:sticky top-20 col-span-8 sm:col-span-6 md:col-span-2 self-start"
-  />
+      <TableOfContents
+        class="md:sticky top-20 col-span-8 sm:col-span-6 md:col-span-2 self-start"
+      /></TitleWithNav
+    >
+  </section>
+
   <div
     id="content"
-    class="col-span-8 sm:col-span-6 md:col-span-5 overflow-y-scroll text-justify"
-    use:tocCrawler={{ mode: "generate", scrollTarget: toc }}
+    class="col-span-7 sm:col-span-6 md:col-span-5 overflow-y-scroll text-justify"
+    use:tocCrawler={{ mode: "generate" }}
     bind:this={toc}
   >
     {@html marked.parse(source)}
