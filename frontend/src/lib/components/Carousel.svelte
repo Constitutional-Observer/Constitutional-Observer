@@ -1,7 +1,9 @@
 <script>
-  import { onMount } from "svelte";
+  import { onDestroy, onMount } from "svelte";
 
   let elemCarousel;
+  let interval;
+  let questionsDiv;
 
   // function carouselLeft() {
   //   const x =
@@ -22,31 +24,33 @@
 
   // auto scroll every 5 seconds
   onMount(() => {
-    setInterval(carouselRight, 5000);
+    interval = setInterval(carouselRight, 4000);
   });
 
-  let questionsDiv;
+  onDestroy(() => {
+    clearInterval(interval);
+  });
 
-  function highlightSpans() {
-    // Get all spans in the questionsDiv
-    const spans = questionsDiv.querySelectorAll("li");
+  // function highlightSpans() {
+  //   // Get all spans in the questionsDiv
+  //   const spans = questionsDiv.querySelectorAll("li");
 
-    // find 30 random spans
-    const randomSpans = [];
-    for (let i = 0; i < 30; i++) {
-      const randomIndex = Math.floor(Math.random() * spans.length);
-      randomSpans.push(spans[randomIndex]);
-    }
+  //   // find 30 random spans
+  //   const randomSpans = [];
+  //   for (let i = 0; i < 30; i++) {
+  //     const randomIndex = Math.floor(Math.random() * spans.length);
+  //     randomSpans.push(spans[randomIndex]);
+  //   }
 
-    for (let i = 0; i < randomSpans.length; i++) {
-      randomSpans[i].classList.add(
-        "underline",
-        "font-semibold",
-        "decoration-2",
-        "text-black/60"
-      );
-    }
-  }
+  //   for (let i = 0; i < randomSpans.length; i++) {
+  //     randomSpans[i].classList.add(
+  //       "underline",
+  //       "font-semibold",
+  //       "decoration-2",
+  //       "text-black/60"
+  //     );
+  //   }
+  // }
 
   // onMount(() => {
   //   highlightSpans();
@@ -59,7 +63,7 @@
   <div class="relative">
     <div
       bind:this={elemCarousel}
-      class=" min-h-[40vh] flex flex-row text-black/50 flex overflow-hidden items-center w-full"
+      class=" min-h-[40vh] flex flex-row text-black/50 flex overflow-hidden items-center snap-mandatory w-full"
     >
       {#if contents.type === "text"}
         <figcaption
@@ -81,7 +85,7 @@
         </div>
       {:else if contents.type === "textCarousel"}
         {#each contents.text as section}
-          <ul class="block flex-none text-3xl w-100">
+          <ul class="block flex-none text-3xl w-full">
             {#each section as subsection}
               {#each subsection as q}
                 <li>{q}</li>

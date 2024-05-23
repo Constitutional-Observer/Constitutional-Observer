@@ -59,27 +59,27 @@
       // split into words and make list
       let words = $query.split(" ");
 
-      // if word is in check list add it
-      for (let i = 0; i < words.length; i++) {
-        console.log(words[i]);
-        switch (words[i]) {
-          case box1.includes(words[i]):
-            box1selected = [...box1selected, words[i]];
-            break;
-          case box2.includes(words[i]):
-            box2selected = [...box2selected, words[i]];
-            break;
-          case box3.includes(words[i]):
-            box3selected = [...box3selected, words[i]];
-            break;
-          case box4.includes(words[i]):
-            box4selected = [...box4selected, words[i]];
-            break;
-          case box5.includes(words[i]):
-            box5selected = [...box5selected, words[i]];
-            break;
-        }
-      }
+      // // if word is in check list add it
+      // for (let i = 0; i < words.length; i++) {
+      //   console.log(words[i]);
+      //   switch (words[i]) {
+      //     case box1.includes(words[i]):
+      //       box1selected = [...box1selected, words[i]];
+      //       break;
+      //     case box2.includes(words[i]):
+      //       box2selected = [...box2selected, words[i]];
+      //       break;
+      //     case box3.includes(words[i]):
+      //       box3selected = [...box3selected, words[i]];
+      //       break;
+      //     case box4.includes(words[i]):
+      //       box4selected = [...box4selected, words[i]];
+      //       break;
+      //     case box5.includes(words[i]):
+      //       box5selected = [...box5selected, words[i]];
+      //       break;
+      //   }
+      // }
     }
   });
 </script>
@@ -133,6 +133,7 @@
           {#each box1 as option}
             <input
               type="checkbox"
+              class="btn"
               id={option}
               bind:group={box1selected}
               value={option}
@@ -146,6 +147,7 @@
           {#each box2 as option}
             <input
               type="checkbox"
+              class="btn"
               id={option}
               bind:group={box2selected}
               value={option}
@@ -158,7 +160,7 @@
       <h4></h4>
       {#each box3 as option}
         <input
-          type="checkbox"
+          type="checkbox" class="btn"
           id={option}
           bind:group={box3selected}
           value={option}
@@ -172,6 +174,7 @@
           {#each box4 as option}
             <input
               type="checkbox"
+              class="btn"
               id={option}
               bind:group={box4selected}
               value={option}
@@ -185,6 +188,7 @@
           {#each box5 as option}
             <input
               type="checkbox"
+              class="btn"
               id={option}
               bind:group={box5selected}
               value={option}
@@ -198,6 +202,7 @@
           {#each box6 as option}
             <input
               type="checkbox"
+              class="btn"
               id={option}
               bind:group={box6selected}
               value={option}
@@ -272,13 +277,13 @@
   }
 
   .q-opt-box h4 {
-    @apply text-2xl pb-4 pt-2 text-center;
+    @apply text-2xl pb-4 pt-2 text-left;
   }
   .q-opt-box {
-    @apply bg-primary m-1 rounded-lg p-5;
+    @apply bg-primaryDark border-2 border-primary m-1 rounded-lg p-5;
   }
+
   input[type="checkbox"] {
-    border: 0;
     clip: rect(0 0 0 0);
     height: 1px;
     margin: -1px;
@@ -291,11 +296,19 @@
   input[type="checkbox"] + label {
     @apply cursor-pointer;
     @apply text-center;
-    @apply text-black/60 text-xl;
+    @apply text-black/60 text-xl border-2 border-primary my-1 rounded-md;
+  }
+
+  input[type="checkbox"]:hover + label {
+    @apply text-black font-bold bg-primary;
+  }
+
+  input[type="checkbox"]:checked {
+    @apply text-black font-bold bg-primary;
   }
 
   input[type="checkbox"]:checked + label {
-    @apply text-black font-bold;
+    @apply text-black font-bold bg-primary;
   }
 
   input[type="checkbox"]:focus + label {

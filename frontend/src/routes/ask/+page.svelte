@@ -25,16 +25,16 @@
 
 <!-- Main content -->
 {#if !currentQuery}
-  <div class="md:p-20 h-full">
+  <div class="md:p-20 h-auto">
     <MainSearch />
   </div>
 {:else}
-  <div class="md:grid gap-5 md:grid-cols-8 mx-10 h-screen text-black">
+  <div class="md:grid gap-5 md:grid-cols-8 mx-10 h-auto md:h-screen text-black">
     <section class="md:relative scroll-container my-10 col-span-2">
       <div class="md:absolute top-[20%] left-1/7">
         <TitleWithNav
           title={$query}
-          subtitle="These responses are collected from an archive of Constituent Assembly Debates and Lok Sabha Questions and Answers."
+          subtitle="Your question is used to meaningfully search a database of the Constitutent Assembly Debates and Lok Sabha Questions and Answers. The Observer hopes to provide you with a historical perspective on ideas that make the nation."
         >
           <form
             class="opacity-80 mt-5 hover:opacity-100 transition-all"
@@ -44,7 +44,7 @@
             }}
             autofocus
           >
-            <div class="w-3/4 flex">
+            <div class="flex">
               <input
                 type="text"
                 name="query"
@@ -58,7 +58,7 @@
               >
             </div>
           </form>
-          <a href="/ask" class="underline pt-5">Go back</a>
+
           {#if loading}
             <span>Loading...</span>
           {/if}
@@ -72,7 +72,11 @@
       <section class="scroll-container col-span-1 md:col-span-3">
         <section class="title">
           <h2 class="title-bg">Constituent Assembly Debates</h2>
-          <p>The Constituent Assembly met between 1947 and 1949.</p>
+          <p>
+            The Constituent Assembly met between 1947 and 1949 and ratified the
+            Constitution of India on 26th January 1950. These arguments are
+            crucial to undertanding to the origins of our democracy.
+          </p>
         </section>
 
         <Accordion>
@@ -111,8 +115,10 @@
         <section class="title">
           <h2 class="title-bg">Lok Sabha Questions</h2>
           <p>
-            The combined question and answers of the last 15 years is available
-            here
+            The Lok Sabha represents the billion+ citizens of india. Its 543
+            members have met 68 days every year on an average since the 2000s.
+            These are responses to questions by MPs asked during question hour
+            (the first 1 hour of each session).
           </p>
         </section>
         <Accordion>
@@ -122,25 +128,24 @@
                 <h4 class="text-2xl pr-3 py-1 text-black/90">
                   {question.Title}
                 </h4>
-                <small>
-                  by {question.Representative} to Ministry of {question[
-                    "Ministry or Category"
-                  ]}</small
-                >
 
                 <!-- {sabha.Name} from {sabha.Constituency} in  -->
               </svelte:fragment>
 
               <svelte:fragment slot="summary">
-                Read the question and answer at this link: <a
-                  href={question.link}
-                  target="_blank">Link</a
-                >
+                by {question.Representative} to Ministry of {question[
+                  "Ministry or Category"
+                ]}
+                Read the question and answer at this link:
+                <a href={question.link} target="_blank">Link</a>
                 <!-- {question.questionAnswer.substring(0, 100)} -->
               </svelte:fragment>
 
               <svelte:fragment slot="content">
-                {question.questionAnswer}
+                Read the question and answer at this link: <a
+                  href={question.link}
+                  target="_blank">Link</a
+                >
               </svelte:fragment>
             </AccordionItem>
           {/each}
@@ -162,7 +167,7 @@
   }
 
   .title {
-    @apply p-4 pt-6 mb-10 bg-primary;
+    @apply p-4 pt-6 mb-10 bg-primaryDark border-2 border-primary;
   }
   .title-bg {
     @apply text-4xl text-black pb-4 font-bold;

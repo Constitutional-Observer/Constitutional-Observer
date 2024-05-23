@@ -10,11 +10,11 @@
   let loading = false;
 </script>
 
-<main class="landing lg:grid lg:grid-cols-10 gap-6 h-[80vh]">
-  <section class=" md:col-span-6 lg:col-span-4 self-center">
+<main class="landing lg:grid lg:grid-cols-10 gap-6 h-auto mx-10">
+  <section class="lg:col-span-4 self-center">
     <TitleWithNav
       title="Ask a Question"
-      subtitle="Imagine questions to the Constituent Assembly and the Lok Sabha that would give you a snapshot of the thinking of the times. Questions like:"
+      subtitle="Ask a question to the people that made our laws (the constitution) and continue to make our laws in the present (the Lok Sabha). Questions like:"
     >
       <Carousel
         contents={{
@@ -26,7 +26,7 @@
       ></Carousel>
     </TitleWithNav>
   </section>
-  <section class=" col-span-6 lg:col-span-6 self-center">
+  <section class="col-span-6 lg:col-span-6 self-center">
     <!-- Central search-->
     <form
       class="text-left"

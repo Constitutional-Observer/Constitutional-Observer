@@ -11,23 +11,25 @@
   <title>About</title>
 </svelte:head>
 <main
-  class="grid grid-cols-10 place-items-start pb-[30vh] gap-10 bg-primaryLight"
+  class="relative lg:grid lg:grid-cols-10 lg:place-items-start pb-[30vh] gap-10 bg-primaryLight mx-20 w-auto"
 >
-  <section class="col-span-7 lg:col-span-4 self-start lg:sticky top-6">
+  <section class="lg:col-span-4 self-start lg:sticky lg:top-6">
     <TitleWithNav
       title="About: Constitutional Discourses Observer"
       subtitle="This is a guide to understanding the project, the vision forward, and serves as a quick overview."
     >
       <TableOfContents
-        class="md:sticky top-20 col-span-8 sm:col-span-6 md:col-span-2 self-start"
+        class="pt-4"
+        active="bg-primary "
+        regionListItem="border-8 border-primary"
       /></TitleWithNav
     >
   </section>
 
   <div
     id="content"
-    class="col-span-7 sm:col-span-6 md:col-span-5 overflow-y-scroll text-justify"
-    use:tocCrawler={{ mode: "generate" }}
+    class=" lg:col-span-6 overflow-y-scroll text-justify"
+    use:tocCrawler={{ mode: "generate", scrollTarget: "#content" }}
     bind:this={toc}
   >
     {@html marked.parse(source)}
@@ -52,6 +54,9 @@
     @apply p-2;
   }
 
+  :global(.toc-list-item) {
+    @apply border-2 border-primary w-fit rounded-md px-2;
+  }
   #content :global(h2) {
     @apply text-3xl pb-1 mt-12;
   }

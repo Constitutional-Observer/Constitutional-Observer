@@ -3,36 +3,36 @@
   import { questions } from "$lib/text.js";
   import { getToastStore } from "@skeletonlabs/skeleton";
   import { goto } from "$app/navigation";
-  import { onMount } from "svelte";
+  import { onDestroy, onMount } from "svelte";
 
   let refreshIntervalId;
 
   let placeholderQuestion = "Who should the nation pray to?";
 
-  function clearOptions(e) {
-    placeholderQuestion = "";
-    clearInterval(refreshIntervalId);
-  }
+  // function clearOptions(e) {
+  //   placeholderQuestion = "";
+  //   clearInterval(refreshIntervalId);
+  // }
 
-  function periodicRefresh() {
-    // random from text
-    placeholderQuestion =
-      questions[0][0][Math.floor(Math.random() * questions[0][0].length)];
-  }
+  // function periodicRefresh() {
+  //   // random from text
+  //   placeholderQuestion =
+  //     questions[0][0][Math.floor(Math.random() * questions[0][0].length)];
+  // }
 
   function navigateTo() {
     clearInterval(refreshIntervalId);
-    // document
-    //   .getElementById("ask-a-question")
-    //   .scrollIntoView({ behavior: "smooth", block: "start" });
-
     $query = placeholderQuestion;
     goto("/ask");
   }
 
-  onMount(() => {
-    refreshIntervalId = setInterval(periodicRefresh, 10000);
-  });
+  // onMount(() => {
+  //   refreshIntervalId = setInterval(periodicRefresh, 10000);
+  // });
+
+  // onDestroy(() => {
+  //   clearInterval(refreshIntervalId);
+  // });
 </script>
 
 <section
@@ -47,16 +47,21 @@
       What did the members of the Constituent Assembly debate about? How does
       the Lok Sabha talk about it now? How have they affected the collective
       lives of the nation?
-      <br />
-      <p class="underline py-3">Ask a question, a simple one.</p>
-      <section class="flex flex-row mt-10 bg-primary p-2">
+      <br /><br />
+
+      <p>
+        <span class="italic py-3">Ask a question, a simple one.</span> The Observer
+        will respond with sections from the Constituent Assembly and the Lok Sabha
+        that will aid in answering your question.
+      </p>
+
+      <section class="flex flex-row mt-10 bg-primary p-2 mb-3">
         <input
           type="text"
           class="form-input text-xl w-full px-3 py-2 resize-none"
           wrap="soft"
           name="query"
           bind:value={placeholderQuestion}
-          on:mouseover={() => clearInterval(refreshIntervalId)}
           autofocus
         />
         <button
@@ -65,8 +70,11 @@
           on:click={navigateTo}>Explore</button
         >
       </section>
-      <button class="bg-primary text-xl px-3 my-1 py-2 rounded">
-        <a href="/about" class="underline">About</a>
+
+      <button class="  text-xl pr-3 my-1 py-2 rounded">
+        <a href="/about" class="underline"
+          >How it works: a conceptual overview</a
+        >
       </button>
     </div>
   </div>

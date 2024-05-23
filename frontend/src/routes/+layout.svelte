@@ -3,8 +3,7 @@
 </script>
 
 <div class="size-disclaimer">
-  Please open this page in a larger window, preferrably in a horizontal
-  orientation, in a desktop or laptop.
+  Please open this page in a larger window (a desktop or laptop)
 </div>
 
 <slot />
@@ -19,6 +18,6 @@
 
 <style lang="postcss">
   .size-disclaimer {
-    @apply text-left  z-50  p-10 bg-primary md:hidden;
+    @apply text-left  z-50  px-5 py-2 bg-primary md:hidden;
   }
 </style>
