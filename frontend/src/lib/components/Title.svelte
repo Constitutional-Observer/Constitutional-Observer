@@ -54,22 +54,23 @@
         will respond with sections from the Constituent Assembly and the Lok Sabha
         that will aid in answering your question.
       </p>
-
-      <section class="flex flex-row mt-10 bg-primary p-2 mb-3">
-        <input
-          type="text"
-          class="form-input text-xl w-full px-3 py-2 resize-none"
-          wrap="soft"
-          name="query"
-          bind:value={placeholderQuestion}
-          autofocus
-        />
-        <button
-          type="submit"
-          class="bg-primary text-white px-2 rounded-md"
-          on:click={navigateTo}>Explore</button
-        >
-      </section>
+      <form on:submit|preventDefault={navigateTo}>
+        <section class="flex flex-row mt-10 bg-primary p-2 mb-3">
+          <input
+            type="text"
+            class="form-input text-xl w-full px-3 py-2 resize-none"
+            wrap="soft"
+            name="query"
+            bind:value={placeholderQuestion}
+            autofocus
+          />
+          <button
+            type="submit"
+            class="bg-primary text-white px-2 rounded-md"
+            on:click={navigateTo}>Explore</button
+          >
+        </section>
+      </form>
 
       <button class="  text-xl pr-3 my-1 py-2 rounded">
         <a href="/about" class="underline"
