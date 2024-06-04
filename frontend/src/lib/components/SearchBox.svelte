@@ -106,11 +106,11 @@
       />
       <button
         type="submit"
-        class="bg-primary w-20 text-white my-3 px-2 py-1 rounded-md"
+        class="btn bg-primary w-20 text-white px-2 py-auto rounded-md"
         disabled={loading}>Ask</button
       >
       <button
-        class="bg-primary w-20 text-white my-3 px-2 py-1 rounded-md"
+        class="btn bg-primary w-20 text-white px-2 py-auto rounded-md"
         on:click={clearOptions}
         disabled={loading}>Clear</button
       >

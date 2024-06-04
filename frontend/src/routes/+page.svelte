@@ -49,7 +49,7 @@ z-10 drop-shadow-2xl border-2 border-primary bg-primaryLight/90 text-pretty w-fu
 
 <style lang="postcss">
   main {
-    background-image: url("/Constitution_of_India_preamble_3.webp");
+    background-image: url("/Constitution_of_India_preamble_4.webp");
     background-repeat: no-repeat;
     background-position: center;
     background-size: cover;

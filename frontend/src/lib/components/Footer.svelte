@@ -16,7 +16,8 @@
     </div>
     <div>
       <p class="text-justify">
-        Please email at adhavan [dot] sivaraj16 [at] gmail [dot] com with
+        This project will be open-sourced as soon as possible. Please email at
+        adhavan [dot] sivaraj16 [at] gmail [dot] com with
         "Constitutional-Observer" as the subject line
       </p>
     </div>

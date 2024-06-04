@@ -11,7 +11,7 @@
   <title>About</title>
 </svelte:head>
 <main
-  class="relative lg:grid lg:grid-cols-10 lg:place-items-start pb-[30vh] gap-10 bg-primaryLight mx-20 w-auto"
+  class="relative lg:grid lg:grid-cols-10 lg:place-items-start pb-[30vh] gap-10 bg-primaryLight px-20 md:px-5"
 >
   <section class="lg:col-span-4 self-start lg:sticky lg:top-6">
     <TitleWithNav
@@ -47,7 +47,7 @@
     @apply list-disc pl-5;
   }
   main {
-    @apply md:w-3/4 w-full mx-5 md:mx-auto;
+    @apply md:w-3/4 w-full  md:mx-auto;
   }
 
   #content :global(p) {

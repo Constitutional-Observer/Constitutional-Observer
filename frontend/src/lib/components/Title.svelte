@@ -66,7 +66,7 @@
           />
           <button
             type="submit"
-            class="bg-primary text-white px-2 rounded-md"
+            class="btn bg-primary text-white px-2 rounded-md"
             on:click={navigateTo}>Explore</button
           >
         </section>
