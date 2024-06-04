@@ -6,19 +6,23 @@
   import { invalidateAll } from "$app/navigation";
   import { page } from "$app/stores";
 
-  import { goto } from "$app/navigation";
   import TitleWithNav from "../../lib/components/TitleWithNav.svelte";
 
   export let data;
   let form;
-  $: form = data;
 
   // check if there is a query
   let currentQuery = $page.url.searchParams.get("query");
-
   $: currentQuery = $page.url.searchParams.get("query");
 
   let loading = false;
+
+  async function handleSubmit(event) {
+    $page.url.searchParams.set("query", $query);
+    data.debates = [];
+    data.sabha = [];
+    invalidateAll();
+  }
 </script>
 
 <svelte:head>
@@ -40,15 +44,8 @@
         >
           <form
             class="opacity-80 mt-5 hover:opacity-100 transition-all"
-            on:submit={(event) => {
-              loading = true;
-              goto("/ask/?query=" + encodeURIComponent($query));
-              $page.url.searchParams.set("query", $query);
-              let loadState = invalidateAll();
-              loadState.then(() => {
-                loading = false;
-              });
-            }}
+            on:submit={handleSubmit}
+            bind:this={form}
             autofocus
           >
             <div class="flex">
@@ -63,7 +60,7 @@
               />
               <button
                 type="submit"
-                class="bg-primary text-white px-2 py-1 rounded-md"
+                class="btn bg-primary text-white px-2 py-1 rounded-md"
                 disabled={loading}>Search</button
               >
             </div>
@@ -78,7 +75,7 @@
       </div>
     </section>
 
-    {#await form.debates}
+    {#await data.debates}
       Loading...
     {:then debates}
       <section class="scroll-container col-span-1 md:col-span-3">
@@ -91,9 +88,15 @@
           </p>
         </section>
 
+        {#if debates.length === 0}
+          <span class="text-xl text-center mx-auto"
+            >loading<span class="loader">...</span></span
+          >
+        {/if}
+
         <Accordion>
           {#each debates as debate, index (debate)}
-            <AccordionItem class="card">
+            <AccordionItem class="card ">
               <svelte:fragment slot="lead">
                 <blockquote
                   class="text-2xl px-3 py-1 blockquote !font-semibold !border-l-[3px] !non-italic text-black/90"
@@ -120,7 +123,7 @@
       <p>Something went wrong</p>
     {/await}
 
-    {#await form.sabha}
+    {#await data.sabha}
       Loading...
     {:then questions}
       <section class="scroll-container col-span-1 md:col-span-3">
@@ -133,6 +136,12 @@
             (the first 1 hour of each session).
           </p>
         </section>
+
+        {#if questions.length === 0}
+          <span class="text-xl text-center mx-auto"
+            >loading<span class="loader">...</span></span
+          >
+        {/if}
         <Accordion>
           {#each questions as question, index (question)}
             <AccordionItem class="card">
@@ -173,6 +182,11 @@
 
 <!-- Main content -->
 <style lang="postcss">
+  .placeholder {
+    @apply bg-surface-300-600-token h-5;
+    /* Theme: Rounded */
+    @apply rounded-token;
+  }
   .title,
   .title-bg {
     @apply sticky top-0 w-full rounded;
