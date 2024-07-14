@@ -7,15 +7,30 @@
   import { page } from "$app/stores";
 
   import TitleWithNav from "../../lib/components/TitleWithNav.svelte";
+    import { onMount } from "svelte";
 
   export let data;
   let form;
+  let loading = true;
+  let currentQuery ='';
 
-  // check if there is a query
-  let currentQuery = $page.url.searchParams.get("query");
+  async function loadQuery(currentQuery) {
+    if (typeof currentQuery != "undefined" && currentQuery != null && typeof window !== 'undefined') {
+      loading = false
+      $query = currentQuery
+    } else {
+      loading = true
+    }
+  }
+
+  onMount(() => {
+    currentQuery = $page.url.searchParams.get("query");
+    loadQuery(currentQuery);
+  });
+
+
   $: currentQuery = $page.url.searchParams.get("query");
-
-  let loading = false;
+  $: loadQuery(currentQuery);
 
   async function handleSubmit(event) {
     $page.url.searchParams.set("query", $query);
@@ -30,7 +45,7 @@
 </svelte:head>
 
 <!-- Main content -->
-{#if !currentQuery}
+{#if loading}
   <div class="md:p-20 h-auto">
     <MainSearch />
   </div>
@@ -175,7 +190,7 @@
     {:catch}
       <p>Something went wrong</p>
     {/await}
-  </div>
+</div>
 {/if}
 
 <Footer />
