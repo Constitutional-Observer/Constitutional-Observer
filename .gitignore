@@ -5,3 +5,10 @@ data/sabha/testog.csv
 data/sabha/test.csv
 data/*
 .vscode/
+archive/
+data/constituent-assembly/debates-embeddings
+data/constituent-assembly/debates-embeddings-2
+data/court-judgements
+data/hwdb
+data/sabha/sabha-embeddings-english-4.json
+
