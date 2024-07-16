@@ -63,7 +63,7 @@
   <div class="relative">
     <div
       bind:this={elemCarousel}
-      class=" min-h-[40vh] flex flex-row text-black/50 flex overflow-hidden items-center snap-mandatory w-full"
+      class="min-h-[40vh] flex flex-row text-black/50 flex overflow-hidden items-center snap-mandatory w-full"
     >
       {#if contents.type === "text"}
         <figcaption
@@ -85,7 +85,7 @@
         </div>
       {:else if contents.type === "textCarousel"}
         {#each contents.text as section}
-          <ul class="block flex-none text-3xl w-full">
+          <ul class="block flex-none text-2xl w-full">
             {#each section as subsection}
               {#each subsection as q}
                 <li>{q}</li>
@@ -124,7 +124,7 @@
                 bind:this={questionsDiv}
               >
                 {#each element.text[0][0] as q}
-                  <span class="text-xl py-5">
+                  <span class="text-[0.8rem] py-5">
                     {q}
                   </span>
                 {/each}

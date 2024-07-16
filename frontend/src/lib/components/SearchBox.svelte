@@ -277,7 +277,7 @@
   }
 
   .q-opt-box h4 {
-    @apply text-2xl pb-4 pt-2 text-left;
+    @apply text-xl pb-4 pt-2 text-left;
   }
   .q-opt-box {
     @apply bg-primaryDark border-2 border-primary m-1 rounded-lg p-5;
@@ -296,7 +296,7 @@
   input[type="checkbox"] + label {
     @apply cursor-pointer;
     @apply text-center;
-    @apply text-black/60 text-xl border-2 border-primary my-1 rounded-md;
+    @apply text-black/60 text-[0.9rem] border-2 border-primary my-1 rounded-md;
   }
 
   input[type="checkbox"]:hover + label {

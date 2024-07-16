@@ -20,10 +20,10 @@
 <section
   class="relative py-7 px-5 backdrop-opacity-50 bg-primaryLight/90 drop-shadow-xl border-4 border-primary"
 >
-  <h1 class="text-3xl md:text-5xl font-bold py-2 pb-8">{title}</h1>
+  <h1 class="text-2xl md:text-4xl font-bold py-2 pb-8">{title}</h1>
 
   {#if subtitle}
-    <p class="md:text-[1.2rem] text-justify text-black/60">
+    <p class="md:text-[1rem] text-justify text-black/60">
       {subtitle}
     </p>
   {/if}

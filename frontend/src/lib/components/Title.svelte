@@ -23,7 +23,7 @@
   function navigateTo() {
     clearInterval(refreshIntervalId);
     $query = placeholderQuestion;
-    goto("/ask");
+    goto("/ask/");
   }
 
   // onMount(() => {
@@ -40,10 +40,10 @@
 >
   <div class="text-left text-black/90 w-full px-2">
     Welcome to the
-    <h1 class="text-3xl md:text-5xl font-bold py-2 pb-8">
+    <h1 class="text-3xl md:text-4xl font-bold py-2 pb-8">
       Constitutional <br />Discourses Observer
     </h1>
-    <div class="text-pretty md:text-[1.2rem] text-black/80 w-full">
+    <div class="text-pretty md:text-[1rem] text-black/80 w-full">
       What did the members of the Constituent Assembly debate about? How does
       the Lok Sabha talk about it now? How have they affected the collective
       lives of the nation?
@@ -58,7 +58,7 @@
         <section class="flex flex-row mt-10 bg-primary p-2 mb-3">
           <input
             type="text"
-            class="form-input text-xl w-full px-3 py-2 resize-none"
+            class="form-input md:text-[1rem] w-full px-3 py-2 resize-none"
             wrap="soft"
             name="query"
             bind:value={placeholderQuestion}
@@ -72,7 +72,7 @@
         </section>
       </form>
 
-      <button class="  text-xl pr-3 my-1 py-2 rounded">
+      <button class="  pr-3 my-1 py-2 rounded">
         <a href="/about" class="underline"
           >How it works: a conceptual overview</a
         >
