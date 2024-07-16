@@ -1,23 +1,30 @@
-<footer class="grid md:grid-cols-3 gap-10">
-  <div>
-    <p class="text-justify mb-10">
-      Constituent Assembly Debates have been sourced from the work of
-      Constitutionofindia.net.
+<footer class="">
+  <hr class="!border-t-4 !border-primary md:mr-[80%] md:mb-10" />
+  <div class="grid md:grid-cols-3 gap-10">
+    <div>
+      <p class="text-justify">
+        <a href="/about" class="underline"> About the project</a>
 
-      <br /> <br />Lok Sabha Questions have been scraped from over 3 lakh PDFs
-      downloaded from sansad.in and other sources.
-    </p>
-    <a href="/about" class="underline text-blue-600"> About the project</a>
-  </div>
-  <div>
-    <p class="text-justify">
-      Please email at adhavan [dot] sivaraj16 [at] gmail [dot] com with
-      "Constitutional-Observer" as the subject line
-    </p>
-  </div>
-  <div class="text-justify">
-    This was co-created and inspired during the course of my undergraduate
-    thesis project at Srishti Manipal, with the guidance of Abhishek Hazra.
+        <br /> <br />
+        Constituent Assembly Debates have been sourced from the work of Constitutionofindia.net.
+        Lok Sabha Questions have been scraped from over 3 lakh PDFs downloaded from
+        sansad.in and other sources. Read more about the methodology
+        <a href="/about#how-does-the-search-engine-work" class="underline"
+          >here</a
+        >
+      </p>
+    </div>
+    <div>
+      <p class="text-justify">
+        This project will be open-sourced as soon as possible. Please email at
+        adhavan [dot] sivaraj16 [at] gmail [dot] com with
+        "Constitutional-Observer" as the subject line
+      </p>
+    </div>
+    <div class="text-justify">
+      This was co-created and inspired during the course of my undergraduate
+      thesis project at Srishti Manipal, with the guidance of Abhishek Hazra.
+    </div>
   </div>
 </footer>
 

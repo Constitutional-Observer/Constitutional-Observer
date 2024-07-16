@@ -1,3 +1,4 @@
+@import url("https://fonts.googleapis.com/css2?family=IM+Fell+DW+Pica:ital@0;1&display=swap");
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -6,4 +7,16 @@ body {
   font-family: "IM Fell English", serif;
   @apply bg-primaryLight antialiased;
   scroll-behavior: smooth;
+}
+
+.im-fell-dw-pica-regular {
+  font-family: "IM Fell DW Pica", serif;
+  font-weight: 400;
+  font-style: normal;
+}
+
+.im-fell-dw-pica-regular-italic {
+  font-family: "IM Fell DW Pica", serif;
+  font-weight: 400;
+  font-style: italic;
 }

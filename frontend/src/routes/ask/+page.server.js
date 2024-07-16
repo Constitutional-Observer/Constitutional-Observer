@@ -6,7 +6,7 @@ if (import.meta.env.MODE === "development") {
   // if production
   apiLink = "https://constitutional-observer-backend.adhavansivaraj.xyz/";
 }
-
+apiLink = "https://constitutional-observer-backend.adhavansivaraj.xyz/";
 export const load = async ({ url, fetch }) => {
   async function debates(query) {
     let resp = await fetch(
@@ -24,6 +24,10 @@ export const load = async ({ url, fetch }) => {
   }
   // get query from url
   const query = url.searchParams.get("query");
+
+  if (!query) {
+    return { debates: [], sabha: [] };
+  }
 
   return {
     debates: structuredClone(await debates(query)), // debates(),

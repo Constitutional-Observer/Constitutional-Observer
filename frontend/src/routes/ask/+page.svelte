@@ -1,157 +1,214 @@
 <script>
   import { query } from "$lib/stores";
   import { Accordion, AccordionItem } from "@skeletonlabs/skeleton";
+  import MainSearch from "$lib/components/MainSearch.svelte";
+  import Footer from "$lib/components/Footer.svelte";
   import { invalidateAll } from "$app/navigation";
   import { page } from "$app/stores";
-  import Footer from "$lib/components/Footer.svelte";
+
+  import TitleWithNav from "../../lib/components/TitleWithNav.svelte";
+    import { onMount } from "svelte";
 
   export let data;
   let form;
-  $: form = data;
+  let loading = true;
+  let currentQuery ='';
 
-  let loading = false;
+  async function loadQuery(currentQuery) {
+    if (typeof currentQuery != "undefined" && currentQuery != null && typeof window !== 'undefined') {
+      loading = false
+      $query = currentQuery
+    } else {
+      loading = true
+    }
+  }
+
+  onMount(() => {
+    currentQuery = $page.url.searchParams.get("query");
+    loadQuery(currentQuery);
+  });
+
+
+  $: currentQuery = $page.url.searchParams.get("query");
+  $: loadQuery(currentQuery);
+
+  async function handleSubmit(event) {
+    $page.url.searchParams.set("query", $query);
+    data.debates = [];
+    data.sabha = [];
+    invalidateAll();
+  }
 </script>
 
 <svelte:head>
   <title>Ask a question: Constitutional Observer</title>
 </svelte:head>
-<main class="relative">
-  <!-- Main content -->
-  {#key form}
-    <div class="md:grid gap-5 md:grid-cols-8 h-screen text-black">
-      <section class="md:relative scroll-container my-10 col-span-2">
-        <div class="md:absolute top-1/3 left-1/7">
-          <h1 class="text-6xl text-bold">
-            {$query}
-          </h1>
+
+<!-- Main content -->
+{#if loading}
+  <div class="md:p-20 h-auto">
+    <MainSearch />
+  </div>
+{:else}
+  <div class="md:grid gap-5 md:grid-cols-8 mx-10 h-auto md:h-screen text-black">
+    <section class="md:relative scroll-container my-10 col-span-2">
+      <div class="md:absolute top-[20%] left-1/7">
+        <TitleWithNav
+          title={$query}
+          subtitle="Your question is used to meaningfully search a database of the Constitutent Assembly Debates and Lok Sabha Questions and Answers. The Observer hopes to provide you with a historical perspective on ideas that make the nation."
+        >
           <form
-            class="opacity-50 hover:opacity-100 transition-all"
-            on:submit={(event) => {
-              $page.url.searchParams.set("query", $query);
-              invalidateAll();
-            }}
+            class="opacity-80 mt-5 hover:opacity-100 transition-all"
+            on:submit={handleSubmit}
+            bind:this={form}
             autofocus
           >
-            <div class="w-3/4 flex">
+            <div class="flex">
               <input
                 type="text"
                 name="query"
                 class="p-1 mr-2 w-full text-gray-300"
+                placeholder="Ask a question"
                 bind:value={$query}
+                disabled={loading}
+                autofocus
               />
               <button
                 type="submit"
-                class="bg-primary text-white px-2 py-1 rounded-md"
-                >Search</button
+                class="btn bg-primary text-white px-2 py-1 rounded-md"
+                disabled={loading}>Search</button
               >
             </div>
           </form>
-          <a href="/" class="underline pt-5">Go back</a>
+
           {#if loading}
-            <span>Loading...</span>
+            <span class="text-xl text-center mx-auto"
+              >loading<span class="loader">...</span></span
+            >
           {/if}
-        </div>
+        </TitleWithNav>
+      </div>
+    </section>
+
+    {#await data.debates}
+      Loading...
+    {:then debates}
+      <section class="scroll-container col-span-1 md:col-span-3">
+        <section class="title">
+          <h2 class="title-bg">Constituent Assembly Debates</h2>
+          <p>
+            The Constituent Assembly met between 1947 and 1949 and ratified the
+            Constitution of India on 26th January 1950. These arguments are
+            crucial to undertanding to the origins of our democracy.
+          </p>
+        </section>
+
+        {#if debates.length === 0}
+          <span class="text-xl text-center mx-auto"
+            >loading<span class="loader">...</span></span
+          >
+        {/if}
+
+        <Accordion>
+          {#each debates as debate, index (debate)}
+            <AccordionItem class="card ">
+              <svelte:fragment slot="lead">
+                <blockquote
+                  class="text-2xl px-3 py-1 blockquote !font-semibold !border-l-[3px] !non-italic text-black/90"
+                >
+                  {debate.content.substring(0, 200) + " ..."}
+                </blockquote></svelte:fragment
+              >
+              <svelte:fragment slot="summary">
+                <h4>
+                  {#if debate.speaker_name}
+                    {debate.speaker_name}
+                  {:else}
+                    Unknown speaker
+                  {/if}
+                </h4>
+                <span>on {new Date(debate.date).toDateString()}</span>
+              </svelte:fragment>
+              <svelte:fragment slot="content">{debate.content}</svelte:fragment>
+            </AccordionItem>
+          {/each}
+        </Accordion>
       </section>
+    {:catch}
+      <p>Something went wrong</p>
+    {/await}
 
-      {#await form.debates}
-        Loading...
-      {:then debates}
-        <section class="scroll-container col-span-1 md:col-span-3">
-          <section class="title">
-            <h2 class="title-bg">Constituent Assembly Debates</h2>
-            <p>The Constituent Assembly met between 1947 and 1949.</p>
-          </section>
-
-          <Accordion>
-            {#each debates as debate, index (debate)}
-              <AccordionItem class="card">
-                <svelte:fragment slot="lead">
-                  <blockquote
-                    class="text-2xl px-3 py-1 blockquote !font-semibold !border-l-[3px] !non-italic text-black/90"
-                  >
-                    {debate.content.substring(0, 200) + " ..."}
-                  </blockquote></svelte:fragment
-                >
-                <svelte:fragment slot="summary">
-                  <h4>
-                    {#if debate.speaker_name}
-                      {debate.speaker_name}
-                    {:else}
-                      Unknown speaker
-                    {/if}
-                  </h4>
-                  <span>on {new Date(debate.date).toDateString()}</span>
-                </svelte:fragment>
-                <svelte:fragment slot="content"
-                  >{debate.content}</svelte:fragment
-                >
-              </AccordionItem>
-            {/each}
-          </Accordion>
+    {#await data.sabha}
+      Loading...
+    {:then questions}
+      <section class="scroll-container col-span-1 md:col-span-3">
+        <section class="title">
+          <h2 class="title-bg">Lok Sabha Questions</h2>
+          <p>
+            The Lok Sabha represents the billion+ citizens of india. Its 543
+            members have met 68 days every year on an average since the 2000s.
+            These are responses to questions by MPs asked during question hour
+            (the first 1 hour of each session).
+          </p>
         </section>
-      {:catch}
-        <p>Something went wrong</p>
-      {/await}
 
-      {#await form.sabha}
-        Loading...
-      {:then questions}
-        <section class="scroll-container col-span-1 md:col-span-3">
-          <section class="title">
-            <h2 class="title-bg">Lok Sabha Questions</h2>
-            <p>
-              The combined question and answers of the last 15 years is
-              available here
-            </p>
-          </section>
-          <Accordion>
-            {#each questions as question, index (question)}
-              <AccordionItem class="card">
-                <svelte:fragment slot="lead">
-                  <h4 class="text-2xl pr-3 py-1 text-black/90">
-                    {question.Title}
-                  </h4>
-                  <small>
-                    by {question.Representative} to Ministry of {question[
-                      "Ministry or Category"
-                    ]}</small
-                  >
+        {#if questions.length === 0}
+          <span class="text-xl text-center mx-auto"
+            >loading<span class="loader">...</span></span
+          >
+        {/if}
+        <Accordion>
+          {#each questions as question, index (question)}
+            <AccordionItem class="card">
+              <svelte:fragment slot="lead">
+                <h4 class="text-2xl pr-3 py-1 text-black/90">
+                  {question.Title}
+                </h4>
 
-                  <!-- {sabha.Name} from {sabha.Constituency} in  -->
-                </svelte:fragment>
+                <!-- {sabha.Name} from {sabha.Constituency} in  -->
+              </svelte:fragment>
 
-                <svelte:fragment slot="summary">
-                  Read the question and answer at this link: <a
-                    href={question.link}
-                    target="_blank">Link</a
-                  >
-                  <!-- {question.questionAnswer.substring(0, 100)} -->
-                </svelte:fragment>
+              <svelte:fragment slot="summary">
+                by {question.Representative} to Ministry of {question[
+                  "Ministry or Category"
+                ]}
+                Read the question and answer at this link:
+                <a href={question.link} target="_blank">Link</a>
+                <!-- {question.questionAnswer.substring(0, 100)} -->
+              </svelte:fragment>
 
-                <svelte:fragment slot="content">
-                  {question.questionAnswer}
-                </svelte:fragment>
-              </AccordionItem>
-            {/each}
-          </Accordion>
-        </section>
-      {:catch}
-        <p>Something went wrong</p>
-      {/await}
-    </div>
-  {/key}
-</main>
+              <svelte:fragment slot="content">
+                Read the question and answer at this link: <a
+                  href={question.link}
+                  target="_blank">Link</a
+                >
+              </svelte:fragment>
+            </AccordionItem>
+          {/each}
+        </Accordion>
+      </section>
+    {:catch}
+      <p>Something went wrong</p>
+    {/await}
+</div>
+{/if}
+
 <Footer />
 
 <!-- Main content -->
 <style lang="postcss">
+  .placeholder {
+    @apply bg-surface-300-600-token h-5;
+    /* Theme: Rounded */
+    @apply rounded-token;
+  }
   .title,
   .title-bg {
     @apply sticky top-0 w-full rounded;
   }
 
   .title {
-    @apply p-4 pt-6 mb-10 bg-primary;
+    @apply p-4 pt-6 mb-10 bg-primaryDark border-2 border-primary;
   }
   .title-bg {
     @apply text-4xl text-black pb-4 font-bold;
@@ -207,5 +264,60 @@
   }
   :global(.accordion-panel[aria-hidden="false"]) {
     @apply bg-primary/40;
+  }
+
+  .loader {
+    width: 180px; /* control the size */
+    aspect-ratio: 8/5;
+    --_g: no-repeat radial-gradient(#000 68%, #0000 71%);
+    -webkit-mask: var(--_g), var(--_g), var(--_g);
+    -webkit-mask-size: 50% 40%;
+    @apply bg-primaryLight;
+    animation: load 2s infinite;
+  }
+
+  @keyframes load {
+    0% {
+      -webkit-mask-position:
+        0% 0%,
+        50% 0%,
+        100% 0%;
+    }
+    16.67% {
+      -webkit-mask-position:
+        0% 100%,
+        50% 0%,
+        100% 0%;
+    }
+    33.33% {
+      -webkit-mask-position:
+        0% 100%,
+        50% 100%,
+        100% 0%;
+    }
+    50% {
+      -webkit-mask-position:
+        0% 100%,
+        50% 100%,
+        100% 100%;
+    }
+    66.67% {
+      -webkit-mask-position:
+        0% 0%,
+        50% 100%,
+        100% 100%;
+    }
+    83.33% {
+      -webkit-mask-position:
+        0% 0%,
+        50% 0%,
+        100% 100%;
+    }
+    100% {
+      -webkit-mask-position:
+        0% 0%,
+        50% 0%,
+        100% 0%;
+    }
   }
 </style>

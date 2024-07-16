@@ -1,7 +1,7 @@
 data/sabha/activity/**
-# Local Netlify folder
 .netlify
 venv/
 data/sabha/testog.csv
 data/sabha/test.csv
 data/*
+.vscode/

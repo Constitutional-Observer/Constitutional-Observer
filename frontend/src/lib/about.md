@@ -1,6 +1,7 @@
 ## Note
 
-_This project is meant to be exhibited alongside a print installation._
+![Photograph of installation](./installation-1.jpeg)
+_This project is meant to be exhibited alongside a print installation. It is being exhibited at the Srishti Manipal campus in Yelahanka, Bengaluru on the 25th and 26th of May, 2024._
 
 How do people, as citizens, question the government? Holding the government accountable is one of the primary parliamentary roles of the opposition. However, as common citizens, we do not know much of how the Parliament functions. The realities of our democracy means there are always people who are ignored, sidelined, pushed, reduced and small-cased. What protects their rights?
 
@@ -20,13 +21,11 @@ Their work has been critical to the making and realisation of this project. I th
 
 ### Lok Sabha Questions
 
-Lok Sabha Questions have been scraped from over 3 lakh PDFs downloaded from sansad.in and other sources, made possible by the work of [Vonter at the india-representatives-watch repository](https://github.com/Vonter/india-representatives-activity/). It is distributed under the ODbL licence. That repository is sourced from [PRS India](https://prsindia.org).
+Lok Sabha Questions have been scraped from over 3 lakh PDFs downloaded from sansad.in and other sources, made possible by the [india-representatives-watch repository](https://github.com/Vonter/india-representatives-activity/). It is distributed under the ODbL licence. That repository is sourced from [PRS India](https://prsindia.org).
 
 ### Free and Open Source Software
 
 This project has mostly been created out of Free and Open Source Software (FOSS). From Inkscape for the print installation, to the machine learning library that creates the embeddings, to the Linux server it runs on.
-
-## Why are these questions framed in certain ways?
 
 ## How does the search engine work?
 
@@ -40,10 +39,13 @@ Both debates and questions are indexed in a database that a machine learning mod
 
 - Lok Sabha questions and answers have not been reliably split, as they are contained in PDFs. Currently the entire text is fed into the model. We are likely to achieve better results once the questions and answers have been split and cleaned up.
 
+- Currently, a subset of questions from the last 15 years is being served instead of the full corpus. The full corpus will be available in the future.
+
 ## Directions forward
 
 This project is open to critical feedback and collaborations. Largely following:
 
-1.  Curation and annotation of the Constituent Assembly Debates and Lok Sabha Questions better - pruned to include valuable debates and questions,
-2.  A frontend experience for new viewers that evokes more questions from them.
-3.  Multilingual print installations.
+1. Curating/tagging and reviewing paragraphs from the debates then use it for improving search inside the Observer. Then, release a Dataset that other public spirited individuals/organisations can use
+2. Understanding the documentation of Lok Sabha debates better and actually obtain paragraphs of debates instead of Questions and Answers as is used in the Observer. This also opens up possibilities of research into the debates to a larger audience, as PDF daily logs can be hard to parse into machine understandable formats.
+3. Explore more public spaces to exhibit the print installation. The installation appears to have drawn many curious observers, and I believe there is value in exploring public spaces in the city as possible locations for the exhibit.
+4. Explore the possibility of multilingual questions, since it appears quite possible for both the installation and the Observer to reach a wider audience with Kannada, Tamil, Hindi or other language based questions

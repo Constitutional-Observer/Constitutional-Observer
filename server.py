@@ -17,13 +17,13 @@ model.to(device)
 app = Flask(__name__)
 
 constituentDebatesEmbeddings = Dataset.load_from_disk(
-    "./data/constituent-assembly/debates-embeddings"
+    "./data/constituent-assembly/debates-embeddings-2"
 ).add_faiss_index(column="embeddings")
 # hwdfEmbeddings = Dataset.load_from_disk("./data/hwdb/hwdb-embeddings").add_faiss_index(
 #     column="embeddings"
 # )
 sabhaQuestionsEmbeddings = Dataset.load_from_disk(
-    "./data/sabha/sabha-embeddings-english-2"
+    "./data/sabha/sabha-embeddings-english-4"
 ).add_faiss_index(column="embeddings")
 # courtJudgementsEmbeddings = Dataset.load_from_disk(
 #     "./data/court-judgements/supreme-court-embeddings"
@@ -55,16 +55,13 @@ def getDebates():
     question_embedding = get_embeddings([query]).cpu().detach().numpy()
 
     scores, samples = constituentDebatesEmbeddings.get_nearest_examples(
-        "embeddings", question_embedding, k=10
+        "embeddings", question_embedding, k=20
     )
 
     del question_embedding
     gc.collect()
 
     samples_df = pd.DataFrame.from_dict(samples)
-    samples_df["scores"] = scores
-    samples_df.sort_values("scores", ascending=False, inplace=True)
-    samples_df = samples_df[samples_df["scores"] > 15]
     samples_df.drop(columns=["embeddings"], inplace=True)
 
     return samples_df.to_dict(orient="records")
@@ -97,15 +94,12 @@ def getSabha():
     question_embedding = get_embeddings([query]).cpu().detach().numpy()
 
     scores, samples_df = sabhaQuestionsEmbeddings.get_nearest_examples(
-        "embeddings", question_embedding, k=10
+        "embeddings", question_embedding, k=20
     )
 
     del question_embedding
     gc.collect()
     samples_df = pd.DataFrame.from_dict(samples_df)
-    samples_df["scores"] = scores
-    samples_df.sort_values("scores", ascending=False, inplace=True)
-    samples_df = samples_df[samples_df["scores"] > 15]
     samples_df.drop(columns=["embeddings"], inplace=True)
     return samples_df.to_dict(orient="records")
 
