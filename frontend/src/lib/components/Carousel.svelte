@@ -70,7 +70,7 @@
           class="absolute
             top-2/4 right-0 z-10 drop-shadow-2xl border-2 border-primary bg-primaryLight/90 text-black/60 text-pretty w-full md:w-[80%] p-5"
         >
-          <h2 class="text-2xl pb-10">{@html contents.title}</h2>
+          <h2 class="text-xl pb-10">{@html contents.title}</h2>
           {@html contents.caption}
         </figcaption>
         <div
@@ -85,7 +85,7 @@
         </div>
       {:else if contents.type === "textCarousel"}
         {#each contents.text as section}
-          <ul class="block flex-none text-2xl w-full">
+          <ul class="block flex-none text-xl w-full">
             {#each section as subsection}
               {#each subsection as q}
                 <li>{q}</li>
@@ -124,7 +124,7 @@
                 bind:this={questionsDiv}
               >
                 {#each element.text[0][0] as q}
-                  <span class="text-[0.8rem] py-5">
+                  <span class="text-sm py-5">
                     {q}
                   </span>
                 {/each}

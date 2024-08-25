@@ -99,7 +99,7 @@
     <div class="flex flex-row bg-primary p-2">
       <input
         type="text"
-        class="form-input text-xl w-full p-3 h-auto"
+        class="form-input text-md w-full p-3 h-auto"
         name="query"
         disabled={loading}
         bind:value={$query}
@@ -116,7 +116,7 @@
       >
     </div>
     {#if loading}
-      <span class="text-xl text-center mx-auto"
+      <span class="text-md text-center mx-auto"
         >loading<span class="loader">...</span></span
       >
     {/if}
@@ -124,7 +124,7 @@
 
   <section class="py-2 px-0 grid">
     <div class="lg:col-span-5">
-      <p class="text-xl text-center py-5">
+      <p class="text-md text-center py-1">
         You can select from these options as well
       </p>
       <div class="grid grid-cols-2 lg:grid-cols-5 gap-2">
@@ -277,7 +277,7 @@
   }
 
   .q-opt-box h4 {
-    @apply text-xl pb-4 pt-2 text-left;
+    @apply text-sm pb-4 pt-2 text-left;
   }
   .q-opt-box {
     @apply bg-primaryDark border-2 border-primary m-1 rounded-lg p-5;

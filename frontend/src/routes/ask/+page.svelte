@@ -12,14 +12,18 @@
   export let data;
   let form;
   let loading = true;
-  let currentQuery ='';
+    let currentQuery = "";
 
   async function loadQuery(currentQuery) {
-    if (typeof currentQuery != "undefined" && currentQuery != null && typeof window !== 'undefined') {
-      loading = false
-      $query = currentQuery
+      if (
+        typeof currentQuery != "undefined" &&
+        currentQuery != null &&
+        typeof window !== "undefined"
+      ) {
+        loading = false;
+        $query = currentQuery;
     } else {
-      loading = true
+        loading = true;
     }
   }
 
@@ -27,7 +31,6 @@
     currentQuery = $page.url.searchParams.get("query");
     loadQuery(currentQuery);
   });
-
 
   $: currentQuery = $page.url.searchParams.get("query");
   $: loadQuery(currentQuery);
@@ -44,15 +47,18 @@
   <title>Ask a question: Constitutional Observer</title>
 </svelte:head>
 
+  <div id="container">
 <!-- Main content -->
 {#if loading}
   <div class="md:p-20 h-auto">
     <MainSearch />
   </div>
 {:else}
-  <div class="md:grid gap-5 md:grid-cols-8 mx-10 h-auto md:h-screen text-black">
+    <div
+      class="md:grid gap-5 md:grid-cols-8 mx-10 text-sm  md:h-[150vh] text-black"
+    >
     <section class="md:relative scroll-container my-10 col-span-2">
-      <div class="md:absolute top-[20%] left-1/7">
+        <div class="md:absolute top-[10%] left-1/7">
         <TitleWithNav
           title={$query}
           subtitle="Your question is used to meaningfully search a database of the Constitutent Assembly Debates and Lok Sabha Questions and Answers. The Observer hopes to provide you with a historical perspective on ideas that make the nation."
@@ -67,7 +73,7 @@
               <input
                 type="text"
                 name="query"
-                class="p-1 mr-2 w-full text-gray-300"
+                  class="p-1 mr-2 w-full text-sm text-gray-300"
                 placeholder="Ask a question"
                 bind:value={$query}
                 disabled={loading}
@@ -90,6 +96,7 @@
       </div>
     </section>
 
+
     {#await data.debates}
       Loading...
     {:then debates}
@@ -97,9 +104,9 @@
         <section class="title">
           <h2 class="title-bg">Constituent Assembly Debates</h2>
           <p>
-            The Constituent Assembly met between 1947 and 1949 and ratified the
-            Constitution of India on 26th January 1950. These arguments are
-            crucial to undertanding to the origins of our democracy.
+                The Constituent Assembly met between 1947 and 1949 and ratified
+                the Constitution of India on 26th January 1950. These arguments
+                are crucial to undertanding to the origins of our democracy.
           </p>
         </section>
 
@@ -114,7 +121,7 @@
             <AccordionItem class="card ">
               <svelte:fragment slot="lead">
                 <blockquote
-                  class="text-2xl px-3 py-1 blockquote !font-semibold !border-l-[3px] !non-italic text-black/90"
+                      class="text-md px-3 py-1 blockquote !font-semibold !border-l-[3px] !non-italic text-black/90"
                 >
                   {debate.content.substring(0, 200) + " ..."}
                 </blockquote></svelte:fragment
@@ -129,7 +136,9 @@
                 </h4>
                 <span>on {new Date(debate.date).toDateString()}</span>
               </svelte:fragment>
-              <svelte:fragment slot="content">{debate.content}</svelte:fragment>
+                  <svelte:fragment slot="content"
+                    >{debate.content}</svelte:fragment
+                  >
             </AccordionItem>
           {/each}
         </Accordion>
@@ -197,6 +206,14 @@
 
 <!-- Main content -->
 <style lang="postcss">
+      #container {
+      @apply  md:px-[5%];
+      background-image: url("/Constitution_of_India_inside_4.webp");
+      background-repeat: no-repeat;
+      background-position: center;
+      background-size: cover;
+    }
+
   .placeholder {
     @apply bg-surface-300-600-token h-5;
     /* Theme: Rounded */
@@ -211,11 +228,11 @@
     @apply p-4 pt-6 mb-10 bg-primaryDark border-2 border-primary;
   }
   .title-bg {
-    @apply text-4xl text-black pb-4 font-bold;
+      @apply text-xl text-black pb-4 font-bold;
   }
 
   .scroll-container {
-    @apply snap-y  overflow-y-auto overflow-x-hidden my-10 px-2;
+      @apply snap-y  overflow-y-auto  my-10 px-2 h-auto;
   }
   :global(.accordion-lead) {
     @apply font-bold text-xl pb-2 w-full;
@@ -231,7 +248,7 @@
     @apply text-balance;
   }
   main {
-    @apply md:mx-auto max-h-screen w-[90%] mx-auto;
+      @apply md:mx-auto max-h-screen  mx-auto;
   }
 
   :global(input[type="text"]) {

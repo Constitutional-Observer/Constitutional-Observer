@@ -9,7 +9,7 @@
   let loading = false;
 </script>
 
-<main class="landing lg:grid lg:grid-cols-10 gap-6 h-auto mx-10">
+<div class="landing overflow-y-auto lg:grid lg:grid-cols-10 gap-6 h-auto text-sm">
   <section class="lg:col-span-4 self-center">
     <TitleWithNav
       title="Ask a Question"
@@ -39,9 +39,10 @@
       <SearchBox {loading}></SearchBox>
     </form>
   </section>
-</main>
+</div>
 
 <!-- Central search-->
 
 <style lang="postcss">
+
 </style>

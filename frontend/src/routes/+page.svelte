@@ -16,16 +16,16 @@
 {/if}
 <main class="relative">
   <section class="relative z-20">
-    <div class="relative md:absolute top-0 md:h-full md:top-[10%] z-20">
+    <div class="relative md:absolute top-0 md:h-full top-[20%] md:top-[10%] mx-auto md:left-[-5%] z-20">
       <div
-        class="md:sticky md:top-1/6 w-full md:w-1/2 lg:w-2/6 h-screen md:h-auto"
+        class="md:sticky w-full md:w-1/3 lg:w-2/5 h-screen "
       >
         <Title />
       </div>
     </div>
-    <figure class="relative md:absolute top-0 md:relative md:mx-[9%]">
+    <figure class="relative md:absolute top-0 md:relative mx-auto md:mx-[9%]">
       <figcaption
-        class="absolute bottom-10 mr-2 right-0 text-black/60
+        class="absolute text-sm bottom-10 right-[-20%] text-black/60
 z-10 drop-shadow-2xl border-2 border-primary bg-primaryLight/90 text-pretty w-full md:w-[40%] lg:w-[30%] p-5"
       >
         On 13 December 1946, the Constituent Assembly formally commenced its
@@ -77,7 +77,7 @@ z-10 drop-shadow-2xl border-2 border-primary bg-primaryLight/90 text-pretty w-fu
   }
 
   :global(input[type="text"]) {
-    @apply selection:bg-primary selection:text-black;
+    @apply selection:bg-primary selection:text-black selection:font-bold;
   }
 
   #landing {

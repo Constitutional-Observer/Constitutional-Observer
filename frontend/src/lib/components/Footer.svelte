@@ -30,6 +30,6 @@
 
 <style lang="postcss">
   footer {
-    @apply md:px-[10%] px-10 py-20 text-black/60 bg-primaryLight backdrop-blur-3xl backdrop-opacity-50;
+    @apply md:px-[10%] px-10 py-20 text-black/60 bg-primaryLight backdrop-blur-3xl backdrop-opacity-50 text-sm;
   }
 </style>

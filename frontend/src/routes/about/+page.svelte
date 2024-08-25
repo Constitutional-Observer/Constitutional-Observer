@@ -11,7 +11,7 @@
   <title>About</title>
 </svelte:head>
 <main
-  class="relative lg:grid lg:grid-cols-10 lg:place-items-start pb-[30vh] gap-10 bg-primaryLight px-20 md:px-5"
+  class="relative lg:grid lg:grid-cols-10 lg:place-items-start pb-[30vh] gap-10 bg-primaryLight  "
 >
   <section class="lg:col-span-4 self-start lg:sticky lg:top-6">
     <TitleWithNav
@@ -19,7 +19,7 @@
       subtitle="This is a guide to understanding the project, the vision forward, and serves as a quick overview."
     >
       <TableOfContents
-        class="pt-4"
+        class="pt-4 text-sm"
         active="bg-primary "
         regionListItem="border-8 border-primary"
       /></TitleWithNav
@@ -28,7 +28,7 @@
 
   <div
     id="content"
-    class=" lg:col-span-6 overflow-y-scroll text-justify"
+    class=" lg:col-span-6 text-sm overflow-y-scroll text-justify"
     use:tocCrawler={{ mode: "generate", scrollTarget: "#content" }}
     bind:this={toc}
   >

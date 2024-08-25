@@ -36,14 +36,14 @@
 </script>
 
 <section
-  class="relative relative py-7 px-5 backdrop-opacity-50 bg-primaryLight/90 drop-shadow-xl border-4 border-primary"
+  class="relative relative py-5 px-3 backdrop-opacity-50 bg-primaryLight/90 drop-shadow-xl border-4 border-primary w-full md:w-[80%] "
 >
   <div class="text-left text-black/90 w-full px-2">
     Welcome to the
-    <h1 class="text-3xl md:text-4xl font-bold py-2 pb-8">
-      Constitutional <br />Discourses Observer
+    <h1 class="text-2xl md:text-3xl lg:text-4xl font-bold py-2 pb-8">
+      Constitutional <br /> Observer
     </h1>
-    <div class="text-pretty md:text-[1rem] text-black/80 w-full">
+    <div class="text-pretty md:text-sm lg:text-md text-black/80 w-full">
       What did the members of the Constituent Assembly debate about? How does
       the Lok Sabha talk about it now? How have they affected the collective
       lives of the nation?
@@ -55,10 +55,10 @@
         that will aid in answering your question.
       </p>
       <form on:submit|preventDefault={navigateTo}>
-        <section class="flex flex-row mt-10 bg-primary p-2 mb-3">
+        <section class="flex flex-row mt-5 bg-primary p-2 mb-1">
           <input
             type="text"
-            class="form-input md:text-[1rem] w-full px-3 py-2 resize-none"
+            class="form-input md:text-sm w-full px-3 py-2 resize-none"
             wrap="soft"
             name="query"
             bind:value={placeholderQuestion}
