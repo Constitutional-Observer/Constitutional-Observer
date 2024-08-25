@@ -6,7 +6,7 @@ if (import.meta.env.MODE === "development") {
   // if production
   apiLink = "https://constitutional-observer-backend.adhavansivaraj.xyz/";
 }
-apiLink = "https://constitutional-observer-backend.adhavansivaraj.xyz/";
+
 export const load = async ({ url, fetch }) => {
   async function debates(query) {
     let resp = await fetch(
@@ -17,7 +17,7 @@ export const load = async ({ url, fetch }) => {
 
   async function sabha(query) {
     let resp = await fetch(
-      apiLink + "/sabha/?query=" + encodeURIComponent(query)
+      apiLink + "/sabhadebates/?query=" + encodeURIComponent(query)
     );
 
     return await resp.json();

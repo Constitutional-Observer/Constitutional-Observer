@@ -19,9 +19,9 @@ Their work has been critical to the making and realisation of this project. I th
 
 \[Disclaimer: CLPR is not directly involved in this project\]
 
-### Lok Sabha Questions
+### Lok Sabha Debates
 
-Lok Sabha Questions have been scraped from over 3 lakh PDFs downloaded from sansad.in and other sources, made possible by the [india-representatives-watch repository](https://github.com/Vonter/india-representatives-activity/). It is distributed under the ODbL licence. That repository is sourced from [PRS India](https://prsindia.org).
+Lok Sabha Debates were sourced from sansad.in. From 1985 to 2019, 2340 sessions' transcripts were downloaded and split into chunks. The transcripts contain the full discussion of all business in that day that has not been omitted. 
 
 ### Free and Open Source Software
 

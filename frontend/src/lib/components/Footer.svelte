@@ -7,23 +7,19 @@
 
         <br /> <br />
         Constituent Assembly Debates have been sourced from the work of Constitutionofindia.net.
-        Lok Sabha Questions have been scraped from over 3 lakh PDFs downloaded from
-        sansad.in and other sources. Read more about the methodology
-        <a href="/about#how-does-the-search-engine-work" class="underline"
-          >here</a
+        Lok Sabha Debates have been scraped from documentation of over 2300 LS sessions from 1985 to 2019 from sansad.in and other sources. Read more about the methodology <a href="/about#how-does-the-search-engine-work" class="underline">here</a
         >
       </p>
     </div>
     <div>
       <p class="text-justify">
-        This project will be open-sourced as soon as possible. Please email at
+        The sourcecode used to create the Observer and scripts used to obtain the data is available at <a href="https://github.com/Constitutional-Observer">this Github organisation</a> . Please email at
         adhavan [dot] sivaraj16 [at] gmail [dot] com with
         "Constitutional-Observer" as the subject line
       </p>
     </div>
     <div class="text-justify">
-      This was co-created and inspired during the course of my undergraduate
-      thesis project at Srishti Manipal, with the guidance of Abhishek Hazra.
+      This was co-created and inspired during the course of a thesis project at Srishti Manipal, with the guidance of Abhishek Hazra.
     </div>
   </div>
 </footer>
