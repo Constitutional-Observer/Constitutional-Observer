@@ -1,30 +1,35 @@
 ```{python}
+
 from transformers import AutoTokenizer, AutoModel
 import torch
-from datasets import Dataset
+from datasets import Dataset, load_from_disk
+from multiprocess import set_start_method
 import pandas as pd
+import numpy as np
 import re
 import ast
 
 model_ckpt = "sentence-transformers/multi-qa-mpnet-base-dot-v1"
-tokenizer = AutoTokenizer.from_pretrained(model_ckpt)
+tokenizer = AutoTokenizer.from_pretrained(model_ckpt, batched=True)
 model = AutoModel.from_pretrained(model_ckpt)
 
 device = torch.device("cuda")
 model.to(device)
 
-
 def cls_pooling(model_output):
     return model_output.last_hidden_state[:, 0]
 
 
-def get_embeddings(text_list):
-    encoded_input = tokenizer(
-        text_list, padding=True, truncation=True, return_tensors="pt"
-    )
-    encoded_input = {k: v.to(device) for k, v in encoded_input.items()}
-    model_output = model(**encoded_input)
-    return cls_pooling(model_output)
+def get_embeddings(chunks):
+    embeddings = []
+    for text_list in chunks:
+        encoded_input = tokenizer(
+            text_list, padding=True, truncation=True, return_tensors="pt"
+        )
+        encoded_input = {k: v.to(device) for k, v in encoded_input.items()}
+        model_output = model(**encoded_input)
+        embeddings.append(cls_pooling(model_output).detach().cpu().numpy()[0])
+    return np.array(embeddings)
 ```
 
 ### Constituent assembly debates
@@ -49,8 +54,7 @@ hwdfEmbeddings = hwdf.map(
 hwdfEmbeddings.save_to_disk("./data/hwdb/hwdb-embeddings")
 ```
 
-### Lok Sabha   
-
+### Lok Sabha QandA
 ```{python}
 
 sabhaQuestions15 = pd.read_csv("./data/sabha/activity/Questions/Lok Sabha/15th_wText.csv")
@@ -64,11 +68,6 @@ sabhaQuestions = pd.concat(
 sabhaQuestions["questionAnswer"] = sabhaQuestions["questionAnswer"].apply(
     lambda x: re.sub(r'[^a-zA-Z0-9\s.,!?;:\'"()-]+', "", str(x))
 )
-
-
-```
-
-```{python}
 
 def separateQandA(x):
 
@@ -131,3 +130,95 @@ courtJudgementsEmbeddings.save_to_disk(
 )
 ```
 
+## Lok Sabha full day debates
+
+### Semantic chunking
+
+```{python}     
+import pandas as pd
+import re 
+from tqdm import tqdm
+from semantic_text_splitter import TextSplitter
+from transformers import AutoTokenizer
+from tokenizers import Tokenizer
+
+import ast
+tokenizer = Tokenizer.from_pretrained("bert-base-uncased")
+  
+#splitter = TextSplitter.from_huggingface_tokenizer(tokenizer, max_tokens)
+
+# Maximum number of characters in a chunk. Will fill up the
+# chunk until it is somewhere in this range.
+splitter = TextSplitter((200,1000))
+
+
+# tokenize into smaller sizes, duplicate rows, and make a db
+data = "/mnt/vault/Vault/Areas/Constitutional Observer/india-loksabha-watch/data/loksabha/sabha-english-documentation-links-text.csv"
+
+df = pd.read_csv(data)
+
+#fill nan with empty string
+df = df.fillna('')
+
+# break the text into smaller pieces, every 200 chars and after a new line
+tqdm.pandas() 
+df['txt'] = df['txt'].progress_apply(lambda x: splitter.chunks(x))
+# df = df.explode("txt").reset_index(drop=True)
+df.head(20)
+
+df.to_csv("data/sabha/sabha-day-english.csv", index=False)
+
+# remove all new line characters and other characters we don't want
+
+df = pd.read_csv("../data/sabha/sabha-day-english.csv")
+df['txt'] = df['txt'].apply(lambda x: re.sub(r'[\x00-\x1f\x7f-\x9f]', "", str(x)))
+
+# explode 
+# recognise lists
+df['txt'] = df['txt'].apply(lambda x: x.replace('\\n', ' '))
+df['txt'] = df['txt'].apply(lambda x: ast.literal_eval(x))
+
+dfNew = df.filter(items=['txt', 'Date'], axis=1)
+dfNew = dfNew[dfNew["txt"].apply(lambda x: len(x) > 100)]
+# del df
+del df 
+
+dfNew = dfNew.explode("txt").reset_index(drop=True)
+dfNew = Dataset.from_pandas(dfNew)
+dfNew.save_to_disk("../data/sabha/sabha-day-english-exploded")
+```
+
+```{python}
+
+def checker(x):
+    if len(re.findall(r"[a-zA-Z]+", x["txt"])) >= 50:
+        return True
+    else:
+        return False
+
+if __name__ == "__main__":
+    dfNew = load_from_disk("../data/sabha/sabha-day-english-exploded")
+    # lost all rows with less than 100 alphabets
+    dfNewDropped = dfNew.filter(checker)
+    sabhaJudgementsEmbeddings = dfNewDropped.map(
+        lambda x: {"embeddings": get_embeddings(x["txt"])}, batched=True )
+    sabhaJudgementsEmbeddings.save_to_disk(
+        "../data/sabha/fullday-embeddings-english"
+    )
+```
+
+### Create FAISS indices and save
+```{python}
+import faiss
+
+# Create faiss indices and save
+debatesEmbeddings = load_from_disk("../data/constituent-assembly/debates-embeddings-2")
+debatesEmbeddings.add_faiss_index(column='embeddings', string_factory="HNSW32", train_size=10000) 
+debatesEmbeddings.save_faiss_index(file ="../data/constituent-assembly/debates-embeddings-2.faiss", index_name="embeddings")
+
+
+sabhaFullDayEmbeddings = load_from_disk("../data/sabha/fullday-embeddings-english")
+sabhaFullDayEmbeddings.add_faiss_index(column='embeddings', string_factory="SQfp16", train_size=1000000)
+sabhaFullDayEmbeddings.save_faiss_index(file ="../data/sabha/fullday-embeddings-english.faiss", index_name="embeddings")
+
+```

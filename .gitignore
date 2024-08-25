@@ -1,6 +1,6 @@
 data/sabha/activity/**
 .netlify
-venv/
+.venv/
 data/sabha/testog.csv
 data/sabha/test.csv
 data/*
@@ -11,4 +11,3 @@ data/constituent-assembly/debates-embeddings-2
 data/court-judgements
 data/hwdb
 data/sabha/sabha-embeddings-english-4.json
-
