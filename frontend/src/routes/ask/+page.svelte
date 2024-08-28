@@ -14,6 +14,8 @@
     let loading = true;
     let currentQuery = "";
 
+    
+
     async function loadQuery(currentQuery) {
       if (
         typeof currentQuery != "undefined" &&
@@ -43,9 +45,12 @@
     }
   </script>
 
-  <svelte:head>
-    <title>Ask a question: Constitutional Observer</title>
-  </svelte:head>
+<svelte:head>
+  <title>Ask a question to the Constitutional Observer</title>
+  <meta name="description" content="The Constitutional Observer provides a comparative interface to understand current and past parliamentry discourse in India. Ask a question and it will search the debates of the Constituent Assembly and Lok Sabha">
+  <meta name="keywords" content="Lok Sabha, Constituent Assembly, Indian Constitution, Politics, Contemporary, Comparative studies, Semantic search">
+</svelte:head>
+
 
   <div id="container">
   <!-- Main content -->

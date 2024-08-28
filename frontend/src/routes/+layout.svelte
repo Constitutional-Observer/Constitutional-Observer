@@ -1,5 +1,6 @@
 <script>
   import "../app.css";
+  import { MetaTags } from 'svelte-meta-tags';
 </script>
 
 <div class="size-disclaimer">

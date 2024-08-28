@@ -8,8 +8,11 @@
 </script>
 
 <svelte:head>
-  <title>About</title>
+  <title>About: Constitutional Observer</title>
+  <meta name="description" content="The Constitutional Observer provides a comparative interface to understand current and past parliamentry discourse in India. Search with a question, and get related discussions in the Lok Sabha and the Constituent Assembly">
+  <meta name="keywords" content="Lok Sabha, Constituent Assembly, Indian Constitution, Politics, Contemporary, Comparative studies">
 </svelte:head>
+
 <main
   class="relative lg:grid lg:grid-cols-10 lg:place-items-start pb-[30vh] gap-10 bg-primaryLight  "
 >
