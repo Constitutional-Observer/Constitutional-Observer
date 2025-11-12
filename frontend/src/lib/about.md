@@ -13,7 +13,7 @@ How have the makers of the Constitution dealt with these? How does the Parliamen
 
 ### Constituent Assembly Debates
 
-The Constituent Assembly Debates have been collated, annotated and archived by the [Constitutional Culture team at the Centre for Law and Policy Research (CLPR), Bangalore](https://clpr.org.in/), at [Constitutionofindia.net](constitutionofindia.net).
+The Constituent Assembly Debates have been collated, annotated and archived by the [Constitutional Culture team at the Centre for Law and Policy Research (CLPR), Bangalore](https://clpr.org.in/), at [Constitutionofindia.net](<https://www.constitutionofindia.net/>).
 
 Their work has been critical to the making and realisation of this project. I thank the team for their work. The Observer extensively used their archive of the Constituent Assembly debates.
 
