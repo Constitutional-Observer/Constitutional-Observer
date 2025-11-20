@@ -14,9 +14,9 @@
 </svelte:head>
 
 <main
-  class="relative lg:grid lg:grid-cols-10 lg:place-items-start pb-[30vh] gap-10 bg-primaryLight  "
+  class="relative grid grid-cols-10 place-items-start pb-[30vh] gap-10 bg-primaryLight  "
 >
-  <section class="lg:col-span-4 self-start lg:sticky lg:top-6">
+  <section class="col-span-10 px-2 sticky lg:col-span-3 self-start lg:sticky lg:top-6">
     <TitleWithNav
       title="About: Constitutional Discourses Observer"
       subtitle="This is a guide to understanding the project, the vision forward, and serves as a quick overview."
@@ -31,7 +31,7 @@
 
   <div
     id="content"
-    class=" lg:col-span-6 text-sm overflow-y-scroll text-justify"
+    class=" col-span-10 lg:col-span-7 px-2 text-sm overflow-y-scroll text-justify"
     use:tocCrawler={{ mode: "generate", scrollTarget: "#content" }}
     bind:this={toc}
   >
@@ -50,7 +50,7 @@
     @apply list-disc pl-5;
   }
   main {
-    @apply md:w-3/4 w-full  md:mx-auto;
+    @apply w-full md:w-3/4   md:mx-auto;
   }
 
   #content :global(p) {

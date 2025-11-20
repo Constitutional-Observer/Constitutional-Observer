@@ -77,6 +77,12 @@
           >How it works: a conceptual overview</a
         >
       </button>
+
+      <button class=" border pr-3 my-1 py-2 rounded">
+        <a href="/collections" class="underline"
+          >Archiving efforts</a
+        >
+      </button>
     </div>
   </div>
 </section>
