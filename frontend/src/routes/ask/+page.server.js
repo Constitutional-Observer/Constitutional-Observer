@@ -1,5 +1,4 @@
-const MEILI_HOST = "https://search.constitutional.observer";
-const MEILI_KEY = "xyz";
+import { MEILI_HOST, MEILI_KEY } from "$env/static/private";
 
 const INDEXES = [
   "state_legislature_debates_ap",

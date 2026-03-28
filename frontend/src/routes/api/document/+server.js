@@ -1,7 +1,5 @@
 import { json } from "@sveltejs/kit";
-
-const MEILI_HOST = "https://search.constitutional.observer";
-const MEILI_KEY = "xyz";
+import { MEILI_HOST, MEILI_KEY } from "$env/static/private";
 
 /**
  * GET /api/document?index=state_legislature_debates_tn&file_name=xxx&highlight_chunks=3,7
