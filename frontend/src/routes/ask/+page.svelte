@@ -12,9 +12,14 @@
   export let data;
   let loading = true;
   let activeState = null;
-  let modalHits = null;
-  let modalState = null;
   let fullDocs = {};
+  let copiedId = null;
+
+  function copyText(text, id) {
+    navigator.clipboard.writeText(text);
+    copiedId = id;
+    setTimeout(() => { if (copiedId === id) copiedId = null; }, 1500);
+  }
   let yearMin = "";
   let yearMax = "";
   let selectedStates = new Set();
@@ -42,6 +47,7 @@
   }
 
   $: resolvedDebates = Array.isArray(data.debates) ? data.debates : [];
+  $: console.log("Result JSON:", resolvedDebates);
 
   // All unique states (before filtering)
   $: allStates = [...new Set(resolvedDebates.map(extractState))].sort();
@@ -69,9 +75,8 @@
   $: hasQuery = !!$page.url.searchParams.get("query");
   $: loading = !hasQuery;
 
-  $: col1 = stateNames.filter((_, i) => i % 3 === 0);
-  $: col2 = stateNames.filter((_, i) => i % 3 === 1);
-  $: col3 = stateNames.filter((_, i) => i % 3 === 2);
+  // Ranked view: all results sorted by score
+  $: rankedHits = [...filteredHits].sort((a, b) => (b._bestScore || b._rankingScore || 0) - (a._bestScore || a._rankingScore || 0));
 
   function toggleStateFilter(s) {
     if (selectedStates.has(s)) {
@@ -95,8 +100,6 @@
 
   function handleSubmit() {
     activeState = null;
-    modalHits = null;
-    modalState = null;
     fullDocs = {};
     const params = new URLSearchParams({
       query: $query,
@@ -108,19 +111,13 @@
   }
 
   function handleStateClick(e) {
-    openModal(e.detail.state);
-  }
-
-  function openModal(stateName) {
-    activeState = stateName;
-    modalState = stateName;
-    modalHits = resultsByState[stateName] || [];
-  }
-
-  function closeModal() {
-    activeState = null;
-    modalState = null;
-    modalHits = null;
+    const state = e.detail.state;
+    if (selectedStates.has(state)) {
+      selectedStates.delete(state);
+    } else {
+      selectedStates.add(state);
+    }
+    selectedStates = selectedStates;
   }
 
   function getHitTitle(hit) { return hit.title_en || hit.subject || "Untitled"; }
@@ -218,7 +215,7 @@
           </form>
         </TitleWithNav>
         <div class="map-box">
-          <IndiaMap {resultsByState} {activeState} on:stateclick={handleStateClick} />
+          <IndiaMap {resultsByState} activeState={selectedStates.size === 1 ? [...selectedStates][0] : null} on:stateclick={handleStateClick} />
         </div>
 
         <!-- Filters -->
@@ -257,8 +254,8 @@
           <div class="filter-section">
             <label class="filter-label">Search params</label>
             <div class="param-grid">
-              <label class="param-label">Semantic ratio</label>
-              <input type="number" step="0.01" min="0" max="1" bind:value={paramSemanticRatio} class="param-input" />
+              <label class="param-label">Semantic ratio <span class="param-value">{paramSemanticRatio}</span></label>
+              <input type="range" step="0.01" min="0" max="1" bind:value={paramSemanticRatio} class="param-slider" />
               <label class="param-label">Limit</label>
               <input type="number" step="1" min="1" max="200" bind:value={paramLimit} class="param-input" />
               <label class="param-label">Score threshold</label>
@@ -269,109 +266,85 @@
         </div>
       </aside>
 
-      <!-- Right: 3 columns of state chips -->
-      <main class="state-grid">
-        {#each [col1, col2, col3] as col}
-          <div class="state-col">
-            {#each col as stateName}
-              {@const hits = resultsByState[stateName]}
-              {@const years = hits.map(h => h.year).filter(Boolean)}
-              {@const minY = years.length ? Math.min(...years) : null}
-              {@const maxY = years.length ? Math.max(...years) : null}
-              <button
-                class="state-chip"
-                class:active={activeState === stateName}
-                on:click={() => openModal(stateName)}
-              >
-                <div>
-                  <span class="chip-name">{stateName}</span>
-                  {#if minY}
-                    <span class="chip-years">{minY}{maxY !== minY ? `–${maxY}` : ""}</span>
-                  {/if}
+      <!-- Right: ranked results across all states -->
+      <main class="results-panel">
+        <Accordion>
+          {#each rankedHits as hit, i (hit.id || i)}
+            <AccordionItem open={i < 3}>
+              <svelte:fragment slot="summary">
+                <div class="result-summary">
+                  <span class="score-badge" title="Ranking score">{(hit._bestScore || hit._rankingScore || 0).toFixed(3)}</span>
+                  <div class="result-info">
+                    <div class="result-head">
+                      <span class="state-badge">{extractState(hit)}</span>
+                      {#if getHitDate(hit)}
+                        <span class="date-badge">{getHitDate(hit)}</span>
+                      {/if}
+                      <h4 class="result-title">{getHitTitle(hit)}</h4>
+                    </div>
+                    <div class="meta-tags">
+                      {#if hit._matchedChunks?.length > 1}
+                        <span class="meta-tag chunks-tag">{hit._matchedChunks.length} chunks</span>
+                      {/if}
+                      {#each getMetaTags(hit).filter(t => t.key !== '_score') as tag (tag.key)}
+                        <span class="meta-tag">{tag.label}: {tag.value}</span>
+                      {/each}
+                      {#if getHitLink(hit)}
+                        <a href={getHitLink(hit)} target="_blank" class="meta-tag meta-link" on:click|stopPropagation>archive</a>
+                      {/if}
+                    </div>
+                  </div>
                 </div>
-                <span class="chip-count">{hits.length}</span>
-              </button>
-            {/each}
-          </div>
-        {/each}
+              </svelte:fragment>
+              <svelte:fragment slot="content">
+                <!-- Matched chunks from search -->
+                {#if hit._matchedChunks && hit._matchedChunks.length > 0}
+                  <p class="matched-label">{hit._matchedChunks.length} matched section{hit._matchedChunks.length > 1 ? "s" : ""}</p>
+                  {#each hit._matchedChunks as mc (mc.chunk_id)}
+                    <div class="matched-chunk">
+                      <div class="chunk-header">
+                        <span class="chunk-id">#{mc.chunk_id} &middot; {mc.score?.toFixed(3) || ""}</span>
+                        <button class="copy-btn" on:click={() => copyText(mc.text, `mc-${hit.id}-${mc.chunk_id}`)}>
+                          {copiedId === `mc-${hit.id}-${mc.chunk_id}` ? "Copied" : "Copy"}
+                        </button>
+                      </div>
+                      <p>{mc.text}</p>
+                    </div>
+                  {/each}
+                {:else}
+                  <blockquote class="result-excerpt">
+                    {getHitContent(hit)}
+                    <button class="copy-btn" on:click={() => copyText(getHitContent(hit), `ex-${hit.id}`)}>
+                      {copiedId === `ex-${hit.id}` ? "Copied" : "Copy"}
+                    </button>
+                  </blockquote>
+                {/if}
+
+                <!-- Full document loader -->
+                {@const docKey = getDocKey(hit)}
+                {#if !fullDocs[docKey]}
+                  <button class="load-doc-btn" on:click={() => loadFullDocument(hit)}>Load full document</button>
+                {:else if fullDocs[docKey].loading}
+                  <p class="doc-loading">Loading...</p>
+                {:else if fullDocs[docKey].chunks.length > 0}
+                  <div class="full-doc">
+                    <p class="doc-info">{fullDocs[docKey].chunks.length} chunks in document</p>
+                    {#each fullDocs[docKey].chunks as chunk (chunk.chunk_id)}
+                      <div id="chunk-{docKey}-{chunk.chunk_id}" class="doc-chunk" class:doc-chunk-highlight={chunk.isHighlighted}>
+                        <span class="chunk-id">#{chunk.chunk_id}</span>
+                        <p>{chunk.text}</p>
+                      </div>
+                    {/each}
+                  </div>
+                {:else}
+                  <p class="doc-loading">Could not load document.</p>
+                {/if}
+              </svelte:fragment>
+            </AccordionItem>
+          {/each}
+        </Accordion>
       </main>
     </div>
-
-    <!-- Modal -->
-    {#if modalState && modalHits}
-      <div class="modal-backdrop" on:click={closeModal} on:keydown={(e) => e.key === 'Escape' && closeModal()}>
-        <div class="modal" on:click|stopPropagation role="dialog" aria-modal="true">
-          <div class="modal-header">
-            <h2>{modalState}</h2>
-            <span class="modal-count">{modalHits.length} results</span>
-            <button class="modal-close" on:click={closeModal}>&times;</button>
-          </div>
-          <div class="modal-body">
-            <Accordion>
-              {#each modalHits as hit, i (hit.id || i)}
-                <AccordionItem open={i < 2}>
-                  <svelte:fragment slot="summary">
-                    <div>
-                      <div class="result-head">
-                        {#if getHitDate(hit)}
-                          <span class="date-badge">{getHitDate(hit)}</span>
-                        {/if}
-                        <h4 class="result-title">{getHitTitle(hit)}</h4>
-                      </div>
-                      <div class="meta-tags">
-                        {#if hit._matchedChunks?.length > 1}
-                          <span class="meta-tag chunks-tag">{hit._matchedChunks.length} chunks</span>
-                        {/if}
-                        {#each getMetaTags(hit) as tag (tag.key)}
-                          <span class="meta-tag">{tag.label}: {tag.value}</span>
-                        {/each}
-                        {#if getHitLink(hit)}
-                          <a href={getHitLink(hit)} target="_blank" class="meta-tag meta-link" on:click|stopPropagation>archive</a>
-                        {/if}
-                      </div>
-                    </div>
-                  </svelte:fragment>
-                  <svelte:fragment slot="content">
-                    <!-- Matched chunks from search -->
-                    {#if hit._matchedChunks && hit._matchedChunks.length > 0}
-                      <p class="matched-label">{hit._matchedChunks.length} matched section{hit._matchedChunks.length > 1 ? "s" : ""}</p>
-                      {#each hit._matchedChunks as mc (mc.chunk_id)}
-                        <div class="matched-chunk">
-                          <span class="chunk-id">#{mc.chunk_id} &middot; {mc.score?.toFixed(3) || ""}</span>
-                          <p>{mc.text}</p>
-                        </div>
-                      {/each}
-                    {:else}
-                      <blockquote class="result-excerpt">{getHitContent(hit)}</blockquote>
-                    {/if}
-
-                    <!-- Full document loader -->
-                    {@const docKey = getDocKey(hit)}
-                    {#if !fullDocs[docKey]}
-                      <button class="load-doc-btn" on:click={() => loadFullDocument(hit)}>Load full document</button>
-                    {:else if fullDocs[docKey].loading}
-                      <p class="doc-loading">Loading...</p>
-                    {:else if fullDocs[docKey].chunks.length > 0}
-                      <div class="full-doc">
-                        <p class="doc-info">{fullDocs[docKey].chunks.length} chunks in document</p>
-                        {#each fullDocs[docKey].chunks as chunk (chunk.chunk_id)}
-                          <div id="chunk-{docKey}-{chunk.chunk_id}" class="doc-chunk" class:doc-chunk-highlight={chunk.isHighlighted}>
-                            <span class="chunk-id">#{chunk.chunk_id}</span>
-                            <p>{chunk.text}</p>
-                          </div>
-                        {/each}
-                      </div>
-                    {:else}
-                      <p class="doc-loading">Could not load document.</p>
-                    {/if}
-                  </svelte:fragment>
-                </AccordionItem>
-              {/each}
-            </Accordion>
-          </div>
-        </div>
-      </div>
-    {/if}
   {/if}
 </div>
 <Footer />
@@ -412,71 +385,25 @@
     @apply mt-3 bg-white/60 backdrop-blur-sm rounded-lg p-3 border border-primary/30;
   }
 
-  /* State grid: 3 columns of chips */
-  .state-grid {
-    @apply flex-1 grid grid-cols-3 gap-2 content-start;
+  /* Results panel */
+  .results-panel {
+    @apply flex-1 min-w-0;
   }
 
-  .state-col {
-    @apply flex flex-col gap-2;
+  .result-summary {
+    @apply flex items-start gap-3 w-full;
   }
 
-  .state-chip {
-    @apply flex items-center justify-between px-3 py-2 rounded-lg cursor-pointer transition-all text-left;
-    @apply bg-primaryLight/80 backdrop-blur-sm border border-primary/20;
-    @apply hover:bg-primary/30 hover:border-primary/40;
+  .score-badge {
+    @apply shrink-0 text-sm font-mono font-bold px-2 py-1 rounded-md bg-emerald-100 text-emerald-900 border border-emerald-300;
   }
 
-  .state-chip.active {
-    @apply bg-primary/40 border-primary ring-1 ring-primary/30;
+  .result-info {
+    @apply flex-1 min-w-0;
   }
 
-  .chip-name {
-    @apply text-xs font-semibold text-black/90;
-  }
-
-  .chip-years {
-    @apply block text-[9px] text-black/40 font-mono mt-0.5;
-  }
-
-  .chip-count {
-    @apply text-[10px] bg-primary/40 text-black/60 px-1.5 py-0.5 rounded-full font-mono;
-  }
-
-  /* Modal */
-  .modal-backdrop {
-    @apply fixed inset-0 bg-black/50 z-50 flex items-start justify-center pt-12 px-4;
-    backdrop-filter: blur(2px);
-  }
-
-  .modal {
-    @apply bg-white rounded-xl shadow-2xl w-full flex flex-col;
-    max-width: 700px;
-    max-height: 80vh;
-  }
-
-  .modal-header {
-    @apply flex items-center gap-3 px-5 py-3 border-b border-gray-200;
-  }
-
-  .modal-header h2 {
-    @apply text-lg font-bold text-black flex-1;
-  }
-
-  .modal-count {
-    @apply text-xs text-black/50;
-  }
-
-  .modal-close {
-    @apply text-2xl text-black/40 hover:text-black leading-none px-1;
-  }
-
-  .modal-close::after {
-    content: "";
-  }
-
-  .modal-body {
-    @apply overflow-y-auto px-5 py-4;
+  .state-badge {
+    @apply text-[11px] font-semibold px-2 py-0.5 rounded bg-blue-100 text-blue-800 border border-blue-200;
   }
 
   /* Filters */
@@ -539,6 +466,15 @@
 
   .param-input {
     @apply w-full text-[11px] px-1.5 py-0.5 rounded border border-primary/30 bg-white/80 font-mono;
+  }
+
+  .param-slider {
+    @apply w-full h-1.5 rounded-full appearance-none cursor-pointer;
+    @apply bg-primary/30 accent-emerald-600;
+  }
+
+  .param-value {
+    @apply font-mono text-[10px] text-black/70 ml-1;
   }
 
   .param-hint {
@@ -618,8 +554,20 @@
     @apply bg-yellow-200/80 border-l-4 border-yellow-500 text-black/90 font-medium;
   }
 
+  .chunk-header {
+    @apply flex items-center justify-between mb-1;
+  }
+
   .chunk-id {
-    @apply text-[10px] text-black/30 font-mono float-right ml-2;
+    @apply text-[10px] text-black/30 font-mono;
+  }
+
+  .copy-btn {
+    @apply text-[10px] px-1.5 py-0.5 rounded border border-primary/20 bg-white/60 text-black/50 hover:bg-primary/20 hover:text-black/80 transition-all;
+  }
+
+  .copy-btn::after {
+    content: "";
   }
 
   :global(input[type="text"]) {
