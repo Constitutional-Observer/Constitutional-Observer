@@ -195,6 +195,7 @@
 </svelte:head>
 
 <div id="container">
+<div id="container">
   {#if loading}
     <div class="md:p-20 h-auto">
       <MainSearch />

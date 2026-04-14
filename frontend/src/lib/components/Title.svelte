@@ -1,38 +1,18 @@
 <script>
   import { query } from "$lib/stores";
   import { questions } from "$lib/text.js";
-  import { getToastStore } from "@skeletonlabs/skeleton";
   import { goto } from "$app/navigation";
   import { onDestroy, onMount } from "svelte";
 
   let refreshIntervalId;
 
-  let placeholderQuestion = "Who should the nation pray to?";
-
-  // function clearOptions(e) {
-  //   placeholderQuestion = "";
-  //   clearInterval(refreshIntervalId);
-  // }
-
-  // function periodicRefresh() {
-  //   // random from text
-  //   placeholderQuestion =
-  //     questions[0][0][Math.floor(Math.random() * questions[0][0].length)];
-  // }
+  let placeholderQuestion = $state("Who should the nation pray to?");
 
   function navigateTo() {
     clearInterval(refreshIntervalId);
     $query = placeholderQuestion;
     goto("/ask/");
   }
-
-  // onMount(() => {
-  //   refreshIntervalId = setInterval(periodicRefresh, 10000);
-  // });
-
-  // onDestroy(() => {
-  //   clearInterval(refreshIntervalId);
-  // });
 </script>
 
 <section
@@ -54,7 +34,7 @@
         will respond with sections from the Constituent Assembly and the Lok Sabha
         that will aid in answering your question.
       </p>
-      <form on:submit|preventDefault={navigateTo}>
+      <form onsubmit={(e) => { e.preventDefault(); navigateTo(); }}>
         <section class="flex flex-row mt-5 bg-primary p-2 mb-1">
           <input
             type="text"
@@ -67,7 +47,7 @@
           <button
             type="submit"
             class="btn bg-primary text-white px-2 rounded-md"
-            on:click={navigateTo}>Explore</button
+            onclick={navigateTo}>Explore</button
           >
         </section>
       </form>

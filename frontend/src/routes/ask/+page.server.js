@@ -65,6 +65,7 @@ async function searchIndex(fetch, index, query, params = SEARCH_PARAMS) {
 
 export const load = async ({ url, fetch }) => {
   const query = url.searchParams.get("query");
+  console.log("[load] query:", query, "| apiLink:", apiLink);
 
   if (!query) {
     return { debates: [], sabha: [], searchParams: SEARCH_PARAMS };

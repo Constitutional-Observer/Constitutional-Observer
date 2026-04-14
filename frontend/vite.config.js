@@ -4,14 +4,13 @@ import { defineConfig } from "vite";
 export default defineConfig({
   plugins: [sveltekit()],
   build: {
-    target: "es2022",
+    cssMinify: 'esbuild',
   },
   esbuild: {
-    target: "es2022",
   },
   optimizeDeps: {
-    esbuildOptions: {
-      target: "es2022",
-    },
   },
+   css: {
+    transformer: 'postcss' // fallback from lightningcss
+  }
 });

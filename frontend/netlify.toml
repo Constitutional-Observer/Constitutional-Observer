@@ -1,4 +1,9 @@
 [build]
-  base="frontend"
-  command = "npm run build"
+  base = "frontend"
+  command = "yarn build"
   publish = "build"
+
+[functions]
+  directory = ".netlify/functions-internal"
+  node_bundler = "esbuild"
+  included_files = [".netlify/server/**"]

@@ -1,10 +1,8 @@
 <script>
-  import { TableOfContents, tocCrawler } from "@skeletonlabs/skeleton";
   import { marked } from "marked";
   import source from "$lib/about.md?raw";
   import TitleWithNav from "../../lib/components/TitleWithNav.svelte";
   import Footer from "$lib/components/Footer.svelte";
-  let toc;
 </script>
 
 <svelte:head>
@@ -20,20 +18,12 @@
     <TitleWithNav
       title="About: Constitutional Discourses Observer"
       subtitle="This is a guide to understanding the project, the vision forward, and serves as a quick overview."
-    >
-      <TableOfContents
-        class="pt-4 text-sm"
-        active="bg-primary "
-        regionListItem="border-8 border-primary"
-      /></TitleWithNav
-    >
+    />
   </section>
 
   <div
     id="content"
     class=" col-span-10 lg:col-span-7 px-2 text-sm overflow-y-scroll text-justify"
-    use:tocCrawler={{ mode: "generate", scrollTarget: "#content" }}
-    bind:this={toc}
   >
     {@html marked.parse(source)}
   </div>

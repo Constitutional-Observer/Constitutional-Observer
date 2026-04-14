@@ -1,28 +1,19 @@
 <script>
   import { onDestroy, onMount } from "svelte";
 
-  let elemCarousel;
+  let elemCarousel = $state();
   let interval;
-  let questionsDiv;
-
-  // function carouselLeft() {
-  //   const x =
-  //     elemCarousel.scrollLeft === 0
-  //       ? elemCarousel.clientWidth * elemCarousel.childElementCount // loop
-  //       : elemCarousel.scrollLeft - elemCarousel.clientWidth; // step left
-  //   elemCarousel.scroll({ left: x, top: 0, behavior: "smooth" });
-  // }
+  let questionsDiv = $state();
 
   function carouselRight() {
     const x =
       elemCarousel.scrollLeft ===
       elemCarousel.scrollWidth - elemCarousel.clientWidth
-        ? 0 // loop
-        : elemCarousel.scrollLeft + elemCarousel.clientWidth; // step right
+        ? 0
+        : elemCarousel.scrollLeft + elemCarousel.clientWidth;
     elemCarousel.scroll({ left: x, top: 0, behavior: "smooth" });
   }
 
-  // auto scroll every 5 seconds
   onMount(() => {
     interval = setInterval(carouselRight, 4000);
   });
@@ -31,32 +22,7 @@
     clearInterval(interval);
   });
 
-  // function highlightSpans() {
-  //   // Get all spans in the questionsDiv
-  //   const spans = questionsDiv.querySelectorAll("li");
-
-  //   // find 30 random spans
-  //   const randomSpans = [];
-  //   for (let i = 0; i < 30; i++) {
-  //     const randomIndex = Math.floor(Math.random() * spans.length);
-  //     randomSpans.push(spans[randomIndex]);
-  //   }
-
-  //   for (let i = 0; i < randomSpans.length; i++) {
-  //     randomSpans[i].classList.add(
-  //       "underline",
-  //       "font-semibold",
-  //       "decoration-2",
-  //       "text-black/60"
-  //     );
-  //   }
-  // }
-
-  // onMount(() => {
-  //   highlightSpans();
-  // });
-
-  export let contents;
+  let { contents } = $props();
 </script>
 
 <section class="relative">
@@ -135,7 +101,7 @@
         <button
           type="button"
           class="btn-icon absolute right-0 top-1/2 z-20 variant-filled bg-primary/90"
-          on:click={carouselRight}
+          onclick={carouselRight}
         >
         </button>
       {/if}

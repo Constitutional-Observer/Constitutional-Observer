@@ -1,6 +1,6 @@
 import texts from "./questions.txt?raw";
 
-let getQuestions = async () => {
+let getQuestions = () => {
   // Construct a text array, with 10 elements from text file
   let fullText = texts.split("\n");
 
@@ -40,7 +40,7 @@ let getQuestions = async () => {
   return reformattedTextArray;
 };
 
-export let questions = await getQuestions();
+export let questions = getQuestions();
 export let text;
 //create a 2d array with 10 * 10 elements
 
@@ -64,7 +64,7 @@ export let images = [
   {
     type: "text",
     title: "How best do you frame a question?",
-    text: await questions,
+    text: questions,
     caption:
       "How do we pose a question that contains a certain vagueness of time and space? It must hint at a core question that need not be restricted to events in time, but even values.",
   },
