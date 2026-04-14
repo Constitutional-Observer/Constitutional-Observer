@@ -1,11 +1,9 @@
 <script>
-  import { page } from "$app/stores";
+  import { page } from "$app/state";
 
-  // get current url
-  let currentUrl = $page.url.pathname.split("/").slice(1);
+  let currentUrl = $derived(page.url.pathname.split("/").slice(1));
 
-  export let title;
-  export let subtitle;
+  let { title, subtitle, children } = $props();
 </script>
 
 <div class=" top-0 text-left text-black/90 w-full px-2">
@@ -28,7 +26,9 @@
     </p>
   {/if}
 
-  <slot></slot>
+  {#if children}
+    {@render children()}
+  {/if}
 </section>
 
 <style lang="postcss">

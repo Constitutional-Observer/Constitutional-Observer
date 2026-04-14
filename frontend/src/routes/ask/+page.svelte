@@ -1,347 +1,189 @@
-  <script>
-    import { query } from "$lib/stores";
-    import { Accordion, AccordionItem } from "@skeletonlabs/skeleton";
-    import MainSearch from "$lib/components/MainSearch.svelte";
-    import Footer from "$lib/components/Footer.svelte";
-    import { invalidateAll } from "$app/navigation";
-    import { page } from "$app/stores";
+<script>
+  import { query } from "$lib/stores";
+  import MainSearch from "$lib/components/MainSearch.svelte";
+  import Footer from "$lib/components/Footer.svelte";
+  import { invalidateAll } from "$app/navigation";
+  import { page } from "$app/state";
+  import TitleWithNav from "../../lib/components/TitleWithNav.svelte";
+  import { onMount } from "svelte";
 
-    import TitleWithNav from "../../lib/components/TitleWithNav.svelte";
-    import { onMount } from "svelte";
+  let { data } = $props();
+  let form;
+  let loading = $state(true);
+  let currentQuery = $state("");
 
-    export let data;
-    let form;
-    let loading = true;
-    let currentQuery = "";
-
-    
-
-    async function loadQuery(currentQuery) {
-      if (
-        typeof currentQuery != "undefined" &&
-        currentQuery != null &&
-        typeof window !== "undefined"
-      ) {
-        loading = false;
-        $query = currentQuery;
-      } else {
-        loading = true;
-      }
+  async function loadQuery(q) {
+    if (
+      typeof q != "undefined" &&
+      q != null &&
+      typeof window !== "undefined"
+    ) {
+      loading = false;
+      $query = q;
+    } else {
+      loading = true;
     }
+  }
 
-    onMount(() => {
-      currentQuery = $page.url.searchParams.get("query");
-      loadQuery(currentQuery);
-    });
+  onMount(() => {
+    currentQuery = page.url.searchParams.get("query");
+    loadQuery(currentQuery);
+  });
 
-    $: currentQuery = $page.url.searchParams.get("query");
-    $: loadQuery(currentQuery);
+  $effect(() => {
+    currentQuery = page.url.searchParams.get("query");
+    loadQuery(currentQuery);
+  });
 
-    async function handleSubmit(event) {
-      $page.url.searchParams.set("query", $query);
-      data.debates = [];
-      data.sabha = [];
-      invalidateAll();
-    }
-  </script>
+  async function handleSubmit() {
+    page.url.searchParams.set("query", $query);
+    data.debates = [];
+    data.sabha = [];
+    invalidateAll();
+  }
+</script>
 
 <svelte:head>
   <title>Ask a question to the Constitutional Observer</title>
-  <meta name="description" content="The Constitutional Observer provides a comparative interface to understand current and past parliamentry discourse in India. Ask a question and it will search the debates of the Constituent Assembly and Lok Sabha">
-  <meta name="keywords" content="Lok Sabha, Constituent Assembly, Indian Constitution, Politics, Contemporary, Comparative studies, Semantic search">
+  <meta name="description" content="Search parliamentary debates" />
 </svelte:head>
 
-
-  <div id="container">
-  <!-- Main content -->
+<div id="container">
   {#if loading}
     <div class="md:p-20 h-auto">
       <MainSearch />
     </div>
   {:else}
-    <div
-      class="md:grid gap-5 md:grid-cols-8 mx-10 text-sm  md:h-[150vh] text-black"
-    >
-      <section class="md:relative scroll-container my-10 col-span-2">
-        <div class="md:absolute top-[10%] left-1/7">
-          <TitleWithNav
-            title={$query}
-            subtitle="Your question is used to meaningfully search a database of the Constitutent Assembly Debates and Lok Sabha Questions and Answers. The Observer hopes to provide you with a historical perspective on ideas that make the nation."
-          >
-            <form
-              class="opacity-80 mt-5 hover:opacity-100 transition-all"
-              on:submit={handleSubmit}
-              bind:this={form}
-              autofocus
-            >
-              <div class="flex">
-                <input
-                  type="text"
-                  name="query"
-                  class="p-1 mr-2 w-full text-sm text-gray-300"
-                  placeholder="Ask a question"
-                  bind:value={$query}
-                  disabled={loading}
-                  autofocus
-                />
-                <button
-                  type="submit"
-                  class="btn bg-primary text-white px-2 py-1 rounded-md"
-                  disabled={loading}>Search</button
-                >
-              </div>
-            </form>
+    <div class="md:grid gap-5 md:grid-cols-8 mx-10 text-sm md:h-[150vh] text-black">
 
-            {#if loading}
-              <span class="text-xl text-center mx-auto"
-                >loading<span class="loader">...</span></span
+      <!-- LEFT PANEL -->
+      <section class="scroll-container my-10 col-span-2">
+        <TitleWithNav title={$query}>
+          <form
+            class="opacity-80 mt-5 hover:opacity-100 transition-all"
+            onsubmit={(e) => { e.preventDefault(); handleSubmit(); }}
+            bind:this={form}
+          >
+            <div class="flex">
+              <input
+                type="text"
+                class="p-1 mr-2 w-full text-sm text-gray-300"
+                bind:value={$query}
+                disabled={loading}
+              />
+              <button
+                type="submit"
+                class="bg-primary text-white px-2 py-1 rounded-md"
+                disabled={loading}
               >
-            {/if}
-          </TitleWithNav>
-        </div>
+                Search
+              </button>
+            </div>
+          </form>
+        </TitleWithNav>
       </section>
 
-      
-        {#await data.debates}
-          Loading...
-        {:then debates}
-          <section class="scroll-container col-span-1 md:col-span-3">
-            <section class="title">
-              <h2 class="title-bg">Constituent Assembly Debates</h2>
-              <p>
-                The Constituent Assembly met between 1947 and 1949 and ratified
-                the Constitution of India on 26th January 1950. These arguments
-                are crucial to undertanding to the origins of our democracy.
-              </p>
-            </section>
-
-            {#if debates.length === 0}
-              <span class="text-xl text-center mx-auto"
-                >loading<span class="loader">...</span></span
-              >
-            {/if}
-
-            <Accordion>
-              {#each debates as debate, index (debate)}
-                <AccordionItem class="card ">
-                  <svelte:fragment slot="lead">
-                    <blockquote
-                      class="text-md px-3 py-1 blockquote !font-semibold !border-l-[3px] !non-italic text-black/90"
-                    >
-                      {debate.content.substring(0, 200) + " ..."}
-                    </blockquote></svelte:fragment
-                  >
-                  <svelte:fragment slot="summary">
-                    <h4>
-                      {#if debate.speaker_name}
-                        {debate.speaker_name}
-                      {:else}
-                        Unknown speaker
-                      {/if}
-                    </h4>
-                    <span>on {new Date(debate.date).toDateString()}</span>
-                  </svelte:fragment>
-                  <svelte:fragment slot="content"
-                    >{debate.content}</svelte:fragment
-                  >
-                </AccordionItem>
-              {/each}
-            </Accordion>
+      <!-- DEBATES -->
+      {#await data.debates}
+        <p>Loading...</p>
+      {:then debates}
+        <section class="scroll-container col-span-3">
+          <section class="title">
+            <h2 class="title-bg">Constituent Assembly Debates</h2>
           </section>
-        {:catch}
-          <p>Something went wrong</p>
-        {/await}
 
-        {#await data.sabha}
-          Loading...
-        {:then questions}
-          <section class="scroll-container col-span-1 md:col-span-3">
-            <section class="title">
-              <h2 class="title-bg">Lok Sabha Debates</h2>
-              <p>
-                The Lok Sabha represents the billion+ citizens of india. Its 543
-                members have met 68 days every year on an average since the 2000s.
-                From 1985 to 2019, debates have been indexed for search here. This has been included for testing on 18/8/24. The quality of responses here will continue to be improved.
-              </p>
-            </section>
+          {#if debates.length === 0}
+            <span class="text-xl">Loading...</span>
+          {/if}
 
-            {#if questions.length === 0}
-              <span class="text-xl text-center mx-auto"
-                >loading<span class="loader">...</span></span
-              >
-            {/if}
-            <Accordion>
-              {#each questions as question, index (question)}
-                <AccordionItem class="card">
-                  <svelte:fragment slot="lead">
-                    <blockquote
-                      class="text-md px-3 py-1 blockquote !font-semibold !border-l-[3px] !non-italic text-black/90"
-                    >
-                      {question.txt}
-                    </blockquote>
+          {#each debates as debate}
+            <details class="accordion">
+              <summary>
+                <div>
+                  <h4>{debate.speaker_name || "Unknown speaker"}</h4>
+                  <span>{new Date(debate.date).toDateString()}</span>
+                </div>
+              </summary>
 
-                    <!-- {sabha.Name} from {sabha.Constituency} in  -->
-                  </svelte:fragment>
+              <blockquote class="mt-2">
+                {debate.content}
+              </blockquote>
+            </details>
+          {/each}
+        </section>
+      {:catch}
+        <p>Error loading debates</p>
+      {/await}
 
-                  <svelte:fragment slot="summary">
-                    on {new Date(question.index[0].Date).toDateString()}
-                    <a
-                      href={"https://eparlib.nic.in" + question.index[0].PDF_Link}
-                      target="_blank">Link</a
-                    >
-                    <!-- {question.questionAnswer.substring(0, 100)} -->
-                  </svelte:fragment>
-
-                  <svelte:fragment slot="content">
-                    Read the question and answer at this link: <a
-                      href={question.link}
-                      target="_blank">Link</a
-                    >
-                  </svelte:fragment>
-                </AccordionItem>
-              {/each}
-            </Accordion>
+      <!-- LOK SABHA -->
+      {#await data.sabha}
+        <p>Loading...</p>
+      {:then questions}
+        <section class="scroll-container col-span-3">
+          <section class="title">
+            <h2 class="title-bg">Lok Sabha Debates</h2>
           </section>
-        {:catch}
-          <p>Something went wrong</p>
-        {/await}
-      </div>
 
-  {/if}
+          {#each questions as question}
+            <details class="accordion">
+              <summary>
+                <span>
+                  {new Date(question.index[0].Date).toDateString()}
+                </span>
+              </summary>
+
+              <div class="mt-2">
+                <p>{question.txt}</p>
+                <a href={question.link} target="_blank">Read more</a>
+              </div>
+            </details>
+          {/each}
+        </section>
+      {:catch}
+        <p>Error loading questions</p>
+      {/await}
+
     </div>
-  <Footer />
+  {/if}
+</div>
 
-  <!-- Main content -->
-  <style lang="postcss">
-      #container {
-      @apply  md:px-[5%];
-      background-image: url("/Constitution_of_India_inside_4.webp");
-      background-repeat: no-repeat;
-      background-position: center;
-      background-size: cover;
-    }
+<Footer />
 
-    .placeholder {
-      @apply bg-surface-300-600-token h-5;
-      /* Theme: Rounded */
-      @apply rounded-token;
-    }
-    .title,
-    .title-bg {
-      @apply sticky top-0 w-full rounded;
-    }
+<style lang="postcss">
+@reference "tailwindcss";
 
-    .title {
-      @apply p-4 pt-6 mb-10 bg-primaryDark border-2 border-primary;
-    }
-    .title-bg {
-      @apply text-xl text-black pb-4 font-bold;
-    }
+#container {
+  @apply md:px-[5%];
+  background-image: url("/Constitution_of_India_inside_4.webp");
+  background-size: cover;
+}
 
-    .scroll-container {
-      @apply snap-y  overflow-y-auto  my-10 px-2 h-auto;
-    }
-    :global(.accordion-lead) {
-      @apply font-bold text-xl pb-2 w-full;
-    }
+.title {
+  @apply p-4 mb-6 bg-primaryDark border border-primary rounded;
+}
 
-    :global(.accordion-summary) {
-      @apply text-sm p-0;
-    }
-    :global(.accordion-control) {
-      @apply flex-wrap;
-    }
-    :global(.accordion-panel) {
-      @apply text-balance;
-    }
-    main {
-      @apply md:mx-auto max-h-screen  mx-auto;
-    }
+.title-bg {
+  @apply text-xl font-bold;
+}
 
-    :global(input[type="text"]) {
-      @apply selection:bg-primary selection:text-black;
-    }
+.scroll-container {
+  @apply overflow-y-auto my-10 px-2;
+}
 
-    a::after {
-      content: "↗";
-    }
-    a {
-      @apply text-blue-800;
-    }
-    :global(.accordion-item, .accordion-item > button) {
-      @apply rounded-lg;
-    }
+/* Accordion styling */
+.accordion {
+  @apply bg-primaryLight rounded-lg p-3 mb-3 transition;
+}
 
-    :global(.accordion-control[aria-expanded="true"]) {
-      @apply bg-primary/100;
-    }
+.accordion:hover {
+  @apply bg-primary/40;
+}
 
-    :global(.accordion-control[aria-expanded="true"]:hover) {
-      @apply bg-primary/40;
-    }
+summary {
+  @apply cursor-pointer font-semibold;
+}
 
-    :global(.accordion-item) {
-      @apply bg-primaryLight select-all;
-    }
-    :global(.accordion-item:hover) {
-      @apply bg-primary/40;
-    }
-    :global(.accordion-panel[aria-hidden="false"]) {
-      @apply bg-primary/40;
-    }
-
-    .loader {
-      width: 180px; /* control the size */
-      aspect-ratio: 8/5;
-      --_g: no-repeat radial-gradient(#000 68%, #0000 71%);
-      -webkit-mask: var(--_g), var(--_g), var(--_g);
-      -webkit-mask-size: 50% 40%;
-      @apply bg-primaryLight;
-      animation: load 2s infinite;
-    }
-
-    @keyframes load {
-      0% {
-        -webkit-mask-position:
-          0% 0%,
-          50% 0%,
-          100% 0%;
-      }
-      16.67% {
-        -webkit-mask-position:
-          0% 100%,
-          50% 0%,
-          100% 0%;
-      }
-      33.33% {
-        -webkit-mask-position:
-          0% 100%,
-          50% 100%,
-          100% 0%;
-      }
-      50% {
-        -webkit-mask-position:
-          0% 100%,
-          50% 100%,
-          100% 100%;
-      }
-      66.67% {
-        -webkit-mask-position:
-          0% 0%,
-          50% 100%,
-          100% 100%;
-      }
-      83.33% {
-        -webkit-mask-position:
-          0% 0%,
-          50% 0%,
-          100% 100%;
-      }
-      100% {
-        -webkit-mask-position:
-          0% 0%,
-          50% 0%,
-          100% 0%;
-      }
-    }
-  </style>
+blockquote {
+  @apply text-sm mt-2;
+}
+</style>

@@ -1,13 +1,14 @@
 <script>
   import "../app.css";
   import { MetaTags } from 'svelte-meta-tags';
+  let { children } = $props();
 </script>
 
 <div class="size-disclaimer">
   Please open this page in a larger window (a desktop or laptop)
 </div>
 
-<slot />
+{@render children()}
 
 <svelte:head>
   <script

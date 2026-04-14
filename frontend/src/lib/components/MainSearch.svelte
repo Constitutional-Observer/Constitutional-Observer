@@ -6,7 +6,7 @@
 
   import Carousel from "./Carousel.svelte";
   import { questions, images } from "$lib/text.js";
-  let loading = false;
+  let loading = $state(false);
 </script>
 
 <div class="landing overflow-y-auto lg:grid lg:grid-cols-10 gap-6 h-auto text-sm">
@@ -26,11 +26,10 @@
     </TitleWithNav>
   </section>
   <section class="col-span-6 lg:col-span-6 self-center">
-    <!-- Central search-->
     <form
       class="text-left"
       method="post"
-      on:submit={(event) => {
+      onsubmit={(event) => {
         event.preventDefault();
         loading = true;
         goto("/ask/?query=" + encodeURIComponent($query));
@@ -40,8 +39,6 @@
     </form>
   </section>
 </div>
-
-<!-- Central search-->
 
 <style lang="postcss">
 

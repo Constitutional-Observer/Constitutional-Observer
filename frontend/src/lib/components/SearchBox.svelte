@@ -2,15 +2,15 @@
   import { query } from "$lib/stores";
   import { onMount } from "svelte";
 
-  export let loading = false;
+  let { loading = false } = $props();
   let box1 = ["Who", "What", "When", "Where", "Why", "How"],
-    box1selected = [];
+    box1selected = $state([]);
 
   let box2 = ["should", "must", "could", "can", "will", "shall", "ought to"],
-    box2selected = [];
+    box2selected = $state([]);
 
   let box3 = ["be", "have", "do", "the"],
-    box3selected = [];
+    box3selected = $state([]);
 
   let box4 = [
       "nation",
@@ -21,10 +21,10 @@
       "community",
       "constitution",
     ],
-    box4selected = [];
+    box4selected = $state([]);
 
   let box5 = ["pray", "feed", "eat", "speak", "love", "know"],
-    box5selected = [];
+    box5selected = $state([]);
 
   let box6 = [
       "government",
@@ -36,11 +36,10 @@
       "love",
       "poems",
     ],
-    box6selected = [];
+    box6selected = $state([]);
 
-  function onchange(text) {
+  function handleChange(text) {
     $query = $query + " " + text;
-    $query = $query;
   }
 
   function clearOptions(e) {
@@ -53,47 +52,8 @@
     box5selected = [];
     box6selected = [];
   }
-
-  onMount(() => {
-    if ($query) {
-      // split into words and make list
-      let words = $query.split(" ");
-
-      // // if word is in check list add it
-      // for (let i = 0; i < words.length; i++) {
-      //   console.log(words[i]);
-      //   switch (words[i]) {
-      //     case box1.includes(words[i]):
-      //       box1selected = [...box1selected, words[i]];
-      //       break;
-      //     case box2.includes(words[i]):
-      //       box2selected = [...box2selected, words[i]];
-      //       break;
-      //     case box3.includes(words[i]):
-      //       box3selected = [...box3selected, words[i]];
-      //       break;
-      //     case box4.includes(words[i]):
-      //       box4selected = [...box4selected, words[i]];
-      //       break;
-      //     case box5.includes(words[i]):
-      //       box5selected = [...box5selected, words[i]];
-      //       break;
-      //   }
-      // }
-    }
-  });
 </script>
 
-<!-- <div class="grid grid-cols-8">
-  <div class="w-80 col-span-2">
-    <p class="text-xl text-left py-5">ask from these</p>
-    {#each text1.slice(0, 4) as option}
-      <button class="text-left text-xl" on:click={() => onchange(option)}>
-        {option}</button
-      >
-    {/each}
-  </div>
-</div> -->
 <div class="w-full grid mt-3 px-1">
   <section class=" ">
     <div class="flex flex-row bg-primary p-2">
@@ -111,7 +71,7 @@
       >
       <button
         class="btn bg-primary w-20 text-white px-2 py-auto rounded-md"
-        on:click={clearOptions}
+        onclick={clearOptions}
         disabled={loading}>Clear</button
       >
     </div>
@@ -137,7 +97,7 @@
               id={option}
               bind:group={box1selected}
               value={option}
-              on:change={() => onchange(option)}
+              onchange={() => handleChange(option)}
             />
             <label for={option}>{option}</label>
           {/each}
@@ -151,24 +111,11 @@
               id={option}
               bind:group={box2selected}
               value={option}
-              on:change={() => onchange(option)}
+              onchange={() => handleChange(option)}
             />
             <label for={option}>{option}</label>
           {/each}
         </div>
-        <!-- <div class="q-opt-box">
-      <h4></h4>
-      {#each box3 as option}
-        <input
-          type="checkbox" class="btn"
-          id={option}
-          bind:group={box3selected}
-          value={option}
-          on:change={() => onchange(option)}
-        />
-        <label for={option}>{option}</label>
-      {/each}
-    </div> -->
         <div class="q-opt-box">
           <h4>Who do you think it affects?</h4>
           {#each box4 as option}
@@ -178,7 +125,7 @@
               id={option}
               bind:group={box4selected}
               value={option}
-              on:change={() => onchange(option)}
+              onchange={() => handleChange(option)}
             />
             <label for={option}>{option}</label>
           {/each}
@@ -192,7 +139,7 @@
               id={option}
               bind:group={box5selected}
               value={option}
-              on:change={() => onchange(option)}
+              onchange={() => handleChange(option)}
             />
             <label for={option}>{option}</label>
           {/each}
@@ -206,7 +153,7 @@
               id={option}
               bind:group={box6selected}
               value={option}
-              on:change={() => onchange(option)}
+              onchange={() => handleChange(option)}
             />
             <label for={option}>{option}</label>
           {/each}
@@ -222,7 +169,7 @@
     @apply disabled:opacity-60 disabled:cursor-not-allowed disabled:cursor-default;
   }
   .loader {
-    width: 180px; /* control the size */
+    width: 180px;
     aspect-ratio: 8/5;
     --_g: no-repeat radial-gradient(#000 68%, #0000 71%);
     -webkit-mask: var(--_g), var(--_g), var(--_g);
