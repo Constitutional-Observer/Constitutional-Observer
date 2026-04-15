@@ -1,14 +1,9 @@
 <script>
   import { getStatePositions } from "$lib/india-states.js";
-  import { createEventDispatcher } from "svelte";
 
-  export let resultsByState = {}; // { "Tamil Nadu": [...], "Karnataka": [...] }
-  export let activeState = null;
+  let { resultsByState = {}, activeState = null, selectedStates = new Set(), onstateclick } = $props();
 
-  const dispatch = createEventDispatcher();
   const statePositions = getStatePositions();
-
-  // Edge point for drawing arrows (right side of SVG)
   const ARROW_EXIT_X = 350;
 
   function getRadius(stateName) {
@@ -18,12 +13,12 @@
   }
 
   function handleClick(stateName) {
-    dispatch("stateclick", { state: stateName });
+    onstateclick?.({ detail: { state: stateName } });
   }
 
-  $: activeStates = Object.keys(resultsByState).filter(
+  let activeStates = $derived(Object.keys(resultsByState).filter(
     (s) => resultsByState[s]?.length > 0
-  );
+  ));
 </script>
 
 <svg
@@ -59,10 +54,10 @@
         y1={state.y}
         x2={ARROW_EXIT_X}
         y2={state.y}
-        stroke={activeState === state.name ? "#b8860b" : "#c3b091"}
-        stroke-width={activeState === state.name ? 2 : 1}
-        stroke-dasharray={activeState === state.name ? "none" : "4 3"}
-        opacity={activeState === state.name ? 0.9 : 0.5}
+        stroke={selectedStates.has(state.name) || activeState === state.name ? "#b8860b" : "#c3b091"}
+        stroke-width={selectedStates.has(state.name) || activeState === state.name ? 2 : 1}
+        stroke-dasharray={selectedStates.has(state.name) || activeState === state.name ? "none" : "4 3"}
+        opacity={selectedStates.has(state.name) || activeState === state.name ? 0.9 : 0.5}
         marker-end="url(#arrowhead)"
         class="arrow-line"
       />
@@ -72,13 +67,14 @@
   <!-- State markers -->
   {#each statePositions as state}
     {@const hasResults = activeStates.includes(state.name)}
-    {@const isActive = activeState === state.name}
+    {@const isSelected = selectedStates.has(state.name)}
+    {@const isActive = isSelected || activeState === state.name}
     <g
       class="state-marker"
       class:has-results={hasResults}
       class:is-active={isActive}
-      on:click={() => hasResults && handleClick(state.name)}
-      on:keydown={(e) => e.key === "Enter" && hasResults && handleClick(state.name)}
+      onclick={() => hasResults && handleClick(state.name)}
+      onkeydown={(e) => e.key === "Enter" && hasResults && handleClick(state.name)}
       role={hasResults ? "button" : "presentation"}
       tabindex={hasResults ? 0 : -1}
     >
@@ -106,12 +102,12 @@
       />
       <text
         x={state.x}
-        y={state.y - getRadius(state.name) - 4}
+        y={state.y - getRadius(state.name) - 5}
         text-anchor="middle"
         class="state-label"
         class:label-active={hasResults}
       >
-        {state.code}
+        {state.code}{#if hasResults} ({resultsByState[state.name]?.length || 0}){/if}
       </text>
     </g>
   {/each}
@@ -138,7 +134,7 @@
   }
 
   .state-label {
-    font-size: 7px;
+    font-size: 9px;
     fill: #999;
     font-family: inherit;
     pointer-events: none;
@@ -147,7 +143,7 @@
   .label-active {
     fill: #333;
     font-weight: 600;
-    font-size: 8px;
+    font-size: 10px;
   }
 
   .arrow-line {

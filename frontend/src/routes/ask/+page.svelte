@@ -1,33 +1,27 @@
 <script>
   import { query } from "$lib/stores";
-  import { Accordion, AccordionItem } from "@skeletonlabs/skeleton";
   import MainSearch from "$lib/components/MainSearch.svelte";
   import Footer from "$lib/components/Footer.svelte";
   import IndiaMap from "$lib/components/IndiaMap.svelte";
   import TitleWithNav from "$lib/components/TitleWithNav.svelte";
   import { goto } from "$app/navigation";
-  import { page } from "$app/stores";
+  import { page } from "$app/state";
   import { onMount, tick } from "svelte";
 
-  export let data;
-  let loading = true;
-  let activeState = null;
-  let fullDocs = {};
-  let copiedId = null;
+  let { data } = $props();
+  let fullDocs = $state({});
+  let copiedId = $state(null);
+  let yearMin = $state("");
+  let yearMax = $state("");
+  let selectedStates = $state(new Set());
+  let selectedHitIndex = $state(null);
+  let activeCollection = $state(null);
 
-  function copyText(text, id) {
-    navigator.clipboard.writeText(text);
-    copiedId = id;
-    setTimeout(() => { if (copiedId === id) copiedId = null; }, 1500);
-  }
-  let yearMin = "";
-  let yearMax = "";
-  let selectedStates = new Set();
-
-  // Editable search params (synced from server defaults on load)
-  let paramSemanticRatio = data.searchParams?.semanticRatio ?? 0.5;
-  let paramLimit = data.searchParams?.limit ?? 50;
-  let paramScoreThreshold = data.searchParams?.scoreThreshold ?? 0.58;
+  // Editable search params (user-adjustable, intentionally capturing initial values)
+  let paramHybrid = $state(false);
+  let paramSemanticRatio = $state(0.5);
+  let paramLimit = $state(50);
+  let paramScoreThreshold = $state(0.58);
 
   const METADATA_KEYS = [
     "house", "session", "term_number", "term_start", "term_end",
@@ -46,37 +40,51 @@
     return grouped;
   }
 
-  $: resolvedDebates = Array.isArray(data.debates) ? data.debates : [];
-  $: console.log("Result JSON:", resolvedDebates);
+  function copyText(text, id) {
+    navigator.clipboard.writeText(text);
+    copiedId = id;
+    setTimeout(() => { if (copiedId === id) copiedId = null; }, 1500);
+  }
 
-  // All unique states (before filtering)
-  $: allStates = [...new Set(resolvedDebates.map(extractState))].sort();
+  let collections = $derived(data.collections || []);
+  let resolvedDebates = $derived(Array.isArray(data.debates) ? data.debates : []);
+  let isStateCollection = $derived(!activeCollection || activeCollection === "State Legislatures");
+  let collectionDebates = $derived(
+    activeCollection
+      ? resolvedDebates.filter(h => h._collection === activeCollection)
+      : resolvedDebates
+  );
 
-  // Year range across all results
-  $: allYears = resolvedDebates.map(h => h.year).filter(Boolean);
-  $: globalMinYear = allYears.length ? Math.min(...allYears) : 0;
-  $: globalMaxYear = allYears.length ? Math.max(...allYears) : 0;
+  $effect(() => { console.log("Result JSON:", resolvedDebates); });
 
-  // Filtered hits
-  $: filteredHits = resolvedDebates.filter(h => {
+  let allStates = $derived([...new Set(collectionDebates.map(extractState))].sort());
+
+  let allYears = $derived(collectionDebates.map(h => h.year).filter(Boolean));
+  let globalMinYear = $derived(allYears.length ? Math.min(...allYears) : 0);
+  let globalMaxYear = $derived(allYears.length ? Math.max(...allYears) : 0);
+
+  let filteredHits = $derived(collectionDebates.filter(h => {
     if (selectedStates.size > 0 && !selectedStates.has(extractState(h))) return false;
     if (yearMin && h.year && h.year < Number(yearMin)) return false;
     if (yearMax && h.year && h.year > Number(yearMax)) return false;
     return true;
-  });
+  }));
 
-  $: allHits = filteredHits;
-  $: resultsByState = groupByState(allHits);
-  $: stateNames = Object.keys(resultsByState).sort((a, b) => {
+  let allHits = $derived(filteredHits);
+  // Unfiltered grouping for map (so all states always show within active collection)
+  let allResultsByState = $derived(groupByState(collectionDebates));
+  let resultsByState = $derived(groupByState(allHits));
+  let stateNames = $derived(Object.keys(resultsByState).sort((a, b) => {
     if (a === "Unknown") return 1;
     if (b === "Unknown") return -1;
     return a.localeCompare(b);
-  });
-  $: hasQuery = !!$page.url.searchParams.get("query");
-  $: loading = !hasQuery;
+  }));
+  let hasQuery = $derived(!!page.url.searchParams.get("query"));
+  let loading = $derived(!hasQuery);
 
-  // Ranked view: all results sorted by score
-  $: rankedHits = [...filteredHits].sort((a, b) => (b._bestScore || b._rankingScore || 0) - (a._bestScore || a._rankingScore || 0));
+  let rankedHits = $derived([...filteredHits].sort((a, b) => (b._bestScore || b._rankingScore || 0) - (a._bestScore || a._rankingScore || 0)));
+  let effectiveIndex = $derived(selectedHitIndex != null && selectedHitIndex < rankedHits.length ? selectedHitIndex : rankedHits.length > 0 ? 0 : null);
+  let selectedHit = $derived(effectiveIndex != null ? rankedHits[effectiveIndex] : null);
 
   function toggleStateFilter(s) {
     if (selectedStates.has(s)) {
@@ -84,7 +92,7 @@
     } else {
       selectedStates.add(s);
     }
-    selectedStates = selectedStates; // trigger reactivity
+    selectedStates = new Set(selectedStates);
   }
 
   function clearFilters() {
@@ -94,15 +102,16 @@
   }
 
   onMount(() => {
-    const q = $page.url.searchParams.get("query");
+    const q = page.url.searchParams.get("query");
     if (q) $query = q;
   });
 
   function handleSubmit() {
-    activeState = null;
     fullDocs = {};
+    selectedHitIndex = null;
     const params = new URLSearchParams({
       query: $query,
+      hybrid: paramHybrid,
       semanticRatio: paramSemanticRatio,
       limit: paramLimit,
       scoreThreshold: paramScoreThreshold,
@@ -117,7 +126,16 @@
     } else {
       selectedStates.add(state);
     }
-    selectedStates = selectedStates;
+    selectedStates = new Set(selectedStates);
+  }
+
+  function getHitPreview(hit) {
+    const text = hit._matchedChunks?.[0]?.text || hit.__discussions || "";
+    return text.length > 150 ? text.slice(0, 150) + "..." : text;
+  }
+
+  function selectHit(index) {
+    selectedHitIndex = selectedHitIndex === index ? null : index;
   }
 
   function getHitTitle(hit) { return hit.title_en || hit.subject || "Untitled"; }
@@ -163,9 +181,7 @@
     if (!index || !hit.file_name) return;
 
     fullDocs[key] = { loading: true, chunks: [] };
-    fullDocs = fullDocs;
 
-    // Pass all matched chunk IDs for highlighting
     const highlightIds = (hit._matchedChunks || []).map(c => c.chunk_id).join(",");
 
     try {
@@ -177,10 +193,8 @@
     } catch {
       fullDocs[key] = { loading: false, chunks: [] };
     }
-    fullDocs = fullDocs;
 
     await tick();
-    // Scroll to first highlighted chunk
     const firstChunkId = hit._matchedChunks?.[0]?.chunk_id;
     if (firstChunkId != null) {
       const el = document.getElementById(`chunk-${key}-${firstChunkId}`);
@@ -195,7 +209,6 @@
 </svelte:head>
 
 <div id="container">
-<div id="container">
   {#if loading}
     <div class="md:p-20 h-auto">
       <MainSearch />
@@ -206,21 +219,55 @@
       <aside class="sidebar">
         <TitleWithNav
           title={$query}
-          subtitle="{allHits.length} results, {stateNames.length} states"
+          subtitle="{allHits.length} results{isStateCollection ? `, ${stateNames.length} states` : ''}{activeCollection ? ` in ${activeCollection}` : ''}"
         >
-          <form class="mt-2" on:submit|preventDefault={handleSubmit}>
+          <form class="mt-2" onsubmit={(e) => { e.preventDefault(); handleSubmit(); }}>
             <div class="flex">
               <input type="text" class="p-1 mr-2 w-full text-xs text-gray-300" placeholder="Ask a question" bind:value={$query} autofocus />
               <button type="submit" class="btn bg-primary text-white px-2 py-0.5 text-xs rounded-md">Go</button>
             </div>
           </form>
         </TitleWithNav>
-        <div class="map-box">
-          <IndiaMap {resultsByState} activeState={selectedStates.size === 1 ? [...selectedStates][0] : null} on:stateclick={handleStateClick} />
-        </div>
-
         <!-- Filters -->
-        <div class="filters">
+        <div class="filter-box">
+          {#if collections.length > 1}
+            <div class="collection-tabs">
+              <button
+                class="collection-tab"
+                class:collection-tab-active={!activeCollection}
+                onclick={() => { activeCollection = null; selectedStates = new Set(); selectedHitIndex = null; }}
+              >All</button>
+              {#each collections as col}
+                <button
+                  class="collection-tab"
+                  class:collection-tab-active={activeCollection === col}
+                  onclick={() => { activeCollection = activeCollection === col ? null : col; selectedStates = new Set(); selectedHitIndex = null; }}
+                >{col}</button>
+              {/each}
+            </div>
+          {/if}
+
+          {#if isStateCollection}
+            <IndiaMap resultsByState={allResultsByState} {selectedStates} onstateclick={handleStateClick} />
+          {/if}
+
+          {#if isStateCollection}
+            <div class="filter-section">
+              <label class="filter-label">States</label>
+              <div class="state-filters">
+                {#each allStates as s}
+                  <button
+                    class="state-filter-btn"
+                    class:selected={selectedStates.has(s)}
+                    onclick={() => toggleStateFilter(s)}
+                  >
+                    {s}
+                  </button>
+                {/each}
+              </div>
+            </div>
+          {/if}
+
           <div class="filter-section">
             <label class="filter-label">Time period</label>
             {#if globalMinYear}
@@ -233,30 +280,19 @@
             </div>
           </div>
 
-          <div class="filter-section">
-            <label class="filter-label">States</label>
-            <div class="state-filters">
-              {#each allStates as s}
-                <button
-                  class="state-filter-btn"
-                  class:selected={selectedStates.has(s)}
-                  on:click={() => toggleStateFilter(s)}
-                >
-                  {s}
-                </button>
-              {/each}
-            </div>
-          </div>
-
           {#if yearMin || yearMax || selectedStates.size > 0}
-            <button class="clear-btn" on:click={clearFilters}>Clear filters</button>
+            <button class="clear-btn" onclick={clearFilters}>Clear filters</button>
           {/if}
 
           <div class="filter-section">
             <label class="filter-label">Search params</label>
             <div class="param-grid">
-              <label class="param-label">Semantic ratio <span class="param-value">{paramSemanticRatio}</span></label>
-              <input type="range" step="0.01" min="0" max="1" bind:value={paramSemanticRatio} class="param-slider" />
+              <label class="param-label">Hybrid (semantic)</label>
+              <input type="checkbox" bind:checked={paramHybrid} class="param-checkbox" />
+              {#if paramHybrid}
+                <label class="param-label">Semantic ratio <span class="param-value">{paramSemanticRatio}</span></label>
+                <input type="range" step="0.01" min="0" max="1" bind:value={paramSemanticRatio} class="param-slider" />
+              {/if}
               <label class="param-label">Limit</label>
               <input type="number" step="1" min="1" max="200" bind:value={paramLimit} class="param-input" />
               <label class="param-label">Score threshold</label>
@@ -267,84 +303,159 @@
         </div>
       </aside>
 
-      <!-- Right: ranked results across all states -->
-      <main class="results-panel">
-        <Accordion>
-          {#each rankedHits as hit, i (hit.id || i)}
-            <AccordionItem open={i < 3}>
-              <svelte:fragment slot="summary">
-                <div class="result-summary">
-                  <span class="score-badge" title="Ranking score">{(hit._bestScore || hit._rankingScore || 0).toFixed(3)}</span>
-                  <div class="result-info">
-                    <div class="result-head">
-                      <span class="state-badge">{extractState(hit)}</span>
-                      {#if getHitDate(hit)}
-                        <span class="date-badge">{getHitDate(hit)}</span>
-                      {/if}
-                      <h4 class="result-title">{getHitTitle(hit)}</h4>
-                    </div>
-                    <div class="meta-tags">
-                      {#if hit._matchedChunks?.length > 1}
-                        <span class="meta-tag chunks-tag">{hit._matchedChunks.length} chunks</span>
-                      {/if}
-                      {#each getMetaTags(hit).filter(t => t.key !== '_score') as tag (tag.key)}
-                        <span class="meta-tag">{tag.label}: {tag.value}</span>
-                      {/each}
-                      {#if getHitLink(hit)}
-                        <a href={getHitLink(hit)} target="_blank" class="meta-tag meta-link" on:click|stopPropagation>archive</a>
-                      {/if}
-                    </div>
+      <!-- Results list -->
+      <main class="results-list">
+        {#each rankedHits as hit, i (hit.id || i)}
+          <!-- Mobile: accordion -->
+          <details class="accordion mobile-only" open={i < 3}>
+            <summary>
+              <div class="result-summary">
+                <span class="score-badge" title="Ranking score">{(hit._bestScore || hit._rankingScore || 0).toFixed(3)}</span>
+                <div class="result-info">
+                  <div class="result-head">
+                    <span class="state-badge">{extractState(hit)}</span>
+                    {#if getHitDate(hit)}
+                      <span class="date-badge">{getHitDate(hit)}</span>
+                    {/if}
+                    <h4 class="result-title">{getHitTitle(hit)}</h4>
                   </div>
+                  <p class="result-preview">{getHitPreview(hit)}</p>
                 </div>
-              </svelte:fragment>
-              <svelte:fragment slot="content">
-                <!-- Matched chunks from search -->
-                {#if hit._matchedChunks && hit._matchedChunks.length > 0}
-                  <p class="matched-label">{hit._matchedChunks.length} matched section{hit._matchedChunks.length > 1 ? "s" : ""}</p>
-                  {#each hit._matchedChunks as mc (mc.chunk_id)}
-                    <div class="matched-chunk">
-                      <div class="chunk-header">
-                        <span class="chunk-id">#{mc.chunk_id} &middot; {mc.score?.toFixed(3) || ""}</span>
-                        <button class="copy-btn" on:click={() => copyText(mc.text, `mc-${hit.id}-${mc.chunk_id}`)}>
-                          {copiedId === `mc-${hit.id}-${mc.chunk_id}` ? "Copied" : "Copy"}
-                        </button>
-                      </div>
-                      <p>{mc.text}</p>
+              </div>
+            </summary>
+            <div class="accordion-content">
+              {#if hit._matchedChunks && hit._matchedChunks.length > 0}
+                <p class="matched-label">{hit._matchedChunks.length} matched section{hit._matchedChunks.length > 1 ? "s" : ""}</p>
+                {#each hit._matchedChunks as mc (mc.chunk_id)}
+                  <div class="matched-chunk">
+                    <div class="chunk-header">
+                      <span class="chunk-id">#{mc.chunk_id} &middot; {mc.score?.toFixed(3) || ""}</span>
+                      <button class="copy-btn" onclick={() => copyText(mc.text, `mc-${hit.id}-${mc.chunk_id}`)}>
+                        {copiedId === `mc-${hit.id}-${mc.chunk_id}` ? "Copied" : "Copy"}
+                      </button>
+                    </div>
+                    <p>{mc.text}</p>
+                  </div>
+                {/each}
+              {:else}
+                <blockquote class="result-excerpt">{getHitContent(hit)}</blockquote>
+              {/if}
+              {#if !fullDocs[getDocKey(hit)]}
+                <button class="load-doc-btn" onclick={() => loadFullDocument(hit)}>Load full document</button>
+              {:else if fullDocs[getDocKey(hit)].loading}
+                <p class="doc-loading">Loading...</p>
+              {:else if fullDocs[getDocKey(hit)].chunks.length > 0}
+                <div class="full-doc">
+                  <p class="doc-info">{fullDocs[getDocKey(hit)].chunks.length} chunks in document</p>
+                  {#each fullDocs[getDocKey(hit)].chunks as chunk (chunk.chunk_id)}
+                    <div id="chunk-{getDocKey(hit)}-{chunk.chunk_id}" class="doc-chunk" class:doc-chunk-highlight={chunk.isHighlighted}>
+                      <span class="chunk-id">#{chunk.chunk_id}</span>
+                      <p>{chunk.text}</p>
                     </div>
                   {/each}
-                {:else}
-                  <blockquote class="result-excerpt">
-                    {getHitContent(hit)}
-                    <button class="copy-btn" on:click={() => copyText(getHitContent(hit), `ex-${hit.id}`)}>
-                      {copiedId === `ex-${hit.id}` ? "Copied" : "Copy"}
-                    </button>
-                  </blockquote>
-                {/if}
+                </div>
+              {:else}
+                <p class="doc-loading">Could not load document.</p>
+              {/if}
+            </div>
+          </details>
 
-                <!-- Full document loader -->
-                {@const docKey = getDocKey(hit)}
-                {#if !fullDocs[docKey]}
-                  <button class="load-doc-btn" on:click={() => loadFullDocument(hit)}>Load full document</button>
-                {:else if fullDocs[docKey].loading}
-                  <p class="doc-loading">Loading...</p>
-                {:else if fullDocs[docKey].chunks.length > 0}
-                  <div class="full-doc">
-                    <p class="doc-info">{fullDocs[docKey].chunks.length} chunks in document</p>
-                    {#each fullDocs[docKey].chunks as chunk (chunk.chunk_id)}
-                      <div id="chunk-{docKey}-{chunk.chunk_id}" class="doc-chunk" class:doc-chunk-highlight={chunk.isHighlighted}>
-                        <span class="chunk-id">#{chunk.chunk_id}</span>
-                        <p>{chunk.text}</p>
-                      </div>
-                    {/each}
-                  </div>
-                {:else}
-                  <p class="doc-loading">Could not load document.</p>
-                {/if}
-              </svelte:fragment>
-            </AccordionItem>
-          {/each}
-        </Accordion>
+          <!-- Desktop: clickable card -->
+          <button
+            class="result-card desktop-only"
+            class:result-card-active={effectiveIndex === i}
+            onclick={() => selectHit(i)}
+          >
+            <div class="result-summary">
+              <span class="score-badge" title="Ranking score">{(hit._bestScore || hit._rankingScore || 0).toFixed(3)}</span>
+              <div class="result-info">
+                <div class="result-head">
+                  <span class="state-badge">{extractState(hit)}</span>
+                  {#if getHitDate(hit)}
+                    <span class="date-badge">{getHitDate(hit)}</span>
+                  {/if}
+                  <h4 class="result-title">{getHitTitle(hit)}</h4>
+                </div>
+                <p class="result-preview">{getHitPreview(hit)}</p>
+                <div class="meta-tags">
+                  {#if hit._matchedChunks?.length > 1}
+                    <span class="meta-tag chunks-tag">{hit._matchedChunks.length} chunks</span>
+                  {/if}
+                  {#each getMetaTags(hit).filter(t => t.key !== '_score') as tag (tag.key)}
+                    <span class="meta-tag">{tag.label}: {tag.value}</span>
+                  {/each}
+                  {#if getHitLink(hit)}
+                    <a href={getHitLink(hit)} target="_blank" class="meta-tag meta-link" onclick={(e) => e.stopPropagation()}>archive</a>
+                  {/if}
+                </div>
+              </div>
+            </div>
+          </button>
+        {/each}
       </main>
+
+      <!-- Desktop: detail panel -->
+      {#if selectedHit}
+        <section class="detail-panel desktop-only">
+          <div class="detail-header">
+            <h3 class="detail-title">{getHitTitle(selectedHit)}</h3>
+            <div class="result-head">
+              <span class="state-badge">{extractState(selectedHit)}</span>
+              {#if getHitDate(selectedHit)}
+                <span class="date-badge">{getHitDate(selectedHit)}</span>
+              {/if}
+            </div>
+            <div class="meta-tags">
+              {#each getMetaTags(selectedHit).filter(t => t.key !== '_score') as tag (tag.key)}
+                <span class="meta-tag">{tag.label}: {tag.value}</span>
+              {/each}
+              {#if getHitLink(selectedHit)}
+                <a href={getHitLink(selectedHit)} target="_blank" class="meta-tag meta-link">archive</a>
+              {/if}
+            </div>
+          </div>
+
+          {#if selectedHit._matchedChunks && selectedHit._matchedChunks.length > 0}
+            <p class="matched-label">{selectedHit._matchedChunks.length} matched section{selectedHit._matchedChunks.length > 1 ? "s" : ""}</p>
+            {#each selectedHit._matchedChunks as mc (mc.chunk_id)}
+              <div class="matched-chunk">
+                <div class="chunk-header">
+                  <span class="chunk-id">#{mc.chunk_id} &middot; {mc.score?.toFixed(3) || ""}</span>
+                  <button class="copy-btn" onclick={() => copyText(mc.text, `mc-${selectedHit.id}-${mc.chunk_id}`)}>
+                    {copiedId === `mc-${selectedHit.id}-${mc.chunk_id}` ? "Copied" : "Copy"}
+                  </button>
+                </div>
+                <p>{mc.text}</p>
+              </div>
+            {/each}
+          {:else}
+            <blockquote class="result-excerpt">
+              {getHitContent(selectedHit)}
+              <button class="copy-btn" onclick={() => copyText(getHitContent(selectedHit), `ex-${selectedHit.id}`)}>
+                {copiedId === `ex-${selectedHit.id}` ? "Copied" : "Copy"}
+              </button>
+            </blockquote>
+          {/if}
+
+          {#if !fullDocs[getDocKey(selectedHit)]}
+            <button class="load-doc-btn" onclick={() => loadFullDocument(selectedHit)}>Load full document</button>
+          {:else if fullDocs[getDocKey(selectedHit)].loading}
+            <p class="doc-loading">Loading...</p>
+          {:else if fullDocs[getDocKey(selectedHit)].chunks.length > 0}
+            <div class="full-doc">
+              <p class="doc-info">{fullDocs[getDocKey(selectedHit)].chunks.length} chunks in document</p>
+              {#each fullDocs[getDocKey(selectedHit)].chunks as chunk (chunk.chunk_id)}
+                <div id="chunk-{getDocKey(selectedHit)}-{chunk.chunk_id}" class="doc-chunk" class:doc-chunk-highlight={chunk.isHighlighted}>
+                  <span class="chunk-id">#{chunk.chunk_id}</span>
+                  <p>{chunk.text}</p>
+                </div>
+              {/each}
+            </div>
+          {:else}
+            <p class="doc-loading">Could not load document.</p>
+          {/if}
+        </section>
+      {/if}
     </div>
   {/if}
 </div>
@@ -361,7 +472,7 @@
 
   .page-layout {
     @apply flex gap-4 py-6 px-4 mx-auto;
-    max-width: 1000px;
+    max-width: 1400px;
   }
 
   @media (max-width: 768px) {
@@ -382,13 +493,58 @@
     }
   }
 
-  .map-box {
-    @apply mt-3 bg-white/60 backdrop-blur-sm rounded-lg p-3 border border-primary/30;
+  .filter-box {
+    @apply mt-3 bg-white/60 backdrop-blur-sm rounded-lg p-3 border border-primary/30 space-y-3;
   }
 
-  /* Results panel */
-  .results-panel {
-    @apply flex-1 min-w-0;
+  /* Responsive show/hide */
+  .mobile-only { display: none; }
+  .desktop-only { display: block; }
+  button.desktop-only { display: block; }
+
+  @media (max-width: 768px) {
+    .mobile-only { display: block; }
+    .desktop-only { display: none !important; }
+  }
+
+  /* Results list */
+  .results-list {
+    @apply flex-1 min-w-0 overflow-y-auto;
+    max-height: calc(100vh - 3rem);
+  }
+
+  @media (max-width: 768px) {
+    .results-list {
+      max-height: none;
+    }
+  }
+
+  /* Desktop result card */
+  .result-card {
+    @apply w-full text-left bg-primaryLight rounded-lg p-3 mb-2 transition cursor-pointer border-2 border-transparent;
+  }
+
+  .result-card:hover {
+    @apply bg-primary/30;
+  }
+
+  .result-card-active {
+    @apply bg-primary/40 border-primary/60;
+  }
+
+  /* Detail panel (desktop) */
+  .detail-panel {
+    @apply md:sticky md:top-4 md:self-start overflow-y-auto rounded-lg bg-primaryLight/80 backdrop-blur-sm p-4 border border-primary/30;
+    width: 420px;
+    max-height: calc(100vh - 3rem);
+  }
+
+  .detail-header {
+    @apply space-y-2 mb-4 pb-3 border-b border-primary/20;
+  }
+
+  .detail-title {
+    @apply text-base font-bold text-black/90;
   }
 
   .result-summary {
@@ -407,9 +563,17 @@
     @apply text-[11px] font-semibold px-2 py-0.5 rounded bg-blue-100 text-blue-800 border border-blue-200;
   }
 
-  /* Filters */
-  .filters {
-    @apply mt-3 space-y-3;
+  .collection-tabs {
+    @apply flex flex-wrap gap-1;
+  }
+
+  .collection-tab {
+    @apply text-[10px] px-2 py-1 rounded-md border border-primary/20 bg-white/60 text-black/60 transition-all font-medium;
+    @apply hover:bg-primary/20;
+  }
+
+  .collection-tab-active {
+    @apply bg-primary/40 border-primary text-black/90 font-bold;
   }
 
   .filter-section {
@@ -493,6 +657,10 @@
 
   .result-title {
     @apply text-sm font-semibold text-black/90;
+  }
+
+  .result-preview {
+    @apply text-[11px] text-black/50 mt-1 line-clamp-2 leading-relaxed;
   }
 
   .meta-tags {
@@ -582,36 +750,29 @@
     @apply text-blue-800;
   }
 
-  /* Accordion overrides */
-  :global(.accordion-lead) {
-    @apply font-bold text-xl pb-2 w-full;
+  /* Accordion (native details) */
+  .accordion {
+    @apply bg-primaryLight rounded-lg p-3 mb-3 transition;
   }
-  :global(.accordion-summary) {
-    @apply text-sm p-0;
-  }
-  :global(.accordion-control) {
-    @apply flex-wrap;
-  }
-  :global(.accordion-panel) {
-    @apply text-balance;
-  }
-  :global(.accordion-item, .accordion-item > button) {
-    @apply rounded-lg;
-  }
-  :global(.accordion-control[aria-expanded="true"]) {
-    @apply bg-primary/100;
-  }
-  :global(.accordion-control[aria-expanded="true"]:hover) {
+
+  .accordion:hover {
     @apply bg-primary/40;
   }
-  :global(.accordion-item) {
-    @apply bg-primaryLight select-all;
-  }
-  :global(.accordion-item:hover) {
+
+  .accordion[open] {
     @apply bg-primary/40;
   }
-  :global(.accordion-panel[aria-hidden="false"]) {
-    @apply bg-primary/40;
+
+  .accordion summary {
+    @apply cursor-pointer list-none;
+  }
+
+  .accordion summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .accordion-content {
+    @apply mt-3 text-balance;
   }
 
   .loader {

@@ -1,16 +1,30 @@
 import { MEILI_HOST, MEILI_KEY } from "$env/static/private";
 
-const INDEXES = [
-  "state_legislature_debates_ap",
-  "state_legislature_debates_as",
-  "state_legislature_debates_ka",
-  "state_legislature_debates_kl",
-  "state_legislature_debates_rj",
-  "state_legislature_debates_tg",
-  "state_legislature_debates_tn",
-  "state_legislature_debates_up",
-  "state_legislature_debates_wb",
-];
+const COLLECTIONS = {
+  "State Legislatures": [
+    "state_legislature_debates_ap",
+    "state_legislature_debates_as",
+    "state_legislature_debates_ka",
+    "state_legislature_debates_kl",
+    "state_legislature_debates_rj",
+    "state_legislature_debates_tg",
+    "state_legislature_debates_tn",
+    "state_legislature_debates_up",
+    "state_legislature_debates_wb",
+  ],
+  // Add future non-state collections here, e.g.:
+  // "Constituent Assembly": ["constituent_assembly_debates"],
+  // "Lok Sabha": ["lok_sabha_debates"],
+};
+
+const ALL_INDEXES = Object.values(COLLECTIONS).flat();
+
+const INDEX_TO_COLLECTION = {};
+for (const [collection, indexes] of Object.entries(COLLECTIONS)) {
+  for (const idx of indexes) {
+    INDEX_TO_COLLECTION[idx] = collection;
+  }
+}
 
 const STATE_CODE_TO_NAME = {
   AP: "Andhra Pradesh",
@@ -25,6 +39,7 @@ const STATE_CODE_TO_NAME = {
 };
 
 const SEARCH_PARAMS = {
+  hybrid: false,
   semanticRatio: 0.5,
   embedder: "LLAMA_PROVIDER",
   limit: 50,
@@ -41,7 +56,7 @@ async function searchIndex(fetch, index, query, params = SEARCH_PARAMS) {
       },
       body: JSON.stringify({
         q: query,
-        hybrid: { semanticRatio: params.semanticRatio, embedder: params.embedder },
+        ...(params.hybrid ? { hybrid: { semanticRatio: params.semanticRatio, embedder: params.embedder } } : {}),
         showRankingScore: true,
         limit: params.limit,
       }),
@@ -56,6 +71,7 @@ async function searchIndex(fetch, index, query, params = SEARCH_PARAMS) {
     return (data.hits || []).map((hit) => ({
       ...hit,
       state: STATE_CODE_TO_NAME[hit.state_code] || hit.state_code || "Unknown",
+      _collection: INDEX_TO_COLLECTION[index] || "Other",
     }));
   } catch (err) {
     console.error(`Failed to search ${index}:`, err.message);
@@ -65,21 +81,24 @@ async function searchIndex(fetch, index, query, params = SEARCH_PARAMS) {
 
 export const load = async ({ url, fetch }) => {
   const query = url.searchParams.get("query");
-  console.log("[load] query:", query, "| apiLink:", apiLink);
+  console.log("[load] query:", query);
+
+  const collections = Object.keys(COLLECTIONS);
 
   if (!query) {
-    return { debates: [], sabha: [], searchParams: SEARCH_PARAMS };
+    return { debates: [], sabha: [], collections, searchParams: SEARCH_PARAMS };
   }
 
   // Allow overriding params from URL
+  const hybrid = url.searchParams.get("hybrid") === "true";
   const semanticRatio = parseFloat(url.searchParams.get("semanticRatio")) || SEARCH_PARAMS.semanticRatio;
   const limit = parseInt(url.searchParams.get("limit")) || SEARCH_PARAMS.limit;
   const scoreThreshold = parseFloat(url.searchParams.get("scoreThreshold")) || SEARCH_PARAMS.scoreThreshold;
 
-  const activeParams = { ...SEARCH_PARAMS, semanticRatio, limit, scoreThreshold };
+  const activeParams = { ...SEARCH_PARAMS, hybrid, semanticRatio, limit, scoreThreshold };
 
   const results = await Promise.all(
-    INDEXES.map((idx) => searchIndex(fetch, idx, query, activeParams))
+    ALL_INDEXES.map((idx) => searchIndex(fetch, idx, query, activeParams))
   );
 
   const allHits = results.flat()
@@ -118,6 +137,7 @@ export const load = async ({ url, fetch }) => {
   return {
     debates: structuredClone(debates),
     sabha: [],
-    searchParams: { ...activeParams, indexes: INDEXES.length, query },
+    collections,
+    searchParams: { ...activeParams, indexes: ALL_INDEXES.length, query },
   };
 };
