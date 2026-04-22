@@ -17,6 +17,9 @@
   let selectedHitIndex = $state(null);
   let activeCollection = $state(null);
 
+  let showIndices = $state(true);
+  let selectedIndexUids = $state(new Set());
+
   // Editable search params (user-adjustable, intentionally capturing initial values)
   let paramHybrid = $state(false);
   let paramSemanticRatio = $state(0.5);
@@ -47,6 +50,18 @@
   }
 
   let collections = $derived(data.collections || []);
+  let indices = $derived(data.indices || []);
+  let indicesByCollection = $derived.by(() => {
+    const grouped = {};
+    for (const idx of indices) {
+      const col = idx.collection || "Other";
+      if (!grouped[col]) grouped[col] = [];
+      grouped[col].push(idx);
+    }
+    return grouped;
+  });
+  let semanticCount = $derived(indices.filter((i) => i.semanticSearch).length);
+  let totalDocs = $derived(indices.reduce((sum, i) => sum + (i.numberOfDocuments || 0), 0));
   let resolvedDebates = $derived(Array.isArray(data.debates) ? data.debates : []);
   let isStateCollection = $derived(!activeCollection || activeCollection === "State Legislatures");
   let collectionDebates = $derived(
@@ -106,6 +121,23 @@
     if (q) $query = q;
   });
 
+  function toggleIndex(uid) {
+    if (selectedIndexUids.has(uid)) {
+      selectedIndexUids.delete(uid);
+    } else {
+      selectedIndexUids.add(uid);
+    }
+    selectedIndexUids = new Set(selectedIndexUids);
+  }
+
+  function selectAllIndices() {
+    selectedIndexUids = new Set(indices.map((i) => i.uid));
+  }
+
+  function clearIndexSelection() {
+    selectedIndexUids = new Set();
+  }
+
   function handleSubmit() {
     fullDocs = {};
     selectedHitIndex = null;
@@ -116,6 +148,9 @@
       limit: paramLimit,
       scoreThreshold: paramScoreThreshold,
     });
+    if (selectedIndexUids.size > 0) {
+      params.set("indices", [...selectedIndexUids].join(","));
+    }
     goto(`/ask?${params.toString()}`, { invalidateAll: true });
   }
 
@@ -166,12 +201,11 @@
   }
 
   function getIndexFromHit(hit) {
-    const code = (hit.state_code || "").toLowerCase();
-    return code ? `state_legislature_debates_${code}` : null;
+    return hit._index || null;
   }
 
   function getDocKey(hit) {
-    return `${hit.state_code}:${hit.file_name}`;
+    return `${hit._index || hit.state_code}:${hit.file_name}`;
   }
 
   async function loadFullDocument(hit) {
@@ -299,6 +333,55 @@
               <input type="number" step="0.01" min="0" max="1" bind:value={paramScoreThreshold} class="param-input" />
             </div>
             <p class="param-hint">Changes apply on next search</p>
+          </div>
+
+          <!-- Indices panel -->
+          <div class="filter-section">
+            <button class="indices-toggle" onclick={() => showIndices = !showIndices}>
+              <span class="filter-label" style="cursor:pointer">Indices ({indices.length}){selectedIndexUids.size > 0 ? ` · ${selectedIndexUids.size} selected` : ''}</span>
+              <span class="indices-summary">
+                <span class="semantic-pill">{semanticCount} semantic</span>
+                <span class="docs-pill">{totalDocs.toLocaleString()} docs</span>
+              </span>
+              <span class="toggle-arrow">{showIndices ? '\u25BE' : '\u25B8'}</span>
+            </button>
+
+            {#if showIndices}
+              <div class="idx-controls">
+                <button class="idx-control-btn" onclick={selectAllIndices}>All</button>
+                <button class="idx-control-btn" onclick={clearIndexSelection}>None</button>
+                {#if selectedIndexUids.size === 0}
+                  <span class="idx-hint">None selected = search all</span>
+                {/if}
+              </div>
+
+              {#each Object.entries(indicesByCollection) as [col, idxList] (col)}
+                <div class="idx-group">
+                  <span class="idx-group-label">{col}</span>
+                  {#each idxList as idx (idx.uid)}
+                    <button class="idx-row" class:idx-row-selected={selectedIndexUids.has(idx.uid)} onclick={() => toggleIndex(idx.uid)}>
+                      <span class="idx-dot" class:idx-dot-semantic={idx.semanticSearch} title={idx.semanticSearch ? `Embedders: ${idx.embedders.join(', ')}` : 'No semantic search'}></span>
+                      <span class="idx-name">{idx.uid}</span>
+                      <span class="idx-docs">{(idx.numberOfDocuments || 0).toLocaleString()}</span>
+                      {#if idx.isIndexing}
+                        <span class="idx-indexing" title="Currently indexing">...</span>
+                      {/if}
+                    </button>
+                    {#if idx.semanticSearch}
+                      <div class="idx-embedders">
+                        {#each idx.embedders as emb}
+                          <span class="idx-embedder-tag">{emb}</span>
+                        {/each}
+                      </div>
+                    {/if}
+                  {/each}
+                </div>
+              {/each}
+              <div class="idx-legend">
+                <span class="idx-dot idx-dot-semantic"></span> <span class="legend-text">Semantic</span>
+                <span class="idx-dot"></span> <span class="legend-text">Keyword only</span>
+              </div>
+            {/if}
           </div>
         </div>
       </aside>
@@ -644,6 +727,97 @@
 
   .param-hint {
     @apply text-[8px] text-black/30 mt-1 italic;
+  }
+
+  /* Indices panel */
+  .indices-toggle {
+    @apply w-full flex items-center gap-2 text-left cursor-pointer bg-transparent border-none p-0;
+  }
+
+  .indices-summary {
+    @apply flex gap-1 ml-auto;
+  }
+
+  .semantic-pill {
+    @apply text-[8px] bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded-full font-medium;
+  }
+
+  .docs-pill {
+    @apply text-[8px] bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded-full font-mono;
+  }
+
+  .toggle-arrow {
+    @apply text-[10px] text-black/40 shrink-0;
+  }
+
+  .idx-group {
+    @apply mt-2;
+  }
+
+  .idx-group-label {
+    @apply text-[9px] font-semibold text-black/40 uppercase tracking-wider;
+  }
+
+  .idx-controls {
+    @apply flex items-center gap-2;
+  }
+
+  .idx-control-btn {
+    @apply text-[9px] px-1.5 py-0.5 rounded border border-primary/20 bg-white/60 text-black/60 transition-all;
+    @apply hover:bg-primary/20;
+  }
+
+  .idx-control-btn::after {
+    content: "";
+  }
+
+  .idx-hint {
+    @apply text-[8px] text-black/30 italic ml-1;
+  }
+
+  .idx-row {
+    @apply w-full flex items-center gap-1.5 py-0.5 text-[10px] text-left bg-transparent border border-transparent rounded px-1 cursor-pointer transition-all;
+    @apply hover:bg-primary/10;
+  }
+
+  .idx-row-selected {
+    @apply bg-primary/20 border-primary/40 font-semibold;
+  }
+
+  .idx-dot {
+    @apply w-2 h-2 rounded-full bg-gray-300 shrink-0;
+  }
+
+  .idx-dot-semantic {
+    @apply bg-emerald-500;
+  }
+
+  .idx-name {
+    @apply flex-1 truncate text-black/70 font-mono text-[9px];
+  }
+
+  .idx-docs {
+    @apply text-black/40 font-mono text-[9px] shrink-0;
+  }
+
+  .idx-indexing {
+    @apply text-amber-600 text-[9px] animate-pulse;
+  }
+
+  .idx-embedders {
+    @apply flex flex-wrap gap-1 ml-3.5 mb-0.5;
+  }
+
+  .idx-embedder-tag {
+    @apply text-[8px] bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded border border-emerald-200 font-mono;
+  }
+
+  .idx-legend {
+    @apply flex items-center gap-1.5 mt-2 pt-2 border-t border-primary/10 text-[9px] text-black/40;
+  }
+
+  .legend-text {
+    @apply mr-2;
   }
 
   /* Result styles */
