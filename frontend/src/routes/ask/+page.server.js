@@ -1,4 +1,7 @@
 import { MEILI_HOST, MEILI_KEY } from "$env/static/private";
+import { Meilisearch } from "meilisearch";
+
+const client = new Meilisearch({ host: MEILI_HOST, apiKey: MEILI_KEY });
 
 const STATE_CODE_TO_NAME = {
   AP: "Andhra Pradesh",
@@ -17,56 +20,8 @@ const SEARCH_PARAMS = {
   semanticRatio: 0.5,
   embedder: "LLAMA_PROVIDER",
   limit: 50,
-  scoreThreshold: 0.58,
+  scoreThreshold: 0.1,
 };
-
-function meiliHeaders() {
-  return {
-    "Content-Type": "application/json",
-    Authorization: `Bearer ${MEILI_KEY}`,
-  };
-}
-
-/** Fetch all indices from Meilisearch */
-async function fetchAllIndices(fetch) {
-  try {
-    const resp = await fetch(`${MEILI_HOST}/indexes?limit=100`, {
-      headers: meiliHeaders(),
-    });
-    if (!resp.ok) {
-      console.error("Failed to fetch indices:", resp.status);
-      return [];
-    }
-    const data = await resp.json();
-    return data.results || [];
-  } catch (err) {
-    console.error("Failed to fetch indices:", err.message);
-    return [];
-  }
-}
-
-/** Fetch embedder config and stats for an index */
-async function fetchIndexDetails(fetch, uid) {
-  try {
-    const [embResp, statsResp] = await Promise.all([
-      fetch(`${MEILI_HOST}/indexes/${uid}/settings/embedders`, { headers: meiliHeaders() }),
-      fetch(`${MEILI_HOST}/indexes/${uid}/stats`, { headers: meiliHeaders() }),
-    ]);
-
-    const embedders = embResp.ok ? await embResp.json() : null;
-    const stats = statsResp.ok ? await statsResp.json() : null;
-    const embedderEntries = embedders && typeof embedders === "object" ? Object.keys(embedders) : [];
-
-    return {
-      numberOfDocuments: stats?.numberOfDocuments || 0,
-      isIndexing: stats?.isIndexing || false,
-      semanticSearch: embedderEntries.length > 0,
-      embedders: embedderEntries,
-    };
-  } catch {
-    return { numberOfDocuments: 0, isIndexing: false, semanticSearch: false, embedders: [] };
-  }
-}
 
 /** Derive a human-readable collection name from an index uid */
 const COLLECTION_MAP = {
@@ -81,64 +36,99 @@ function deriveCollection(uid) {
   for (const [prefix, name] of Object.entries(COLLECTION_MAP)) {
     if (uid.startsWith(prefix)) return name;
   }
-  // Fallback: humanize the uid
   return uid.split("_").map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
 }
 
-async function searchIndex(fetch, index, query, params = SEARCH_PARAMS, indexMeta = null) {
-  // Only send hybrid if this index actually has the embedder configured
-  const canHybrid = params.hybrid && indexMeta?.semanticSearch && indexMeta.embedders?.includes(params.embedder);
-
+/** Fetch all indices and their details */
+async function fetchIndicesWithDetails() {
   try {
-    const resp = await fetch(`${MEILI_HOST}/indexes/${index}/search`, {
-      method: "POST",
-      headers: meiliHeaders(),
-      body: JSON.stringify({
-        q: query,
-        ...(canHybrid ? { hybrid: { semanticRatio: params.semanticRatio, embedder: params.embedder } } : {}),
-        showRankingScore: true,
-        limit: params.limit,
-      }),
-    });
+    const { results: rawIndices } = await client.getIndexes({ limit: 100 });
 
-    if (!resp.ok) {
-      console.error(`Meilisearch error for ${index}:`, resp.status);
-      return [];
-    }
-
-    const data = await resp.json();
-    return (data.hits || []).map((hit) => ({
-      ...hit,
-      state: STATE_CODE_TO_NAME[hit.state_code] || hit.state_code || "Unknown",
-      _collection: deriveCollection(index),
-      _index: index,
-    }));
+    return await Promise.all(
+      rawIndices.map(async (idx) => {
+        try {
+          const [embedders, stats] = await Promise.all([
+            client.index(idx.uid).getEmbedders(),
+            client.index(idx.uid).getStats(),
+          ]);
+          const embedderEntries = embedders && typeof embedders === "object" ? Object.keys(embedders) : [];
+          return {
+            uid: idx.uid,
+            primaryKey: idx.primaryKey,
+            createdAt: idx.createdAt,
+            updatedAt: idx.updatedAt,
+            collection: deriveCollection(idx.uid),
+            numberOfDocuments: stats?.numberOfDocuments || 0,
+            isIndexing: stats?.isIndexing || false,
+            semanticSearch: embedderEntries.length > 0,
+            embedders: embedderEntries,
+          };
+        } catch (err) {
+          console.error(`Failed to fetch details for index ${idx.uid}:`, err.message);
+          return {
+            uid: idx.uid,
+            primaryKey: idx.primaryKey,
+            createdAt: idx.createdAt,
+            updatedAt: idx.updatedAt,
+            collection: deriveCollection(idx.uid),
+            numberOfDocuments: 0,
+            isIndexing: false,
+            semanticSearch: false,
+            embedders: [],
+          };
+        }
+      })
+    );
   } catch (err) {
-    console.error(`Failed to search ${index}:`, err.message);
+    console.error("Failed to fetch indices:", err.message);
     return [];
   }
 }
 
-export const load = async ({ url, fetch }) => {
+async function searchIndices(indexUids, query, params = SEARCH_PARAMS, indexMetaMap = {}) {
+  const queries = indexUids.map((uid) => {
+    const meta = indexMetaMap[uid];
+    const canHybrid = params.hybrid && meta?.semanticSearch && meta.embedders?.includes(params.embedder);
+    return {
+      indexUid: uid,
+      q: query,
+      ...(canHybrid ? { hybrid: { semanticRatio: params.semanticRatio, embedder: params.embedder } } : {}),
+      showRankingScore: true,
+      limit: params.limit,
+      offset: params.offset || 0,
+      attributesToHighlight: ["*"],
+      hitsPerPage: 800,
+      highlightPreTag: "<strong>",
+      highlightPostTag: "</strong>",
+      facets: [],
+    };
+  });
+
+  try {
+    const { results } = await client.multiSearch({ queries });
+    const totalEstimated = results.reduce((sum, r) => sum + (r.estimatedTotalHits || 0), 0);
+    const hits = results.flatMap((r) =>
+      (r.hits || []).map((hit) => ({
+        ...hit,
+        state: STATE_CODE_TO_NAME[hit.state_code] || hit.state_code || "Unknown",
+        _collection: deriveCollection(r.indexUid),
+        _index: r.indexUid,
+      }))
+    );
+    return { hits, totalEstimated };
+  } catch (err) {
+    console.error("Multi-search failed:", err.message);
+    return { hits: [], totalEstimated: 0 };
+  }
+}
+
+export const load = async ({ url }) => {
   const query = url.searchParams.get("query");
 
-  // Fetch all indices and their details from Meilisearch in parallel
-  const rawIndices = await fetchAllIndices(fetch);
-  const indicesWithDetails = await Promise.all(
-    rawIndices.map(async (idx) => {
-      const details = await fetchIndexDetails(fetch, idx.uid);
-      return {
-        uid: idx.uid,
-        primaryKey: idx.primaryKey,
-        createdAt: idx.createdAt,
-        updatedAt: idx.updatedAt,
-        collection: deriveCollection(idx.uid),
-        ...details,
-      };
-    })
-  );
+  const startTime = Date.now();
+  const indicesWithDetails = await fetchIndicesWithDetails();
+  console.log(`Loaded ${indicesWithDetails.length} indices in ${Date.now() - startTime}ms`);
 
-  // Build dynamic collections from discovered indices
   const collectionSet = new Set();
   for (const idx of indicesWithDetails) {
     collectionSet.add(idx.collection);
@@ -156,36 +146,34 @@ export const load = async ({ url, fetch }) => {
     };
   }
 
-  // Allow overriding params from URL
   const hybrid = url.searchParams.get("hybrid") === "true";
   const semanticRatio = parseFloat(url.searchParams.get("semanticRatio")) || SEARCH_PARAMS.semanticRatio;
   const limit = parseInt(url.searchParams.get("limit")) || SEARCH_PARAMS.limit;
   const scoreThreshold = parseFloat(url.searchParams.get("scoreThreshold")) || SEARCH_PARAMS.scoreThreshold;
+  const offset = parseInt(url.searchParams.get("offset")) || 0;
 
-  const activeParams = { ...SEARCH_PARAMS, hybrid, semanticRatio, limit, scoreThreshold };
+  const activeParams = { ...SEARCH_PARAMS, hybrid, semanticRatio, limit, scoreThreshold, offset };
 
-  // Only search selected indices (if specified), otherwise all
   const selectedParam = url.searchParams.get("indices");
   const searchUids = selectedParam
     ? selectedParam.split(",").filter((uid) => allIndexUids.includes(uid))
     : allIndexUids;
 
-  // Build lookup for index metadata so searchIndex can check embedder support
   const indexMetaMap = {};
   for (const idx of indicesWithDetails) {
     indexMetaMap[idx.uid] = idx;
   }
 
-  const results = await Promise.all(
-    searchUids.map((uid) => searchIndex(fetch, uid, query, activeParams, indexMetaMap[uid]))
-  );
+  console.log(`Search: query="${query}" indices=[${searchUids.join(",")}] hybrid=${activeParams.hybrid} limit=${activeParams.limit}`);
+  const searchStart = Date.now();
+  const { hits: rawHits, totalEstimated } = await searchIndices(searchUids, query, activeParams, indexMetaMap);
+  console.log(`Search completed in ${Date.now() - searchStart}ms`);
 
-  const allHits = results
-    .flat()
+  const allHits = rawHits
     .filter((h) => (h._rankingScore || 0) > activeParams.scoreThreshold)
     .sort((a, b) => (b._rankingScore || 0) - (a._rankingScore || 0));
+  console.log(`Hits: ${totalEstimated} estimated, ${rawHits.length} returned, ${allHits.length} above threshold (${activeParams.scoreThreshold})`);
 
-  // Group chunks from the same document (index + file_name)
   const docMap = new Map();
   for (const hit of allHits) {
     const key = `${hit._index}:${hit.file_name}`;
@@ -205,7 +193,6 @@ export const load = async ({ url, fetch }) => {
     }
   }
 
-  // Sort merged docs by best score, sort chunks within each doc by chunk_id
   const debates = [...docMap.values()]
     .sort((a, b) => (b._bestScore || 0) - (a._bestScore || 0))
     .map((d) => {
@@ -215,7 +202,8 @@ export const load = async ({ url, fetch }) => {
 
   return {
     debates: structuredClone(debates),
-    sabha: [],
+    hitCount: allHits.length,
+    totalEstimated,
     collections,
     indices: indicesWithDetails,
     searchParams: { ...activeParams, indexes: allIndexUids.length, query },
