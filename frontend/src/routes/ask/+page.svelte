@@ -4,12 +4,17 @@
   import IndiaMap from "$lib/components/IndiaMap.svelte";
   import TitleWithNav from "$lib/components/TitleWithNav.svelte";
   import { goto } from "$app/navigation";
-  import { tick } from "svelte";
+  import { tick, untrack } from "svelte";
 
   let { data } = $props();
 
+  const DOCS_PER_PAGE = 20;
+  const MAX_HITS = 1500;
+  const BATCH_SIZE = 200;
+
   // Local UI state
   let searchInput = $state("");
+  let searching = $state(false);
   $effect(() => { searchInput = data.searchParams?.query || ""; });
   let activeCollection = $state(null);
   let selectedStates = $state(new Set());
@@ -20,36 +25,133 @@
   let fullDocs = $state({});
   let showIndices = $state(true);
   let selectedIndexUids = $state(new Set());
+  let currentPage = $state(0);
 
   // Search params (user-adjustable)
   let paramHybrid = $state(false);
   let paramSemanticRatio = $state(0.5);
-  let paramLimit = $state(50);
-  let paramScoreThreshold = $state(0.58);
+  let paramLimit = $state(200);
+  let paramScoreThreshold = $state(0.1);
+
+  // Lazy loading state
+  let allDocs = $state([]);
+  let totalHitCount = $state(0);
+  let totalEstimated = $state(0);
+  let loadingMore = $state(false);
+  let loadProgress = $state("");
 
   const METADATA_KEYS = [
     "house", "session", "term_number", "term_start", "term_end",
     "section_type", "languages", "state_code",
   ];
 
+  // Track which query the lazy loader is working on, so stale loads cancel
+  let lazyLoadQuery = "";
+
+  // Seed from server data when it changes
+  $effect(() => {
+    const serverDebates = Array.isArray(data.debates) ? data.debates : [];
+    allDocs = serverDebates;
+    totalHitCount = data.hitCount || 0;
+    totalEstimated = data.totalEstimated || 0;
+    currentPage = 0;
+    selectedHitIndex = null;
+    searching = false;
+    loadingMore = false;
+
+    // Use data.* directly in the condition to avoid tracking $state vars
+    const query = data.searchParams?.query;
+    const estimated = data.totalEstimated || 0;
+    const hitCount = data.hitCount || 0;
+    if (query && estimated > hitCount) {
+      untrack(() => lazyLoadRemaining(query, hitCount, estimated));
+    }
+  });
+
+  async function lazyLoadRemaining(query, initialHitCount, initialEstimated) {
+    lazyLoadQuery = query;
+    loadingMore = true;
+
+    let offset = BATCH_SIZE; // server already loaded the first batch
+    let accumulated = initialHitCount;
+    let estimated = initialEstimated;
+
+    while (accumulated < MAX_HITS && accumulated < estimated) {
+      // Abort if a new search started
+      if (lazyLoadQuery !== query) break;
+
+      loadProgress = `Loading more results... ${accumulated} of ~${estimated}`;
+      try {
+        const params = new URLSearchParams({
+          query,
+          limit: String(BATCH_SIZE),
+          offset: String(offset),
+          hybrid: String(data.searchParams?.hybrid || false),
+          semanticRatio: String(data.searchParams?.semanticRatio || 0.5),
+          scoreThreshold: String(data.searchParams?.scoreThreshold || 0.1),
+        });
+        if (data.searchParams?.indices) {
+          params.set("indices", data.searchParams.indices);
+        }
+        const resp = await fetch(`/api/search?${params}`);
+        if (!resp.ok) break;
+        const batch = await resp.json();
+        if (!batch.docs?.length) break;
+
+        // Abort if a new search started while fetching
+        if (lazyLoadQuery !== query) break;
+
+        // Merge new docs: update existing or append
+        const docMap = new Map(allDocs.map(d => [`${d._index}:${d.file_name}`, d]));
+        for (const doc of batch.docs) {
+          const key = `${doc._index}:${doc.file_name}`;
+          if (docMap.has(key)) {
+            const existing = docMap.get(key);
+            const existingChunkIds = new Set(existing._matchedChunks.map(c => c.chunk_id));
+            for (const mc of doc._matchedChunks) {
+              if (!existingChunkIds.has(mc.chunk_id)) {
+                existing._matchedChunks.push(mc);
+              }
+            }
+            existing._matchedChunks.sort((a, b) => (a.chunk_id || 0) - (b.chunk_id || 0));
+            if (doc._bestScore > existing._bestScore) {
+              existing._bestScore = doc._bestScore;
+              existing._rankingScore = doc._rankingScore;
+            }
+          } else {
+            docMap.set(key, doc);
+          }
+        }
+        allDocs = [...docMap.values()].sort((a, b) => (b._bestScore || 0) - (a._bestScore || 0));
+        accumulated += batch.hitCount;
+        totalHitCount = accumulated;
+        estimated = batch.totalEstimated || estimated;
+        totalEstimated = estimated;
+        offset += BATCH_SIZE;
+      } catch (err) {
+        console.error("Lazy load failed:", err);
+        break;
+      }
+    }
+
+    // Only clear loading state if this is still the active query
+    if (lazyLoadQuery === query) {
+      loadingMore = false;
+      loadProgress = "";
+    }
+  }
+
   // --- Derived data ---
 
   let hasQuery = $derived(!!data.searchParams?.query);
-  let debates = $derived(Array.isArray(data.debates) ? data.debates : []);
   let collections = $derived(data.collections || []);
   let indices = $derived(data.indices || []);
-
-  let currentOffset = $derived(data.searchParams?.offset || 0);
-  let currentLimit = $derived(data.searchParams?.limit || 50);
-  let totalEstimated = $derived(data.totalEstimated || 0);
-  let hasNextPage = $derived(currentOffset + currentLimit < totalEstimated);
-  let hasPrevPage = $derived(currentOffset > 0);
 
   let isStateCollection = $derived(!activeCollection || activeCollection === "State Legislatures");
 
   // Filter: collection -> state -> year
   let filteredHits = $derived.by(() => {
-    let hits = debates;
+    let hits = allDocs;
     if (activeCollection) {
       hits = hits.filter(h => h._collection === activeCollection);
     }
@@ -69,9 +171,20 @@
     [...filteredHits].sort((a, b) => (b._bestScore || 0) - (a._bestScore || 0))
   );
 
-  // For the map: group by state from collection-filtered (not year/state filtered) debates
+  // Pagination
+  let totalPages = $derived(Math.ceil(rankedHits.length / DOCS_PER_PAGE));
+  let pageHits = $derived(rankedHits.slice(currentPage * DOCS_PER_PAGE, (currentPage + 1) * DOCS_PER_PAGE));
+
+  // Reset page when filters change
+  $effect(() => {
+    // Touch filter deps to track them
+    activeCollection; selectedStates; yearMin; yearMax;
+    currentPage = 0;
+  });
+
+  // For the map: group by state from collection-filtered debates
   let collectionDebates = $derived(
-    activeCollection ? debates.filter(h => h._collection === activeCollection) : debates
+    activeCollection ? allDocs.filter(h => h._collection === activeCollection) : allDocs
   );
   let resultsByStateForMap = $derived(groupByState(collectionDebates));
   let allStates = $derived([...new Set(collectionDebates.map(h => h.state || "Unknown"))].sort());
@@ -87,11 +200,11 @@
 
   // Detail panel selection
   let effectiveIndex = $derived(
-    selectedHitIndex != null && selectedHitIndex < rankedHits.length
+    selectedHitIndex != null && selectedHitIndex < pageHits.length
       ? selectedHitIndex
-      : rankedHits.length > 0 ? 0 : null
+      : pageHits.length > 0 ? 0 : null
   );
-  let selectedHit = $derived(effectiveIndex != null ? rankedHits[effectiveIndex] : null);
+  let selectedHit = $derived(effectiveIndex != null ? pageHits[effectiveIndex] : null);
 
   // Indices sidebar
   let indicesByCollection = $derived.by(() => {
@@ -143,6 +256,20 @@
     return `${hit._index || hit.state_code}:${hit.file_name}`;
   }
 
+  // Page number window for pagination
+  function pageWindow(current, total, maxVisible = 7) {
+    if (total <= maxVisible) return Array.from({ length: total }, (_, i) => i);
+    const pages = [];
+    pages.push(0);
+    let start = Math.max(1, current - 2);
+    let end = Math.min(total - 2, current + 2);
+    if (start > 1) pages.push(-1); // ellipsis
+    for (let i = start; i <= end; i++) pages.push(i);
+    if (end < total - 2) pages.push(-1); // ellipsis
+    pages.push(total - 1);
+    return pages;
+  }
+
   // --- Actions ---
 
   function buildSearchParams(overrides = {}) {
@@ -163,11 +290,14 @@
   function handleSubmit() {
     fullDocs = {};
     selectedHitIndex = null;
+    currentPage = 0;
+    searching = true;
     goto(`/ask?${buildSearchParams().toString()}`, { invalidateAll: true });
   }
 
-  function goToPage(newOffset) {
-    goto(`/ask?${buildSearchParams({ offset: newOffset }).toString()}`, { invalidateAll: true });
+  function goToPage(page) {
+    currentPage = Math.max(0, Math.min(page, totalPages - 1));
+    selectedHitIndex = null;
   }
 
   function toggleState(s) {
@@ -235,15 +365,29 @@
       <aside class="sidebar">
         <TitleWithNav
           title={searchInput}
-          subtitle="{filteredHits.length} documents, {data.hitCount || 0} results of {data.totalEstimated || 0} total{isStateCollection ? `, ${stateNames.length} states` : ''}{activeCollection ? ` in ${activeCollection}` : ''}"
+          subtitle="{rankedHits.length} documents, {totalHitCount} results of ~{totalEstimated} total{isStateCollection ? `, ${stateNames.length} states` : ''}{activeCollection ? ` in ${activeCollection}` : ''}"
         >
           <form class="mt-2" onsubmit={(e) => { e.preventDefault(); handleSubmit(); }}>
-            <div class="flex">
-              <input type="text" class="p-1 mr-2 w-full text-xs text-gray-300" placeholder="Ask a question" bind:value={searchInput} autofocus />
-              <button type="submit" class="btn bg-primary text-white px-2 py-0.5 text-xs rounded-md">Go</button>
+            <div class="flex items-center">
+              <div class="search-input-wrap">
+                <input type="text" class="p-1 w-full text-xs text-gray-300" placeholder="Ask a question" bind:value={searchInput} disabled={searching} />
+                {#if searching}
+                  <span class="search-ellipsis"></span>
+                {/if}
+              </div>
+              <button type="submit" class="btn bg-primary text-white px-2 py-0.5 text-xs rounded-md ml-2" disabled={searching}>
+                {searching ? "..." : "Go"}
+              </button>
             </div>
           </form>
         </TitleWithNav>
+
+        {#if loadingMore}
+          <div class="loading-bar">
+            <div class="loading-bar-fill" style="width: {Math.min(100, (totalHitCount / Math.min(totalEstimated, MAX_HITS)) * 100)}%"></div>
+          </div>
+          <p class="loading-text">{loadProgress}</p>
+        {/if}
 
         <div class="filter-box">
           {#if collections.length > 1}
@@ -300,8 +444,6 @@
                 <label class="param-label">Semantic ratio <span class="param-value">{paramSemanticRatio}</span></label>
                 <input type="range" step="0.01" min="0" max="1" bind:value={paramSemanticRatio} class="param-slider" />
               {/if}
-              <label class="param-label">Limit</label>
-              <input type="number" step="1" min="1" max="200" bind:value={paramLimit} class="param-input" />
               <label class="param-label">Score threshold</label>
               <input type="number" step="0.01" min="0" max="1" bind:value={paramScoreThreshold} class="param-input" />
             </div>
@@ -361,7 +503,23 @@
 
       <!-- Results list -->
       <main class="results-list">
-        {#each rankedHits as hit, i (hit.id || i)}
+        <!-- Pagination top -->
+        {#if totalPages > 1}
+          <nav class="pagination">
+            <button class="page-btn" disabled={currentPage === 0} onclick={() => goToPage(currentPage - 1)}>Prev</button>
+            {#each pageWindow(currentPage, totalPages) as p}
+              {#if p === -1}
+                <span class="page-ellipsis">...</span>
+              {:else}
+                <button class="page-btn" class:page-btn-active={p === currentPage} onclick={() => goToPage(p)}>{p + 1}</button>
+              {/if}
+            {/each}
+            <button class="page-btn" disabled={currentPage >= totalPages - 1} onclick={() => goToPage(currentPage + 1)}>Next</button>
+            <span class="page-info">Page {currentPage + 1} of {totalPages}</span>
+          </nav>
+        {/if}
+
+        {#each pageHits as hit, i (hit.id || `${currentPage}-${i}`)}
           <!-- Mobile -->
           <details class="accordion mobile-only" open={i < 3}>
             <summary>
@@ -444,6 +602,21 @@
             </div>
           </button>
         {/each}
+
+        <!-- Pagination bottom -->
+        {#if totalPages > 1}
+          <nav class="pagination">
+            <button class="page-btn" disabled={currentPage === 0} onclick={() => goToPage(currentPage - 1)}>Prev</button>
+            {#each pageWindow(currentPage, totalPages) as p}
+              {#if p === -1}
+                <span class="page-ellipsis">...</span>
+              {:else}
+                <button class="page-btn" class:page-btn-active={p === currentPage} onclick={() => goToPage(p)}>{p + 1}</button>
+              {/if}
+            {/each}
+            <button class="page-btn" disabled={currentPage >= totalPages - 1} onclick={() => goToPage(currentPage + 1)}>Next</button>
+          </nav>
+        {/if}
       </main>
 
       <!-- Detail panel -->
@@ -542,6 +715,17 @@
     @apply mt-3 bg-white/60 backdrop-blur-sm rounded-lg p-3 border border-primary/30 space-y-3;
   }
 
+  /* Loading bar */
+  .loading-bar {
+    @apply mt-2 h-1 rounded-full bg-primary/20 overflow-hidden;
+  }
+  .loading-bar-fill {
+    @apply h-full bg-emerald-500 rounded-full transition-all duration-300;
+  }
+  .loading-text {
+    @apply text-[9px] text-black/40 mt-0.5 italic;
+  }
+
   .mobile-only { display: none; }
   .desktop-only { display: block; }
   button.desktop-only { display: block; }
@@ -558,6 +742,25 @@
 
   @media (max-width: 768px) {
     .results-list { max-height: none; }
+  }
+
+  /* Pagination */
+  .pagination {
+    @apply flex items-center gap-1 py-2 flex-wrap;
+  }
+  .page-btn {
+    @apply text-[11px] px-2 py-1 rounded border border-primary/20 bg-white/60 text-black/60 transition-all cursor-pointer;
+    @apply hover:bg-primary/20 disabled:opacity-30 disabled:cursor-not-allowed;
+  }
+  .page-btn::after { content: ""; }
+  .page-btn-active {
+    @apply bg-primary/40 border-primary text-black/90 font-bold;
+  }
+  .page-ellipsis {
+    @apply text-[11px] text-black/30 px-1;
+  }
+  .page-info {
+    @apply text-[10px] text-black/40 ml-2;
   }
 
   .result-card {
@@ -657,6 +860,24 @@
   .chunk-id { @apply text-[10px] text-black/30 font-mono; }
   .copy-btn { @apply text-[10px] px-1.5 py-0.5 rounded border border-primary/20 bg-white/60 text-black/50 hover:bg-primary/20 hover:text-black/80 transition-all; }
   .copy-btn::after { content: ""; }
+  /* Search loading indicator */
+  .search-input-wrap {
+    @apply relative flex-1;
+  }
+  .search-ellipsis {
+    @apply absolute right-2 top-1/2 -translate-y-1/2 text-xs text-black/40 font-mono;
+  }
+  .search-ellipsis::after {
+    content: "";
+    animation: ellipsis 1.2s steps(4, end) infinite;
+  }
+  @keyframes ellipsis {
+    0% { content: ""; }
+    25% { content: "."; }
+    50% { content: ".."; }
+    75% { content: "..."; }
+  }
+
   :global(input[type="text"]) { @apply selection:bg-primary selection:text-black; }
   a::after { content: "↗"; }
   a { @apply text-blue-800; }
