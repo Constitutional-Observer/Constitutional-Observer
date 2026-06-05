@@ -16,7 +16,7 @@
 </script>
 
 <section
-  class="relative relative py-5 px-3 backdrop-opacity-50 bg-primaryLight/90 drop-shadow-xl border-4 border-primary w-full md:w-[80%] "
+  class="relative relative py-5 px-3 backdrop-opacity-50 bg-primaryLight/90 drop-shadow-xl border-4 border-primary  "
 >
   <div class="text-left text-black/90 w-full px-2">
     Welcome to the
@@ -26,15 +26,11 @@
     <div class="text-pretty md:text-sm lg:text-md text-black/80 w-full">
       What did the members of the Constituent Assembly debate about? How does
       the Lok Sabha talk about it now? How have they affected the collective
-      lives of the nation?
+      lives of the nation? The Constitutional Observer collects materials from State Legislatures, Government Orders, Gazettes, Public Archives so that one can trace the lifecycle of the constitution's application in all walks of the nation's life.
       <br /><br />
 
-      <p>
-        <span class="italic py-3">Ask a question, a simple one.</span> The Observer
-        will respond with sections from the Constituent Assembly and the Lok Sabha
-        that will aid in answering your question.
-      </p>
-      <form onsubmit={(e) => { e.preventDefault(); navigateTo(); }}>
+
+      <!-- <form onsubmit={(e) => { e.preventDefault(); navigateTo(); }}>
         <section class="flex flex-row mt-5 bg-primary p-2 mb-1">
           <input
             type="text"
@@ -50,17 +46,23 @@
             onclick={navigateTo}>Explore</button
           >
         </section>
-      </form>
+      </form> -->
 
       <button class="  pr-3 my-1 py-2 rounded">
         <a href="/about" class="underline"
-          >How it works: a conceptual overview</a
+          >About the observer</a
         >
       </button>
 
       <button class=" border pr-3 my-1 py-2 rounded">
         <a href="/collections" class="underline"
           >Archiving efforts</a
+        >
+      </button>
+
+        <button class=" border pr-3 my-1 py-2 rounded">
+        <a href="/collections" class="underline"
+          >People and Contributors</a
         >
       </button>
     </div>
