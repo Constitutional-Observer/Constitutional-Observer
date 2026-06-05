@@ -1,3 +1,6 @@
+// t-SNE implementation.
+// Source: Andrej Karpathy's tsnejs — https://github.com/karpathy/tsnejs
+// Packaged as @keckelt/tsne; vendored here to avoid the npm dependency.
 class TSNE {
     constructor(opt) {
         // return 0 mean unit standard deviation random number
