@@ -2,6 +2,8 @@
   import { browser } from "$app/environment";
   import { untrack, tick } from "svelte";
   import { TOPIC_STOPWORDS } from "$lib/topic-stopwords.js";
+  import { TOPIC_PHRASES, PHRASE_MERGED_SET, SEED_GROUPS } from "$lib/topic-phrases.js";
+  import { applyPhrases } from "$lib/phrase-matcher.js";
   // d3-zoom: pan/wheel-zoom and touch gestures on the cluster canvas.
   import { select as d3select } from "d3-selection";
   import { zoom as d3zoom, zoomIdentity } from "d3-zoom";
@@ -9,6 +11,11 @@
  
 
   const hitTitle = (hit, i) => hit.title_en || hit.subject || `Document ${i + 1}`;
+
+  const humanTerm = (term) => {
+    const s = term.replace(/_/g, " ");
+    return s.charAt(0).toUpperCase() + s.slice(1);
+  };
 
   // Strip all HTML except <strong>…</strong> so the API's highlight tags
   // render safely via {@html} without allowing arbitrary markup.
@@ -31,7 +38,7 @@
     // Global token cap — bigram counting is O(total tokens) and a 1000-doc
     // search of long debates can blow JS heap without this.
     static #MAX_TOTAL_TOKENS   = 800_000;
-    static #KEEP_POS  = new Set(["NOUN", "PROPN", "ADJ"]);
+    static #KEEP_POS  = new Set(["NOUN", "PROPN"]);
     static #NON_LATIN = /[^ -ɏ]/;
 
     static #argmax(a) {
@@ -43,7 +50,6 @@
         || hit.__discussions || "";
     }
 
-    numTopics   = $state(12);
     // λ: 1 = top-probability (common), 0 = pure lift (distinctive), 0.6 = LDAvis default mix.
     lambda      = $state(0.6);
     processing  = $state(false);
@@ -51,8 +57,9 @@
     stats       = $state(null);
     rawClusters = $state([]);  // {topic, allTerms:[{term,probability,pw}], coherence, count, items}[]
 
-    #lastSig   = "";
-    #cachedNlp = null;
+    #lastSig            = "";
+    #cachedNlp          = null;
+    #cachedSeedGroups   = null; // SEED_GROUPS with unigrams lemmatized via winkNLP
 
     // LDAvis relevance:  λ·log P(w|k) + (1−λ)·log[ P(w|k) / P(w) ].
     // Re-ranking is cheap (K × 30 candidates) so it re-derives on every λ tick.
@@ -78,8 +85,7 @@
 
     async run(hits, query = "") {
       if (!browser) return;
-      const K   = this.numTopics;
-      const sig = `${hits?.length ?? 0}:${K}:${query}`;
+      const sig = `${hits?.length ?? 0}:${query}`;
       if (sig === this.#lastSig) return;
       this.#lastSig = sig;
 
@@ -103,6 +109,19 @@
             import("wink-nlp"), import("wink-eng-lite-web-model"),
           ]);
           this.#cachedNlp = winkNLPmod.default(modelMod.default);
+          // Pre-lemmatize unigram seeds using the same normalizer that builds the vocab.
+          // Multi-word phrases are left as-is (they're already written in lemma form and
+          // will be phrase-merged to underscore form before the vocab is built).
+          const _nlp = this.#cachedNlp, _its = _nlp.its;
+          this.#cachedSeedGroups = SEED_GROUPS.map(group =>
+            group.map(phrase => {
+              const trimmed = phrase.trim().toLowerCase();
+              if (trimmed.includes(" ")) return trimmed;
+              const tok = _nlp.readDoc(trimmed).tokens().itemAt(0);
+              const lemma = tok ? tok.out(_its.lemma) : null;
+              return (lemma || trimmed).toLowerCase().replace(/[^\p{L}\p{M}]/gu, "");
+            })
+          );
         }
         const nlp = this.#cachedNlp, its = nlp.its;
 
@@ -110,68 +129,66 @@
         this.progress = `Tokenizing ${cappedHits.length} documents...`;
         await new Promise(r => setTimeout(r, 0));
 
-        // Per-run stopwords from the search query — the query appears in every
-        // hit by definition so it carries no discriminating signal.
-        const queryStopwords = new Set();
-        if (query && query.trim()) {
-          nlp.readDoc(query.trim()).tokens().each((t) => {
-            const n = t.out(its.normal);
-            if (!n) return;
-            if (TopicPipeline.#NON_LATIN.test(n)) {
-              for (const piece of n.toLowerCase().split(/\s+/)) {
-                const term = piece.replace(/[^\p{L}\p{M}]/gu, "");
-                if (term.length >= 2) queryStopwords.add(term);
-              }
-              return;
-            }
-            if (t.out(its.type) !== "word") return;
-            const lem = (t.out(its.lemma) || n).toLowerCase().replace(/[^\p{L}]/gu, "");
-            if (lem.length >= 2) queryStopwords.add(lem);
-          });
-        }
-
         const tokenized = [], meta = [];
-        let stoppedCount = 0, keptTokens = 0, queryStopped = 0;
+        let stoppedCount = 0, keptTokens = 0, phrasesMatched = 0;
         for (let i = 0; i < cappedHits.length; i++) {
           if (keptTokens >= TopicPipeline.#MAX_TOTAL_TOKENS) break;
           const hit  = cappedHits[i];
           const text = TopicPipeline.#hitText(hit);
           if (!text || text.length < 40) continue;
-          const lemmas = [];
+
+          // Build the doc's RAW lemma stream (no filtering yet) with parallel
+          // drop flags. We need the unfiltered stream so curated multi-word
+          // phrases like "right to information" can match — the joiner "to"
+          // would otherwise be dropped by the stopword filter before the
+          // phrase matcher ever sees it.
+          const rawLemmas = [], dropFlag = [];
           nlp.readDoc(text).tokens().each((t) => {
-            if (lemmas.length >= TopicPipeline.#MAX_TOKENS_PER_DOC) return;
+            if (rawLemmas.length >= TopicPipeline.#MAX_TOKENS_PER_DOC) return;
             const normal = t.out(its.normal);
             if (!normal) return;
 
-            // Non-Latin script (Tamil, Devanagari, …): winkNLP types these as
-            // "alien" not "word", and sometimes lumps multi-word runs into one
-            // token — so we script-detect first, split on whitespace, and
-            // keep \p{L}+\p{M} (combining marks matter: அனுமதி → matras lost
-            // without them would become அனமத).
+            // Non-Latin script: keep \p{L}+\p{M} so Indic matras survive.
             if (TopicPipeline.#NON_LATIN.test(normal)) {
               for (const piece of normal.toLowerCase().split(/\s+/)) {
                 const term = piece.replace(/[^\p{L}\p{M}]/gu, "");
-                if (term.length < 3) continue;
-                if (TOPIC_STOPWORDS.has(term)) { stoppedCount++; continue; }
-                if (queryStopwords.has(term)) { queryStopped++; continue; }
-                lemmas.push(term);
+                if (term.length < 2) continue;
+                let drop = false;
+                if (term.length < 3) drop = true;
+                else if (TOPIC_STOPWORDS.has(term)) { drop = true; stoppedCount++; }
+                rawLemmas.push(term);
+                dropFlag.push(drop);
               }
               return;
             }
 
             // English path. Strip non-letters from the lemma so "mr." → "mr"
-            // gets rejected by the length filter (winkNLP keeps trailing
-            // punctuation on some lemmas). Fall back to surface form when the
-            // model produces no lemma (numbers, odd tokens).
+            // is too short to pass; fall back to surface form when no lemma.
             if (t.out(its.type) !== "word") return;
-            if (t.out(its.stopWordFlag)) { stoppedCount++; return; }
-            if (!TopicPipeline.#KEEP_POS.has(t.out(its.pos))) return;
-            const lemma = (t.out(its.lemma) || normal).toLowerCase().replace(/[^\p{L}]/gu, "");
-            if (lemma.length < 3) return;
-            if (TOPIC_STOPWORDS.has(lemma)) { stoppedCount++; return; }
-            if (queryStopwords.has(lemma)) { queryStopped++; return; }
-            lemmas.push(lemma);
+            const rawLemma = t.out(its.lemma) || normal;
+            const lemma = rawLemma.toLowerCase().replace(/[^\p{L}]/gu, "");
+            if (lemma.length < 2) return;
+            // Accented Latin (U+00C0–U+024F) in English-path text = PDF OCR artifact; drop.
+            if (/[À-ɏ]/.test(lemma)) return;
+            let drop = false;
+            if (lemma.length < 3) drop = true;
+            else if (t.out(its.stopWordFlag)) { drop = true; stoppedCount++; }
+            else if (!TopicPipeline.#KEEP_POS.has(t.out(its.pos))) drop = true;
+            else if (TOPIC_STOPWORDS.has(lemma)) { drop = true; stoppedCount++; }
+            rawLemmas.push(lemma);
+            dropFlag.push(drop);
           });
+
+          // Lexicon phrase match runs against the unfiltered stream. Then we
+          // emit the matcher output: phrase merges unconditionally, single
+          // tokens only if their drop flag is false.
+          const m = applyPhrases(rawLemmas, TOPIC_PHRASES.root);
+          phrasesMatched += m.matched;
+          const lemmas = [];
+          for (let k = 0; k < m.tokens.length; k++) {
+            if (m.fromPhrase[k]) lemmas.push(m.tokens[k]);
+            else if (!dropFlag[m.srcIdx[k]]) lemmas.push(m.tokens[k]);
+          }
           if (lemmas.length < 8) continue;
           keptTokens += lemmas.length;
           tokenized.push(lemmas);
@@ -207,16 +224,80 @@
         }
         const tBigram = performance.now();
 
-        // minDocFreq floor 2 → drops hapaxes. maxDocFreq 0.8 → drops terms in
-        // ≥80% of docs (esp. the search query). LDA returns top-50 candidates
-        // so the LDAvis relevance re-ranker has room to surface low-λ picks.
-        const minDocFreq = Math.max(2, Math.floor(phrased.length * 0.05));
-        this.progress = `Running LDA · ${phrased.length} docs · ${K} topics...`;
-        await new Promise(r => setTimeout(r, 0));
-        const { topics: ldaTopics, theta, vocab, prunedByMax } = lda(phrased, K, 50, {
-          iterations: 300, burnIn: 50, thinInterval: 20, sampleLag: 10,
-          alpha: 50 / K, beta: 0.01, minDocFreq, maxDocFreq: 0.6,
+        // 1% doc-frequency floor — keeps domain-specific terms while dropping words seen in only 1 doc.
+        // The old 5% floor was too aggressive: for 651 docs it set minDocFreq=32,
+        // leaving only 202 vocab words and almost no seed matches.
+        const minDocFreq = Math.max(2, Math.floor(phrased.length * 0.007));
+        const ldaOpts = (k, quick) => ({
+          iterations: quick ? 50 : 300, burnIn: quick ? 15 : 50,
+          thinInterval: quick ? 10 : 20, sampleLag: quick ? 5 : 10,
+          // α — document-topic Dirichlet prior; 50/K is the symmetric Griffiths heuristic.
+          docTopicPrior: 50 / k,
+          // β — topic-word Dirichlet prior (Blei et al. 2003 §2).
+          wordTopicPrior: 0.03,
+          minDocFreq, maxDocFreq: 0.3,
+          seedGroups: this.#cachedSeedGroups,
+          // μ* — total seed pseudo-count per topic (Lu et al. 2011 §3.2).
+          // With ~18 seeds/topic: ω ≈ μ*/18. At 30 → ω≈1.7 (strong guidance,
+          // corpus still contributes); at 70 → ω≈3.9 (topics locked to seeds).
+          seedStrength: 30,
+          // γ — sequential carry-over from previous document (Watanabe & Baturo 2024 Eq. 7).
+          sequentialSmoothing: 0.7,
         });
+
+        // JSD between two phi rows — used in sweep and in post-LDA quality scoring.
+        const EPS = 1e-12;
+        const jsdPair = (pi, pj) => {
+          let s = 0;
+          for (let v = 0; v < pi.length; v++) {
+            const m = (pi[v] + pj[v]) * 0.5;
+            if (pi[v] > EPS) s += pi[v] * Math.log(pi[v] / (m + EPS));
+            if (pj[v] > EPS) s += pj[v] * Math.log(pj[v] / (m + EPS));
+          }
+          return s * 0.5;
+        };
+
+        // Regularized divergence score for a given LDA run (Deveaud et al. 2014).
+        // δ controls granularity: lower δ → prefer more, finer topics.
+        // 0.05 = medium (paper default); 0.02 = fine (better for large corpora).
+        const DELTA = 0.01
+        const rdForRun = (phiK, thetaK, k) => {
+          const p = new Array(k).fill(0);
+          for (const t of thetaK) for (let i = 0; i < k; i++) p[i] += t[i];
+          const pSum = p.reduce((a, b) => a + b, 0);
+          for (let i = 0; i < k; i++) p[i] /= (pSum || 1);
+          let rd = DELTA * DELTA;
+          for (let i = 0; i < k; i++) {
+            for (let j = 0; j < k; j++) {
+              const w = p[i] * p[j] - DELTA * DELTA;
+              if (w > 0) rd += jsdPair(phiK[i], phiK[j]) * w;
+            }
+          }
+          return rd;
+        };
+
+        // K-sweep: quick LDA runs over the candidate range, pick K with highest RD.
+        // Upper bound: 1 topic per 5 docs (keeps topics stable) but never more than
+        // seed groups + 20 (avoids pointlessly thin residual topics).
+        const K_MIN = 4;
+        const K_MAX = Math.min(SEED_GROUPS.length + 20, Math.floor(phrased.length / 5));
+        let bestK = K_MIN, bestRD = -Infinity;
+        for (let kc = K_MIN; kc <= K_MAX; kc += 3) {
+          this.progress = `Finding K · scanning ${kc}/${K_MAX}...`;
+          await new Promise(r => setTimeout(r, 0));
+          const { phi: phiK, theta: thetaK } = lda(phrased, kc, 5, ldaOpts(kc, true));
+          if (!phiK || !phiK.length) continue;
+          const rd = rdForRun(phiK, thetaK, kc);
+          if (rd > bestRD) { bestRD = rd; bestK = kc; }
+        }
+
+        // Full LDA run at the found optimal K.
+        this.progress = `K=${bestK} · Running full model (${phrased.length} docs)...`;
+        await new Promise(r => setTimeout(r, 0));
+        const K = bestK;
+        const { topics: ldaTopics, theta, vocab, prunedByMax, phi, seedMatched, seedTotal, seedMatchedPhrases } =
+          lda(phrased, K, 100, ldaOpts(K, false));
+        console.log(`[TopicMap] Seed phrases found (${seedMatched}/${seedTotal}):`, seedMatchedPhrases);
 
         if (theta.length < 4 || vocab.length === 0) {
           this.progress = "Topic model collapsed (vocabulary too small).";
@@ -231,13 +312,29 @@
         const tsne = new TSNE({ dim: 2, perplexity, epsilon: 10 });
         tsne.initDataRaw(theta);
         for (let it = 0; it < 250; it++) tsne.step();
-        const globalRaw  = tsne.getSolution();
+        const globalRaw   = tsne.getSolution();
         const assignments = theta.map(t => TopicPipeline.#argmax(t));
         const probs       = theta.map((t, j) => t[assignments[j]]);
-        const coherence = ldaTopics.map(t => t.slice(0, 5).reduce((s, x) => s + x.probability, 0));
-        const order     = ldaTopics.map((_, k) => k).sort((a, b) => coherence[b] - coherence[a]);
 
-        // P(w) for the LDAvis lift denominator. Computed over phrased corpus.
+        // P(Z=k) and per-topic distinctiveness for display ordering.
+        const pK = new Array(K).fill(0);
+        for (const t of theta) for (let k = 0; k < K; k++) pK[k] += t[k];
+        const pKSum = pK.reduce((a, b) => a + b, 0);
+        for (let k = 0; k < K; k++) pK[k] /= (pKSum || 1);
+        const topicJSD = new Array(K).fill(0);
+        for (let i = 0; i < K; i++) {
+          let wSum = 0;
+          for (let j = 0; j < K; j++) {
+            if (i === j) continue;
+            topicJSD[i] += jsdPair(phi[i], phi[j]) * pK[j];
+            wSum += pK[j];
+          }
+          if (wSum > 0) topicJSD[i] /= wSum;
+        }
+        // Sort by distinctiveness: most distinct topic first.
+        const order = ldaTopics.map((_, k) => k).sort((a, b) => topicJSD[b] - topicJSD[a]);
+
+        // P(w) for the LDAvis lift denominator.
         let totalTokens = 0;
         const tokenFreq = new Map();
         for (const doc of phrased) {
@@ -254,10 +351,6 @@
           buckets[k].push({ j, gx: globalRaw[j][0], gy: globalRaw[j][1], prob: probs[j], hit: meta[j].hit, idx: meta[j].idx });
         }
 
-        // Per-cluster: normalize t-SNE coords to local bbox, contract by SPREAD
-        // toward centroid (display only, t-SNE topology preserved). allTerms
-        // carries top-50 candidates with P(w|k)+P(w) so `clusters` getter can
-        // re-rank by relevance(λ) without re-running LDA.
         const SPREAD = 0.7;
         this.rawClusters = order.map((k) => {
           const items = buckets[k];
@@ -276,16 +369,16 @@
             term: t.term, probability: t.probability,
             pw: (tokenFreq.get(t.term) || 0) / (totalTokens || 1),
           }));
-          return { topic: k, allTerms, coherence: coherence[k], count: counts[k], items: placed };
+          return { topic: k, allTerms, coherence: topicJSD[k], count: counts[k], items: placed };
         });
 
         this.stats = {
           hits: cappedHits.length, modeledDocs: tokenized.length, vocab: vocab.length,
-          keptTokens, stoppedCount, queryStopped,
-          queryStopwords: [...queryStopwords],
-          prunedByMax: prunedByMax || 0,
+          keptTokens, stoppedCount, phrasesMatched,
+          prunedByMax: prunedByMax || 0, maxDocFreqPct: 30,
           bigramsKept, bigramsMerged, phrasesPerPass,
           bigramExamples: phraseExamples.slice(0, 12),
+          K, rdScore: bestRD.toFixed(4), seedMatched, seedTotal,
           nlpMs:    Math.round(tNlp - t0),
           bigramMs: Math.round(tBigram - tNlp),
           ldaMs:    Math.round(tLda - tBigram),
@@ -472,14 +565,17 @@
 
   // `query` feeds the per-run stopword set so query terms (which every hit
   // contains by definition) don't dominate every topic.
-  let { hits = [], query = "", onselect } = $props();
+  let { hits = [], query = "", onselect, paginationDone = true } = $props();
 
   const pipeline = new TopicPipeline();
   const map      = new ClusterMap();
 
-  // Re-run pipeline on hits / K / query change. run() dedupes via sig.
+  // Only run after all pages have loaded — avoids re-running LDA on every
+  // incremental batch. When paginationDone flips to true it fires once with
+  // the final complete hit list; until then the effect returns early.
   $effect(() => {
-    hits; pipeline.numTopics; query;
+    hits; query; paginationDone;
+    if (!paginationDone) return;
     untrack(() => pipeline.run(hits, query));
   });
 
@@ -507,6 +603,22 @@
     return map.computeLabels(pipeline.clusters);
   });
 
+  // Phrases (multi-word merged tokens) currently visible in the topic grid,
+  // partitioned by source. Recomputes on λ slider change since the displayed
+  // term list per cluster is itself derived from λ via LDAvis relevance.
+  let phrasesShown = $derived.by(() => {
+    const seen = new Set();
+    for (const c of pipeline.clusters) {
+      for (const t of c.terms) if (t.term.includes("_")) seen.add(t.term);
+    }
+    const all = [...seen].sort();
+    return {
+      lexicon:  all.filter(p => PHRASE_MERGED_SET.has(p)),
+      emergent: all.filter(p => !PHRASE_MERGED_SET.has(p)),
+      total:    all.length,
+    };
+  });
+
 </script>
 
 <svelte:window onkeydown={(e) => { if (e.key === "Escape" && map.view === "cluster") map.close(); }} />
@@ -514,17 +626,16 @@
 <section class="topic-map">
   <div class="tm-header">
     <span class="tm-title">Topic map</span>
-    <label class="tm-label">K
-      <input type="number" min="2" max="12" bind:value={pipeline.numTopics}
-        class="tm-number" disabled={pipeline.processing} />
-    </label>
+    {#if pipeline.stats}
+      <span class="tm-label">Topics <strong class="tm-kval">{pipeline.stats.K}</strong></span>
+    {/if}
     <label class="tm-label" title="LDAvis relevance: λ=1 common topic words, λ=0 distinctive. 0.6 recommended.">
       Mix
       <input type="range" min="0" max="1" step="0.05" bind:value={pipeline.lambda} class="tm-slider" />
       <span class="tm-lambda-value">λ {pipeline.lambda.toFixed(2)}</span>
     </label>
     <button class="tm-rerun" disabled={pipeline.processing}
-      onclick={() => pipeline.rerun(hits)}>
+      onclick={() => pipeline.rerun(hits, query)}>
       {pipeline.processing ? "Working..." : "Re-run"}
     </button>
     {#if pipeline.progress}
@@ -532,7 +643,15 @@
     {:else if pipeline.stats}
       {@const s = pipeline.stats}
       <span class="tm-stats">
-        {s.modeledDocs}/{s.hits} docs · vocab {s.vocab} · {s.keptTokens} tokens · {s.stoppedCount} stopwords removed{#if s.queryStopped} · {s.queryStopped} query terms removed [{s.queryStopwords.join(', ')}]{/if}{#if s.prunedByMax} · {s.prunedByMax} terms pruned by max-doc-freq (>70%){/if} · phrases [{s.phrasesPerPass?.map((n, i) => `${n} ${i === 0 ? '2-gram' : i === 1 ? '3-gram' : (i + 2) + '-gram'}`).join(' + ') || `${s.bigramsKept} bigrams`}] ({s.bigramsMerged} merges) · NLP {s.nlpMs}ms · phrases {s.bigramMs}ms · LDA {s.ldaMs}ms · t-SNE {s.tsneMs}ms
+        {s.modeledDocs}/{s.hits} docs · vocab {s.vocab} · {s.keptTokens} tokens · {s.stoppedCount} stopwords removed{#if s.phrasesMatched} · {s.phrasesMatched} lexicon phrases matched{/if}{#if s.prunedByMax} · {s.prunedByMax} terms pruned by max-doc-freq (>{s.maxDocFreqPct}%){/if} · phrases [{s.phrasesPerPass?.map((n, i) => `${n} ${i === 0 ? '2-gram' : i === 1 ? '3-gram' : (i + 2) + '-gram'}`).join(' + ') || `${s.bigramsKept} bigrams`}] ({s.bigramsMerged} merges) · seeds {s.seedMatched}/{s.seedTotal} · K {s.K} · RD {s.rdScore} · NLP {s.nlpMs}ms · phrases {s.bigramMs}ms · LDA {s.ldaMs}ms · t-SNE {s.tsneMs}ms
+        {#if phrasesShown.total}
+          <span class="tm-bigram-examples">
+            · shown ({phrasesShown.total}): {[
+              ...phrasesShown.lexicon.map(p => `★${p}`),
+              ...phrasesShown.emergent,
+            ].join(", ")}
+          </span>
+        {/if}
         {#if s.bigramExamples?.length}
           <span class="tm-bigram-examples"> · examples: {s.bigramExamples.join(", ")}</span>
         {/if}
@@ -553,10 +672,17 @@
           >
             <div class="tm-cell-count">{cluster.count}</div>
             <ul class="tm-cell-terms">
-              {#each cluster.terms.slice(0, 8) as t (t.term)}
-                <li class="tm-term">{t.term}</li>
+              {#each cluster.terms.slice(0, 5) as t (t.term)}
+                <li class="tm-term">{humanTerm(t.term)}</li>
               {/each}
             </ul>
+            {#if cluster.terms.length > 5}
+              <p class="tm-cell-flow">
+                {#each cluster.terms.slice(5, 15) as t (t.term)}
+                  <span class="tm-term--minor">{humanTerm(t.term)}</span>
+                {/each}
+              </p>
+            {/if}
           </button>
         {/each}
       </div>
@@ -577,8 +703,8 @@
             </button>
           </div>
           <h3 class="tm-cluster-title">
-            {#each cluster.terms.slice(0, 5) as t (t.term)}
-              <span class="tm-cluster-term">{t.term}</span>
+            {#each cluster.terms.slice(0, 10) as t (t.term)}
+              <span class="tm-cluster-term">{humanTerm(t.term)}</span>
             {/each}
           </h3>
           <span class="tm-cluster-count">{cluster.count} docs</span>
@@ -643,7 +769,7 @@
   .tm-header { @apply flex items-center gap-3 px-3 py-2 border-b border-primary/20 flex-wrap; }
   .tm-title  { @apply text-[11px] font-bold text-black/70 uppercase tracking-wider; }
   .tm-label  { @apply flex items-center gap-1 text-[10px] font-semibold text-black/60 uppercase tracking-wider; }
-  .tm-number { @apply w-12 text-[11px] px-1.5 py-0.5 rounded border border-primary/30 bg-white/80 font-mono; }
+  .tm-kval   { @apply font-mono text-black/80 ml-0.5; }
   .tm-slider { @apply w-24 align-middle; }
   .tm-lambda-value { @apply text-[10px] font-mono text-black/60 ml-1; }
   .tm-rerun {
@@ -663,18 +789,25 @@
   .tm-cell {
     @apply relative rounded-lg p-3 text-left cursor-pointer transition-all bg-white/70 hover:bg-white/90;
     border: 6px double rgba(0, 0, 0, 0.18);
-    aspect-ratio: 1 / 1; min-height: 140px;
+    min-height: 250px;
   }
   .tm-cell:hover { box-shadow: 0 4px 14px rgba(0,0,0,0.1); transform: translateY(-1px); }
   .tm-cell::after { content: ""; }
   .tm-cell-count {
     @apply absolute top-1.5 right-2 text-[10px] font-mono font-bold px-1.5 rounded bg-black/10 text-black/50;
   }
-  .tm-cell-terms { @apply h-full flex flex-col gap-0 pr-6 pt-1 pl-1 m-0 list-none overflow-hidden; }
+  .tm-cell-terms { @apply flex flex-col gap-0 pr-6 pt-1 pl-1 m-0 list-none overflow-hidden; }
   .tm-term {
     @apply text-[12px] font-medium leading-snug truncate text-black/70;
   }
   .tm-term::before { content: "· "; opacity: 0.4; }
+  .tm-cell-flow {
+    @apply m-0 mt-1 px-1 leading-snug;
+  }
+  .tm-term--minor {
+    @apply text-[9px] text-black/45 font-normal;
+  }
+  .tm-term--minor + .tm-term--minor::before { content: " · "; opacity: 0.35; }
 
   .tm-cluster-view { @apply p-3; }
   .tm-cluster-head { @apply flex items-center gap-3 mb-2 flex-wrap; }
