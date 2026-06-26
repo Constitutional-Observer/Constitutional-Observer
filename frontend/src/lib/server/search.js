@@ -86,7 +86,10 @@ export async function searchIndices(indexUids, query, params = DEFAULT_SEARCH_PA
       showRankingScore: true,
       limit: params.limit,
       offset: params.offset || 0,
-      attributesToHighlight: ["*"],
+      // Only highlight the field we actually display. ["*"] makes Meilisearch
+      // render a highlighted copy of every attribute of every hit, which (×200
+      // hits × all indices) bloats the payload into megabytes.
+      attributesToHighlight: ["__discussions"],
       highlightPreTag: "<strong>",
       highlightPostTag: "</strong>",
       facets: [],
@@ -121,15 +124,26 @@ export function groupHitsIntoDocs(hits, scoreThreshold = 0.1) {
   const docMap = new Map();
   for (const hit of filtered) {
     const key = `${hit._index}:${hit.file_name}`;
+    // `text` is the raw chunk (used by the client-side NLP/topic pipeline);
+    // `textHL` carries Meilisearch's <strong>-highlighted query terms for display.
+    // Pull `_formatted` out of the spread so the heavy highlight blob is not
+    // shipped to the client — we only keep the highlighted __discussions.
+    const { _formatted, ...rest } = hit;
+    const chunk = {
+      chunk_id: hit.chunk_id,
+      text: hit.__discussions || "",
+      textHL: _formatted?.__discussions || hit.__discussions || "",
+      score: hit._rankingScore,
+    };
     if (!docMap.has(key)) {
       docMap.set(key, {
-        ...hit,
-        _matchedChunks: [{ chunk_id: hit.chunk_id, text: hit.__discussions || "", score: hit._rankingScore }],
+        ...rest,
+        _matchedChunks: [chunk],
         _bestScore: hit._rankingScore || 0,
       });
     } else {
       const doc = docMap.get(key);
-      doc._matchedChunks.push({ chunk_id: hit.chunk_id, text: hit.__discussions || "", score: hit._rankingScore });
+      doc._matchedChunks.push(chunk);
       if ((hit._rankingScore || 0) > doc._bestScore) {
         doc._bestScore = hit._rankingScore;
         doc._rankingScore = hit._rankingScore;

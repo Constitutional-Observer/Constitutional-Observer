@@ -1,7 +1,6 @@
 ## Note
 
 ![Photograph of installation](./installation-1.jpeg)
-_This project is meant to be exhibited alongside a print installation. It is being exhibited at the Srishti Manipal campus in Yelahanka, Bengaluru on the 25th and 26th of May, 2024._
 
 How do people, as citizens, question the government? Holding the government accountable is one of the primary parliamentary roles of the opposition. However, as common citizens, we do not know much of how the Parliament functions. The realities of our democracy means there are always people who are ignored, sidelined, pushed, reduced and small-cased. What protects their rights?
 
@@ -22,6 +21,10 @@ Their work has been critical to the making and realisation of this project. I th
 ### Lok Sabha Debates
 
 Lok Sabha Debates were sourced from sansad.in. From 1985 to 2019, 2340 sessions' transcripts were downloaded and split into chunks. The transcripts contain the full discussion of all business in that day that has not been omitted. 
+
+### State Legislatures
+
+State Legislatures are being archived from the legislatures websites. Progress can be seen at [the collections page](/collections)
 
 ### Free and Open Source Software
 

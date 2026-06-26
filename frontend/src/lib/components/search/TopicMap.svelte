@@ -1,10 +1,10 @@
 <script>
   import { browser } from "$app/environment";
   import { untrack, tick } from "svelte";
-  import { TOPIC_STOPWORDS } from "$lib/topic-stopwords.js";
-  import { TOPIC_PHRASES, PHRASE_MERGED_SET, SEED_GROUPS } from "$lib/topic-phrases.js";
-  import { applyPhrases } from "$lib/phrase-matcher.js";
-  // d3-zoom: pan/wheel-zoom and touch gestures on the cluster canvas.
+  import { TOPIC_STOPWORDS } from "$lib/topic-modelling/topic-stopwords.js";
+  import { TOPIC_PHRASES, PHRASE_MERGED_SET, SEED_GROUPS } from "$lib/topic-modelling/topic-phrases.js";
+  import { applyPhrases } from "$lib/topic-modelling/phrase-matcher.js";
+
   import { select as d3select } from "d3-selection";
   import { zoom as d3zoom, zoomIdentity } from "d3-zoom";
 
@@ -28,8 +28,15 @@
       .replace(/&lt;\/strong&gt;/g, "</strong>");
   }
 
-  // First matched chunk text, falling back to __discussions.
-  const hitExcerpt = (hit) => hit._matchedChunks?.[0]?.text || hit.__discussions || "";
+  // First matched chunk text with Meilisearch highlight tags, falling back to
+  // plain text / __discussions. The highlighted form lets cluster excerpts show
+  // the matched search terms (rendered via sanitizeHighlight + {@html}).
+  const hitExcerpt = (hit) =>
+    hit._matchedChunks?.[0]?.textHL ||
+    hit._matchedChunks?.[0]?.text ||
+    hit._formatted?.__discussions ||
+    hit.__discussions ||
+    "";
 
   // ── TopicPipeline ──── NLP/LDA/t-SNE pipeline → clusters ──────────────────
   class TopicPipeline {
@@ -101,7 +108,7 @@
 
       try {
         const [{ default: lda }, { TSNE }, { default: detectAndMergeBigrams }] = await Promise.all([
-          import("$lib/lda.js"), import("$lib/tsne.js"), import("$lib/bigrams.js"),
+          import("$lib/topic-modelling/lda.js"), import("$lib/topic-modelling/tsne.js"), import("$lib/topic-modelling/bigrams.js"),
         ]);
 
         if (!this.#cachedNlp) {
@@ -351,6 +358,15 @@
           buckets[k].push({ j, gx: globalRaw[j][0], gy: globalRaw[j][1], prob: probs[j], hit: meta[j].hit, idx: meta[j].idx });
         }
 
+        // Global t-SNE extent — used to place every dot in one shared scatter
+        // (overview view) so clusters keep their real relative positions.
+        let gMinX = Infinity, gMaxX = -Infinity, gMinY = Infinity, gMaxY = -Infinity;
+        for (const p of globalRaw) {
+          if (p[0] < gMinX) gMinX = p[0]; if (p[0] > gMaxX) gMaxX = p[0];
+          if (p[1] < gMinY) gMinY = p[1]; if (p[1] > gMaxY) gMaxY = p[1];
+        }
+        const gRx = (gMaxX - gMinX) || 1, gRy = (gMaxY - gMinY) || 1;
+
         const SPREAD = 0.7;
         this.rawClusters = order.map((k) => {
           const items = buckets[k];
@@ -362,8 +378,12 @@
           const rx = (maxX - minX) || 1, ry = (maxY - minY) || 1;
           const placed = items.map(it => ({
             ...it,
+            // Per-cluster normalized coords (spread to fill the zoomed view).
             nx: items.length === 1 ? 0.5 : 0.5 + ((it.gx - minX) / rx - 0.5) * SPREAD,
             ny: items.length === 1 ? 0.5 : 0.5 + ((it.gy - minY) / ry - 0.5) * SPREAD,
+            // Global normalized coords (shared scatter / overview).
+            ngx: (it.gx - gMinX) / gRx,
+            ngy: (it.gy - gMinY) / gRy,
           })).sort((a, b) => b.prob - a.prob);
           const allTerms = (ldaTopics[k] || []).map(t => ({
             term: t.term, probability: t.probability,
@@ -399,17 +419,19 @@
     static #PAD       = 32;
     static #SCALE_MIN = 0.2;
     static #SCALE_MAX = 4;
-    view            = $state("grid");
+
+    view            = $state("overview");   // "overview" (scatter+boxes) | "cluster"
     selectedCluster = $state(null);
     hoveredCircle   = $state(null);
+    hoveredBox      = $state(null);          // cluster idx under cursor in overview
     mapCanvas       = $state(null);
     mapRect         = $state(null);
     transform       = $state({ x: 0, y: 0, k: 1 });
     #zoomBehavior   = null;
     #dragMoved      = false;
 
-    open(idx) { this.selectedCluster = idx; this.view = "cluster"; this.resetView(); }
-    close()   { this.view = "grid"; this.selectedCluster = null; this.hoveredCircle = null; this.resetView(); }
+    open(idx) { this.selectedCluster = idx; this.view = "cluster"; this.hoveredBox = null; this.resetView(); }
+    close()   { this.view = "overview"; this.selectedCluster = null; this.hoveredCircle = null; this.resetView(); }
 
     attachZoom() {
       if (!this.mapCanvas) return;
@@ -509,6 +531,131 @@
       }
     }
 
+    // Global-scatter pixel position for a dot (overview view).
+    #toPxG(it, w, h) {
+      const pad = ClusterMap.#PAD;
+      return {
+        cx: (pad + it.ngx * (w - pad * 2)) * this.transform.k + this.transform.x,
+        cy: (pad + (1 - it.ngy) * (h - pad * 2)) * this.transform.k + this.transform.y,
+      };
+    }
+
+    // Pixel-space bounding box + opacity for every cluster. Prominence is
+    // encoded by transparency (more documents = more opaque), never colour or
+    // font size — a fixed label size keeps the field calm. `alpha` runs
+    // 0.3 (sparse cluster, recedes) → 1 (largest cluster, pops).
+    static #LABEL_FONT = "700 12px ui-sans-serif, system-ui, sans-serif";
+    overviewBoxes(clusters, w, h) {
+      const maxCount = Math.max(1, ...clusters.map(c => c.count || c.items.length));
+      const BPAD = 14;
+      return clusters.map((cluster, idx) => {
+        let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+        for (const it of cluster.items) {
+          const { cx, cy } = this.#toPxG(it, w, h);
+          if (cx < x0) x0 = cx; if (cx > x1) x1 = cx;
+          if (cy < y0) y0 = cy; if (cy > y1) y1 = cy;
+        }
+        const frac = (cluster.count || cluster.items.length) / maxCount;
+        return {
+          idx,
+          x0: x0 - BPAD, y0: y0 - BPAD, x1: x1 + BPAD, y1: y1 + BPAD,
+          label: cluster.terms.slice(0, 3).map(t => humanTerm(t.term)).join(" · "),
+          alpha: 0.3 + 0.7 * frac,               // opacity by document share
+          count: cluster.count || cluster.items.length,
+        };
+      });
+    }
+
+    drawOverview(clusters) {
+      if (!this.mapCanvas || !clusters.length) return;
+
+      const dpr = window.devicePixelRatio || 1;
+      const rect = this.mapCanvas.getBoundingClientRect();
+      const w = rect.width, h = rect.height;
+      const W = Math.max(1, Math.floor(w * dpr));
+      const H = Math.max(1, Math.floor(h * dpr));
+      if (this.mapCanvas.width  !== W) this.mapCanvas.width  = W;
+      if (this.mapCanvas.height !== H) this.mapCanvas.height = H;
+
+      const ctx = this.mapCanvas.getContext("2d");
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.scale(dpr, dpr);
+      ctx.clearRect(0, 0, w, h);
+
+      const boxes = this.overviewBoxes(clusters, w, h);
+
+      // ── Pass 1: cluster boxes (behind dots) ──────────────
+      // Thin solid border only — no fill, no dashes — at the cluster's opacity
+      // so sparse clusters recede. Hovered box snaps to full strength.
+      for (const b of boxes) {
+        const hover = this.hoveredBox === b.idx;
+        ctx.beginPath();
+        ctx.roundRect(b.x0, b.y0, b.x1 - b.x0, b.y1 - b.y0, 8);
+        ctx.lineWidth   = hover ? 2 : 1;
+        ctx.strokeStyle = `rgba(0,0,0,${hover ? 0.7 : 0.15 + 0.35 * b.alpha})`;
+        ctx.stroke();
+      }
+
+      // ── Pass 2: dots (all clusters) — opacity = cluster score ───
+      for (let ci = 0; ci < boxes.length; ci++) {
+        const a = this.hoveredBox === ci ? 0.95 : 0.2 + 0.6 * boxes[ci].alpha;
+        ctx.fillStyle = `rgba(0,0,0,${a})`;
+        for (const it of clusters[ci].items) {
+          const { cx, cy } = this.#toPxG(it, w, h);
+          ctx.beginPath();
+          ctx.arc(cx, cy, 2.2, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+
+      // ── Pass 3: topic labels (fixed size, opacity = cluster score) ───
+      ctx.textBaseline = "top";
+      ctx.textAlign = "left";
+      ctx.font = ClusterMap.#LABEL_FONT;
+      for (const b of boxes) {
+        const hover = this.hoveredBox === b.idx;
+        const a = hover ? 1 : 0.45 + 0.55 * b.alpha;
+        const tx = Math.max(4, Math.min(b.x0 + 6, w - 6 - ctx.measureText(b.label).width));
+        const ty = Math.max(2, b.y0 - 16);
+        // White halo for legibility over dots.
+        ctx.lineWidth = 3;
+        ctx.strokeStyle = `rgba(255,255,255,${0.85 * a})`;
+        ctx.strokeText(b.label, tx, ty);
+        ctx.fillStyle = `rgba(0,0,0,${a})`;
+        ctx.fillText(b.label, tx, ty);
+      }
+
+      if (!this.mapRect || this.mapRect.width !== w || this.mapRect.height !== h) {
+        this.mapRect = { width: w, height: h };
+      }
+    }
+
+    // Which cluster box is under the cursor (smallest enclosing box wins).
+    pickClusterBox(clientX, clientY, clusters) {
+      if (!this.mapCanvas) return null;
+      const rect = this.mapCanvas.getBoundingClientRect();
+      const mx = clientX - rect.left, my = clientY - rect.top;
+      const boxes = this.overviewBoxes(clusters, rect.width, rect.height);
+      let best = null, bestArea = Infinity;
+      for (const b of boxes) {
+        if (mx >= b.x0 && mx <= b.x1 && my >= b.y0 && my <= b.y1) {
+          const area = (b.x1 - b.x0) * (b.y1 - b.y0);
+          if (area < bestArea) { bestArea = area; best = b.idx; }
+        }
+      }
+      return best;
+    }
+
+    onMoveOverview(e, clusters) {
+      const idx = this.pickClusterBox(e.clientX, e.clientY, clusters);
+      if (this.hoveredBox !== idx) this.hoveredBox = idx;
+    }
+    onClickOverview(e, clusters) {
+      if (this.#dragMoved) { this.#dragMoved = false; return; }
+      const idx = this.pickClusterBox(e.clientX, e.clientY, clusters);
+      if (idx != null) this.open(idx);
+    }
+
     // Greedy label placement — no canvas context needed.
     // Returns {j, idx, hit, cx, cy, lx, ly, lw, lh} for each placed label.
     computeLabels(clusters) {
@@ -592,9 +739,14 @@
   // Wire d3-zoom once when the canvas binds; redraw dots on any state change.
   $effect(() => { if (map.mapCanvas) untrack(() => map.attachZoom()); });
   $effect(() => {
-    if (map.view !== "cluster" || map.selectedCluster == null) return;
-    pipeline.clusters; map.hoveredCircle; map.transform;
-    tick().then(() => map.draw(pipeline.clusters));
+    map.view; map.selectedCluster; map.hoveredCircle; map.hoveredBox; map.transform;
+    pipeline.clusters;
+    if (!map.mapCanvas) return;
+    if (map.view === "overview") {
+      tick().then(() => map.drawOverview(pipeline.clusters));
+    } else if (map.view === "cluster" && map.selectedCluster != null) {
+      tick().then(() => map.draw(pipeline.clusters));
+    }
   });
 
   // HTML label cards — recomputed whenever transform or clusters change.
@@ -659,107 +811,96 @@
     {/if}
   </div>
 
-  {#if map.view === "grid"}
-    {#if pipeline.clusters.length === 0 && !pipeline.processing}
-      <div class="tm-empty">{pipeline.progress || "Waiting for search results..."}</div>
-    {:else}
-      <div class="tm-grid">
-        {#each pipeline.clusters as cluster, idx (cluster.topic)}
-          <button
-            class="tm-cell"
-            onclick={() => map.open(idx)}
-            title="Open cluster map"
-          >
-            <div class="tm-cell-count">{cluster.count}</div>
-            <ul class="tm-cell-terms">
-              {#each cluster.terms.slice(0, 5) as t (t.term)}
-                <li class="tm-term">{humanTerm(t.term)}</li>
-              {/each}
-            </ul>
-            {#if cluster.terms.length > 5}
-              <p class="tm-cell-flow">
-                {#each cluster.terms.slice(5, 15) as t (t.term)}
-                  <span class="tm-term--minor">{humanTerm(t.term)}</span>
-                {/each}
-              </p>
-            {/if}
-          </button>
-        {/each}
-      </div>
-    {/if}
-
-  {:else if map.view === "cluster" && map.selectedCluster != null}
-    {@const cluster = pipeline.clusters[map.selectedCluster]}
-    {#if cluster}
-      <div class="tm-cluster-view">
-        <header class="tm-cluster-head">
-          <button class="tm-back" onclick={() => map.close()}>← All topics</button>
-          <div class="tm-zoom-btns" title="Or hold Ctrl + scroll">
-            <button class="tm-zoom-btn" onclick={() => map.zoomBy(1.4)}>+</button>
-            <button class="tm-zoom-btn" onclick={() => map.zoomBy(1 / 1.4)}>−</button>
-            <button class="tm-zoom-btn" onclick={() => map.resetView()}
-              disabled={map.transform.x === 0 && map.transform.y === 0 && map.transform.k === 1}>
-              ⟲
-            </button>
-          </div>
+  {#if pipeline.clusters.length === 0 && !pipeline.processing}
+    <div class="tm-empty">{pipeline.progress || "Waiting for search results..."}</div>
+  {:else}
+    <div class="tm-subhead">
+      {#if map.view === "cluster" && map.selectedCluster != null}
+        {@const cluster = pipeline.clusters[map.selectedCluster]}
+        <button class="tm-back" onclick={() => map.close()}>← All topics</button>
+        {#if cluster}
           <h3 class="tm-cluster-title">
             {#each cluster.terms.slice(0, 10) as t (t.term)}
               <span class="tm-cluster-term">{humanTerm(t.term)}</span>
             {/each}
           </h3>
           <span class="tm-cluster-count">{cluster.count} docs</span>
-        </header>
-
-        <div class="tm-map-wrap">
-          <!-- d3-zoom owns pan/wheel-zoom; we only handle hover + click. -->
-          <canvas
-            bind:this={map.mapCanvas}
-            class="tm-map"
-            onmousemove={(e) => map.onMove(e, pipeline.clusters)}
-            onmouseleave={() => map.onLeave()}
-            onclick={(e) => map.onClick(e, pipeline.clusters, onselect)}
-          ></canvas>
-
-          <!-- Dashed leader lines from each dot to its label card -->
-          <svg class="tm-leaders" aria-hidden="true">
-            {#each topLabeled as r (r.j)}
-              <line
-                x1={r.cx} y1={r.cy}
-                x2={r.lx < r.cx ? r.lx + 200 : r.lx}
-                y2={r.ly + 10}
-                class="tm-leader-line"
-              />
-            {/each}
-          </svg>
-
-          <!-- HTML label cards — native click events, {@html} for highlights -->
-          {#each topLabeled as r (r.j)}
-            <div
-              class="tm-label-card"
-              style="left: {r.lx}px; top: {r.ly}px"
-              onclick={(e) => { e.stopPropagation(); onselect?.(r.idx); }}
-              role="button" tabindex="0"
-              onkeydown={(e) => { if (e.key === "Enter") onselect?.(r.idx); }}
-            >
-              <div class="tm-label-title">{hitTitle(r.hit, r.idx)}</div>
-              {#if hitExcerpt(r.hit)}
-                <p class="tm-label-excerpt">{@html sanitizeHighlight(hitExcerpt(r.hit))}</p>
-              {/if}
-            </div>
-          {/each}
-
-          {#if map.hoveredCircle}
-            {@const hov = map.hoveredCircle}
-            <div class="tm-hover-tip">
-              <div class="tm-tip-title">{hitTitle(hov.hit, hov.idx)}</div>
-              {#if hitExcerpt(hov.hit)}
-                <p class="tm-tip-excerpt">{@html sanitizeHighlight(hitExcerpt(hov.hit))}</p>
-              {/if}
-            </div>
-          {/if}
-        </div>
+        {/if}
+      {:else}
+        <span class="tm-hint">Click a topic box to zoom in · hold Ctrl + scroll to zoom · drag to pan</span>
+      {/if}
+      <div class="tm-zoom-btns" title="Or hold Ctrl + scroll">
+        <button class="tm-zoom-btn" onclick={() => map.zoomBy(1.4)}>+</button>
+        <button class="tm-zoom-btn" onclick={() => map.zoomBy(1 / 1.4)}>−</button>
+        <button class="tm-zoom-btn" onclick={() => map.resetView()}
+          disabled={map.transform.x === 0 && map.transform.y === 0 && map.transform.k === 1}>
+          ⟲
+        </button>
       </div>
-    {/if}
+    </div>
+
+    <div class="tm-map-wrap">
+      <!-- d3-zoom owns pan/wheel-zoom; we only handle hover + click. -->
+      <canvas
+        bind:this={map.mapCanvas}
+        class="tm-map"
+        onmousemove={(e) => map.view === "cluster"
+          ? map.onMove(e, pipeline.clusters)
+          : map.onMoveOverview(e, pipeline.clusters)}
+        onmouseleave={() => { map.onLeave(); map.hoveredBox = null; }}
+        onclick={(e) => map.view === "cluster"
+          ? map.onClick(e, pipeline.clusters, onselect)
+          : map.onClickOverview(e, pipeline.clusters)}
+      ></canvas>
+
+      {#if map.view === "cluster" && map.selectedCluster != null}
+        <!-- Dashed leader lines from each dot to its label card -->
+        <svg class="tm-leaders" aria-hidden="true">
+          {#each topLabeled as r (r.j)}
+            <line
+              x1={r.cx} y1={r.cy}
+              x2={r.lx < r.cx ? r.lx + 200 : r.lx}
+              y2={r.ly + 10}
+              class="tm-leader-line"
+            />
+          {/each}
+        </svg>
+
+        <!-- HTML label cards — native click events, {@html} for highlights -->
+        {#each topLabeled as r (r.j)}
+          <div
+            class="tm-label-card"
+            style="left: {r.lx}px; top: {r.ly}px"
+            onclick={(e) => { e.stopPropagation(); onselect?.(r.idx); }}
+            role="button" tabindex="0"
+            onkeydown={(e) => { if (e.key === "Enter") onselect?.(r.idx); }}
+          >
+            <div class="tm-label-title">{hitTitle(r.hit, r.idx)}</div>
+            {#if hitExcerpt(r.hit)}
+              <p class="tm-label-excerpt">{@html sanitizeHighlight(hitExcerpt(r.hit))}</p>
+            {/if}
+          </div>
+        {/each}
+
+        {#if map.hoveredCircle}
+          {@const hov = map.hoveredCircle}
+          <div class="tm-hover-tip">
+            <div class="tm-tip-title">{hitTitle(hov.hit, hov.idx)}</div>
+            {#if hitExcerpt(hov.hit)}
+              <p class="tm-tip-excerpt">{@html sanitizeHighlight(hitExcerpt(hov.hit))}</p>
+            {/if}
+          </div>
+        {/if}
+      {:else if map.hoveredBox != null && pipeline.clusters[map.hoveredBox]}
+        {@const hc = pipeline.clusters[map.hoveredBox]}
+        <div class="tm-hover-tip">
+          <div class="tm-tip-title">{hc.count} documents · click to zoom in</div>
+          <p class="tm-tip-excerpt">
+            {hc.terms.slice(0, 8).map((t) => humanTerm(t.term)).join(" · ")}
+          </p>
+        </div>
+      {/if}
+    </div>
   {/if}
 </section>
 
@@ -782,35 +923,8 @@
   .tm-bigram-examples { @apply text-emerald-700/70; }
   .tm-empty    { @apply px-3 py-6 text-center text-sm text-black/40 italic; }
 
-  .tm-grid {
-    @apply grid gap-2 p-3;
-    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-  }
-  .tm-cell {
-    @apply relative rounded-lg p-3 text-left cursor-pointer transition-all bg-white/70 hover:bg-white/90;
-    border: 6px double rgba(0, 0, 0, 0.18);
-    min-height: 250px;
-  }
-  .tm-cell:hover { box-shadow: 0 4px 14px rgba(0,0,0,0.1); transform: translateY(-1px); }
-  .tm-cell::after { content: ""; }
-  .tm-cell-count {
-    @apply absolute top-1.5 right-2 text-[10px] font-mono font-bold px-1.5 rounded bg-black/10 text-black/50;
-  }
-  .tm-cell-terms { @apply flex flex-col gap-0 pr-6 pt-1 pl-1 m-0 list-none overflow-hidden; }
-  .tm-term {
-    @apply text-[12px] font-medium leading-snug truncate text-black/70;
-  }
-  .tm-term::before { content: "· "; opacity: 0.4; }
-  .tm-cell-flow {
-    @apply m-0 mt-1 px-1 leading-snug;
-  }
-  .tm-term--minor {
-    @apply text-[9px] text-black/45 font-normal;
-  }
-  .tm-term--minor + .tm-term--minor::before { content: " · "; opacity: 0.35; }
-
-  .tm-cluster-view { @apply p-3; }
-  .tm-cluster-head { @apply flex items-center gap-3 mb-2 flex-wrap; }
+  .tm-subhead { @apply flex items-center gap-3 px-3 pt-2 pb-1 flex-wrap; }
+  .tm-hint { @apply text-[10px] text-black/45 italic; }
   .tm-back {
     @apply text-[11px] px-2 py-0.5 rounded border border-primary/30 bg-white/60 text-black/70 cursor-pointer hover:bg-primary/20;
   }
@@ -832,7 +946,8 @@
   .tm-cluster-count { @apply text-[10px] text-black/50 font-mono ml-auto; }
 
   .tm-map-wrap {
-    @apply relative w-full rounded-lg border border-primary/20 bg-white/40 overflow-hidden;
+    @apply relative rounded-lg border border-primary/20 bg-white/40 overflow-hidden mx-3 mb-3;
+    width: auto;
     height: 520px;
   }
   .tm-map        { @apply absolute inset-0 w-full h-full; cursor: grab; touch-action: none; }

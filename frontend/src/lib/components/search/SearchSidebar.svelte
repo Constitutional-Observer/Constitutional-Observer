@@ -1,7 +1,7 @@
 <script>
-  import IndiaMap from "$lib/components/IndiaMap.svelte";
-  import TimelineSlider from "$lib/components/TimelineSlider.svelte";
-  import TitleWithNav from "$lib/components/TitleWithNav.svelte";
+  import IndiaMap from "$lib/components/search/IndiaMap.svelte";
+  import TimelineSlider from "$lib/components/search/TimelineSlider.svelte";
+  import TitleWithNav from "$lib/components/general/TitleWithNav.svelte";
 
   let {
     // Search bar

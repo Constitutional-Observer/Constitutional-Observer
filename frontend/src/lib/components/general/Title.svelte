@@ -1,8 +1,6 @@
 <script>
   import { query } from "$lib/stores";
-  import { questions } from "$lib/text.js";
   import { goto } from "$app/navigation";
-  import { onDestroy, onMount } from "svelte";
 
   let refreshIntervalId;
 

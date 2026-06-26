@@ -1,10 +1,10 @@
 <script>
-  import MainSearch from "$lib/components/MainSearch.svelte";
-  import Footer from "$lib/components/Footer.svelte";
-  import TopicMap from "$lib/components/TopicMap.svelte";
-  import SearchSidebar from "$lib/components/SearchSidebar.svelte";
+  import ResultsList from "$lib/components/search/ResultsList.svelte";
+  import SearchSidebar from "$lib/components/search/SearchSidebar.svelte";
+  import DetailPanel from "$lib/components/search/DetailPanel.svelte";
   import { goto } from "$app/navigation";
-  import { tick, untrack } from "svelte";
+  import { browser } from "$app/environment";
+  import { tick, untrack, onMount } from "svelte";
 
   // ---------------------------------------------------------------------------
   // DocPanel — result selection, copy feedback, full-document cache

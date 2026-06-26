@@ -1,5 +1,5 @@
 <script>
-  import { getStatePositions } from "$lib/india-states.js";
+  import { getStatePositions } from "$lib/data/india-states.js";
 
   let { resultsByState = {}, activeState = null, selectedStates = new Set(), onstateclick } = $props();
 

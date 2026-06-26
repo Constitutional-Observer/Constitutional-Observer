@@ -1,12 +1,10 @@
 <script>
   import "../app.css";
   import { MetaTags } from 'svelte-meta-tags';
+  import Footer from "$lib/components/general/Footer.svelte";
   let { children } = $props();
 </script>
 
-<div class="size-disclaimer">
-  Please open this page in a larger window (a desktop or laptop)
-</div>
 
 {@render children()}
 
@@ -17,7 +15,7 @@
     data-website-id="77592837-b465-4a97-9c79-194f59cd9a52"
   ></script>
 </svelte:head>
-
+<Footer/>
 <style lang="postcss">
   .size-disclaimer {
     @apply text-left  z-50  px-5 py-2 bg-primary md:hidden;

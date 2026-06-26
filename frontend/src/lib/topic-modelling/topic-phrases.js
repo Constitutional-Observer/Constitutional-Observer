@@ -15,6 +15,9 @@
 //   - Prefer the most corpus-distinctive unigram over a generic synonym.
 
 // ── Constitutional / Legal ──
+
+import { compileTrie } from "$lib/topic-modelling/phrase-matcher.js";
+
 const CONSTITUTIONAL = [
   "right to information", "right to education", "right to food",
   "right to privacy", "right to life", "right to work", "right to property",
@@ -668,8 +671,6 @@ const PROCEDURAL = [
   "motion", "resolution", "debate", "adjournment",
   "quorum", "division", "vote", "tabled",
 ];
-
-import { compileTrie } from "$lib/phrase-matcher.js";
 
 // Only multi-word entries go into the phrase-merge trie; unigrams are filtered out.
 export const RAW_PHRASES = [

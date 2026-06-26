@@ -1,8 +1,7 @@
 <script>
   import { marked } from "marked";
   import source from "$lib/about.md?raw";
-  import TitleWithNav from "../../lib/components/TitleWithNav.svelte";
-  import Footer from "$lib/components/Footer.svelte";
+  import TitleWithNav from "$lib/components/general/TitleWithNav.svelte";
 </script>
 
 <svelte:head>
@@ -29,7 +28,6 @@
   </div>
 </main>
 
-<Footer />
 
 <style lang="postcss">
   :global(ol) {

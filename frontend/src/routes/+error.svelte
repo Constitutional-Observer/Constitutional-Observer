@@ -1,6 +1,5 @@
 <script>
   import { page } from "$app/state";
-  import Footer from "$lib/components/Footer.svelte";
 </script>
 
 <main class="md:h-[70vh] grid place-content-center md:px-[10%]">
@@ -24,4 +23,3 @@
   >
 </main>
 
-<Footer></Footer>
