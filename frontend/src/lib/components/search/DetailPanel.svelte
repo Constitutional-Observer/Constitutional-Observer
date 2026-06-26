@@ -1,259 +1,302 @@
 <script>
-  // Right-hand column for the search page: a localStorage bookmarks list plus a
-  // collapsible detail accordion that shows the selected result, or a bookmark
-  // opened by id. Reactive state lives on the `panel` (DocPanel) and `bookmarks`
-  // (Bookmarks) class instances passed in as props.
-  let { panel, bookmarks, selectedHit } = $props();
+  // Modal-based detail/bookmarks UI for the search page. The bookmarks modal is
+  // opened by a trigger in the sidebar (via the bindable `showBookmarks` prop);
+  // clicking a result (or opening a bookmark) opens the detail modal. Reactive
+  // state lives on the `panel` (DocPanel) and `bookmarks` (Bookmarks) class
+  // instances passed in as props.
+  import { renderHighlight as renderHL } from "$lib/highlight.js";
 
-  // Render Meilisearch highlight markup ({@html}) safely: escape everything,
-  // then restore only the <strong>…</strong> highlight tags the search API adds.
-  function renderHighlight(text) {
-    return String(text || "")
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/&lt;strong&gt;/g, "<strong>")
-      .replace(/&lt;\/strong&gt;/g, "</strong>");
+  let {
+    panel,
+    bookmarks,
+    selectedHit,
+    showBookmarks = $bindable(false),
+  } = $props();
+
+  // Query-term + topic-term highlight for the open document.
+  const renderHighlight = (text) => renderHL(text, docTopics);
+
+  // Detail modal is open whenever something is selected (a result hit or an
+  // opened bookmark). The bookmarks modal is toggled independently.
+  let detailOpen = $derived(!!(panel.openedBookmark || selectedHit));
+
+  function closeDetail() {
+    panel.selectedHitIndex = null;
+    panel.closeBookmark();
   }
 
-  // Open whenever something is selected (a result hit or an opened bookmark),
-  // closed otherwise.
-  let detailOpen = $state(false);
-  $effect(() => {
-    detailOpen = !!(panel.openedBookmark || selectedHit);
-  });
+  function openBookmark(bm) {
+    showBookmarks = false;
+    panel.openById(bm);
+  }
+
+  function onKeydown(e) {
+    if (e.key !== "Escape") return;
+    if (detailOpen) closeDetail();
+    else if (showBookmarks) showBookmarks = false;
+  }
 </script>
 
-<aside class="right-col">
-  <!-- Bookmarks (persisted to localStorage) -->
-  <section class="bookmarks-panel">
-    <header class="bm-header">
-      <span class="bm-title">★ Bookmarks</span>
-      <span class="bm-count">{bookmarks.items.length}</span>
-    </header>
-    {#if bookmarks.items.length === 0}
-      <p class="bm-empty">No bookmarks yet. Open a result and tap ☆ to save it.</p>
-    {:else}
-      <ul class="bm-list">
-        {#each bookmarks.items as bm (bm.key)}
-          <li class="bm-item">
-            <button class="bm-open" onclick={() => panel.openById(bm)}>
-              <span class="bm-item-head">
-                <span class="state-badge">{bm.state}</span>
-                {#if bm.date}<span class="date-badge">{bm.date}</span>{/if}
-              </span>
-              <span class="bm-item-title">{bm.title}</span>
-            </button>
-            <button
-              class="bm-remove"
-              title="Remove bookmark"
-              onclick={() => bookmarks.remove(bm.key)}>✕</button
-            >
-          </li>
-        {/each}
-      </ul>
-    {/if}
-  </section>
+<svelte:window onkeydown={onKeydown} />
 
-  <!-- Detail accordion — closed when nothing is selected -->
-  <details class="detail-accordion" bind:open={detailOpen}>
-    <summary class="detail-summary">
-      {#if panel.openedBookmark}
-        <span class="detail-summary-label">Bookmark</span>
-        <span class="detail-summary-title">{panel.openedBookmark.meta.title}</span>
-      {:else if selectedHit}
-        <span class="detail-summary-label">Selected</span>
-        <span class="detail-summary-title"
-          >{selectedHit.title_en || selectedHit.subject || "Untitled"}</span
-        >
-      {:else}
-        <span class="detail-summary-title detail-summary-empty">Nothing selected</span>
-      {/if}
-    </summary>
-
-    <div class="detail-body">
-      {#if panel.openedBookmark}
-        {@const ob = panel.openedBookmark}
-        <div class="detail-header">
-          <div class="detail-actions">
-            <button class="back-btn" onclick={() => panel.closeBookmark()}
-              >← Close</button
-            >
-          </div>
-          <h3 class="detail-title">{ob.meta.title}</h3>
-          <div class="result-head">
-            <span class="state-badge">{ob.meta.state}</span>
-            {#if ob.meta.date}<span class="date-badge">{ob.meta.date}</span>{/if}
-          </div>
-        </div>
-        {#if ob.loading}
-          <p class="doc-loading">Loading document…</p>
-        {:else if ob.chunks.length}
-          <div class="full-doc">
-            <p class="doc-info">{ob.chunks.length} chunks in document</p>
-            {#each ob.chunks as chunk, ci (chunk.chunk_id ?? ci)}
-              <div
-                class="doc-chunk"
-                class:doc-chunk-highlight={chunk.isHighlighted}
-              >
-                <span class="chunk-id">#{chunk.chunk_id}</span>
-                <p>{chunk.text}</p>
-              </div>
-            {/each}
-          </div>
+<!-- Bookmarks modal -->
+{#if showBookmarks}
+  <div
+    class="modal-overlay"
+    role="presentation"
+    onclick={() => (showBookmarks = false)}
+  >
+    <div
+      class="modal bookmarks-modal"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Bookmarks"
+      tabindex="-1"
+      onclick={(e) => e.stopPropagation()}
+    >
+      <header class="modal-header">
+        <span class="modal-title">★ Bookmarks <span class="bm-count">{bookmarks.items.length}</span></span>
+        <button class="modal-close" title="Close" onclick={() => (showBookmarks = false)}>✕</button>
+      </header>
+      <div class="modal-body">
+        {#if bookmarks.items.length === 0}
+          <p class="bm-empty">No bookmarks yet. Open a result and tap ☆ to save it.</p>
         {:else}
-          <p class="doc-loading">Could not load document.</p>
-        {/if}
-      {:else if selectedHit}
-        <div class="detail-header">
-          <div class="detail-actions">
-            <button
-              class="bookmark-btn"
-              class:bookmarked={bookmarks.has(selectedHit)}
-              onclick={() => bookmarks.toggle(selectedHit)}
-            >
-              {bookmarks.has(selectedHit) ? "★ Bookmarked" : "☆ Bookmark"}
-            </button>
-          </div>
-          <h3 class="detail-title">
-            {selectedHit.title_en || selectedHit.subject || "Untitled"}
-          </h3>
-          <div class="result-head">
-            <span class="state-badge">{selectedHit.state || "Unknown"}</span>
-            {#if panel.hitDate(selectedHit)}<span class="date-badge"
-                >{panel.hitDate(selectedHit)}</span
-              >{/if}
-          </div>
-          <div class="meta-tags">
-            {#each panel.metaTags(selectedHit) as tag (tag.key)}
-              <span class="meta-tag">{tag.label}: {tag.value}</span>
-            {/each}
-            {#if selectedHit.archive_link}
-              <a
-                href={selectedHit.archive_link}
-                target="_blank"
-                class="meta-tag meta-link">archive</a
-              >
-            {/if}
-          </div>
-        </div>
-
-        {#if selectedHit._matchedChunks?.length}
-          <p class="matched-label">
-            {selectedHit._matchedChunks.length} matched section{selectedHit
-              ._matchedChunks.length > 1
-              ? "s"
-              : ""}
-          </p>
-          {#each selectedHit._matchedChunks as mc, mci (mc.chunk_id ?? mci)}
-            <div class="matched-chunk">
-              <div class="chunk-header">
-                <span class="chunk-id"
-                  >#{mc.chunk_id} &middot; {mc.score?.toFixed(3) || ""}</span
-                >
-                <button
-                  class="copy-btn"
-                  onclick={() =>
-                    panel.copyText(mc.text, `mc-${selectedHit.id}-${mc.chunk_id}`)}
-                >
-                  {panel.copiedId === `mc-${selectedHit.id}-${mc.chunk_id}`
-                    ? "Copied"
-                    : "Copy"}
+          <ul class="bm-list">
+            {#each bookmarks.items as bm (bm.key)}
+              <li class="bm-item">
+                <button class="bm-open" onclick={() => openBookmark(bm)}>
+                  <span class="bm-item-head">
+                    <span class="state-badge">{bm.state}</span>
+                    {#if bm.date}<span class="date-badge">{bm.date}</span>{/if}
+                  </span>
+                  <span class="bm-item-title">{bm.title}</span>
                 </button>
-              </div>
-              <p>{@html renderHighlight(mc.textHL || mc.text)}</p>
-            </div>
-          {/each}
-        {:else}
-          <blockquote class="result-excerpt">
-            {@html renderHighlight(
-              selectedHit._formatted?.__discussions ||
-                selectedHit.__discussions ||
-                "",
-            )}
-            <button
-              class="copy-btn"
-              onclick={() =>
-                panel.copyText(
-                  selectedHit.__discussions || "",
-                  `ex-${selectedHit.id}`,
-                )}
-            >
-              {panel.copiedId === `ex-${selectedHit.id}` ? "Copied" : "Copy"}
-            </button>
-          </blockquote>
+                <button
+                  class="bm-remove"
+                  title="Remove bookmark"
+                  onclick={() => bookmarks.remove(bm.key)}>✕</button
+                >
+              </li>
+            {/each}
+          </ul>
         {/if}
+      </div>
+    </div>
+  </div>
+{/if}
 
-        {#if !panel.fullDocs[panel.docKey(selectedHit)]}
-          <button
-            class="load-doc-btn"
-            onclick={() => panel.loadFullDocument(selectedHit)}
-            >Load full document</button
+<!-- Detail modal -->
+{#if detailOpen}
+  <div class="modal-overlay" role="presentation" onclick={closeDetail}>
+    <div
+      class="modal detail-modal"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Document detail"
+      tabindex="-1"
+      onclick={(e) => e.stopPropagation()}
+    >
+      <header class="modal-header">
+        {#if panel.openedBookmark}
+          <span class="detail-summary-label">Bookmark</span>
+          <span class="modal-title">{panel.openedBookmark.meta.title}</span>
+        {:else if selectedHit}
+          <span class="detail-summary-label">Selected</span>
+          <span class="modal-title"
+            >{selectedHit.title_en || selectedHit.subject || "Untitled"}</span
           >
-        {:else if panel.fullDocs[panel.docKey(selectedHit)].loading}
-          <p class="doc-loading">Loading...</p>
-        {:else if panel.fullDocs[panel.docKey(selectedHit)].chunks.length > 0}
-          <div class="full-doc">
-            <p class="doc-info">
-              {panel.fullDocs[panel.docKey(selectedHit)].chunks.length} chunks in
-              document
-            </p>
-            {#each panel.fullDocs[panel.docKey(selectedHit)].chunks as chunk, ci (chunk.chunk_id ?? ci)}
-              <div
-                id="chunk-{panel.docKey(selectedHit)}-{chunk.chunk_id}"
-                class="doc-chunk"
-                class:doc-chunk-highlight={chunk.isHighlighted}
+        {/if}
+        <button class="modal-close" title="Close" onclick={closeDetail}>✕</button>
+      </header>
+
+      <div class="modal-body detail-body">
+        {#if panel.openedBookmark}
+          {@const ob = panel.openedBookmark}
+          <div class="detail-header">
+            <h3 class="detail-title">{ob.meta.title}</h3>
+            <div class="result-head">
+              <span class="state-badge">{ob.meta.state}</span>
+              {#if ob.meta.date}<span class="date-badge">{ob.meta.date}</span>{/if}
+            </div>
+          </div>
+          {#if ob.loading}
+            <p class="doc-loading">Loading document…</p>
+          {:else if ob.chunks.length}
+            <div class="full-doc">
+              <p class="doc-info">{ob.chunks.length} chunks in document</p>
+              {#each ob.chunks as chunk, ci (chunk.chunk_id ?? ci)}
+                <div
+                  class="doc-chunk"
+                  class:doc-chunk-highlight={chunk.isHighlighted}
+                >
+                  <span class="chunk-id">#{chunk.chunk_id}</span>
+                  <p>{@html renderHighlight(chunk.text)}</p>
+                </div>
+              {/each}
+            </div>
+          {:else}
+            <p class="doc-loading">Could not load document.</p>
+          {/if}
+        {:else if selectedHit}
+          <div class="detail-header">
+            <div class="detail-actions">
+              <button
+                class="bookmark-btn"
+                class:bookmarked={bookmarks.has(selectedHit)}
+                onclick={() => bookmarks.toggle(selectedHit)}
               >
-                <span class="chunk-id">#{chunk.chunk_id}</span>
-                <p>{chunk.text}</p>
+                {bookmarks.has(selectedHit) ? "★ Bookmarked" : "☆ Bookmark"}
+              </button>
+            </div>
+            <h3 class="detail-title">
+              {selectedHit.title_en || selectedHit.subject || "Untitled"}
+            </h3>
+            <div class="result-head">
+              <span class="state-badge">{selectedHit.state || "Unknown"}</span>
+              {#if panel.hitDate(selectedHit)}<span class="date-badge"
+                  >{panel.hitDate(selectedHit)}</span
+                >{/if}
+            </div>
+            <div class="meta-tags">
+              {#each panel.metaTags(selectedHit) as tag (tag.key)}
+                <span class="meta-tag">{tag.label}: {tag.value}</span>
+              {/each}
+              {#if selectedHit.archive_link}
+                <a
+                  href={selectedHit.archive_link}
+                  target="_blank"
+                  class="meta-tag meta-link">archive</a
+                >
+              {/if}
+            </div>
+          </div>
+
+          {#if selectedHit._matchedChunks?.length}
+            <p class="matched-label">
+              {selectedHit._matchedChunks.length} matched section{selectedHit
+                ._matchedChunks.length > 1
+                ? "s"
+                : ""}
+            </p>
+            {#each selectedHit._matchedChunks as mc, mci (mc.chunk_id ?? mci)}
+              <div class="matched-chunk">
+                <div class="chunk-header">
+                  <span class="chunk-id"
+                    >#{mc.chunk_id} &middot; {mc.score?.toFixed(3) || ""}</span
+                  >
+                  <button
+                    class="copy-btn"
+                    onclick={() =>
+                      panel.copyText(mc.text, `mc-${selectedHit.id}-${mc.chunk_id}`)}
+                  >
+                    {panel.copiedId === `mc-${selectedHit.id}-${mc.chunk_id}`
+                      ? "Copied"
+                      : "Copy"}
+                  </button>
+                </div>
+                <p>{@html renderHighlight(mc.textHL || mc.text)}</p>
               </div>
             {/each}
-          </div>
-        {:else}
-          <p class="doc-loading">Could not load document.</p>
+          {:else}
+            <blockquote class="result-excerpt">
+              {@html renderHighlight(
+                selectedHit._formatted?.__discussions ||
+                  selectedHit.__discussions ||
+                  "",
+              )}
+              <button
+                class="copy-btn"
+                onclick={() =>
+                  panel.copyText(
+                    selectedHit.__discussions || "",
+                    `ex-${selectedHit.id}`,
+                  )}
+              >
+                {panel.copiedId === `ex-${selectedHit.id}` ? "Copied" : "Copy"}
+              </button>
+            </blockquote>
+          {/if}
+
+          {#if !panel.fullDocs[panel.docKey(selectedHit)]}
+            <button
+              class="load-doc-btn"
+              onclick={() => panel.loadFullDocument(selectedHit)}
+              >Load full document</button
+            >
+          {:else if panel.fullDocs[panel.docKey(selectedHit)].loading}
+            <p class="doc-loading">Loading...</p>
+          {:else if panel.fullDocs[panel.docKey(selectedHit)].chunks.length > 0}
+            <div class="full-doc">
+              <p class="doc-info">
+                {panel.fullDocs[panel.docKey(selectedHit)].chunks.length} chunks in
+                document
+              </p>
+              {#each panel.fullDocs[panel.docKey(selectedHit)].chunks as chunk, ci (chunk.chunk_id ?? ci)}
+                <div
+                  id="chunk-{panel.docKey(selectedHit)}-{chunk.chunk_id}"
+                  class="doc-chunk"
+                  class:doc-chunk-highlight={chunk.isHighlighted}
+                >
+                  <span class="chunk-id">#{chunk.chunk_id}</span>
+                  <p>{chunk.text}</p>
+                </div>
+              {/each}
+            </div>
+          {:else}
+            <p class="doc-loading">Could not load document.</p>
+          {/if}
         {/if}
-      {:else}
-        <p class="detail-empty-body">
-          Select a result, a topic dot, or a bookmark to see details here.
-        </p>
-      {/if}
+      </div>
     </div>
-  </details>
-</aside>
+  </div>
+{/if}
 
 <style lang="postcss">
-  /* Layout: stacked bookmarks panel + detail accordion; hidden on mobile. */
-  .right-col {
-    @apply flex flex-col gap-3;
-    width: 420px;
-    min-height: 0;
-    flex-shrink: 0;
-  }
-  @media (max-width: 768px) {
-    .right-col { display: none; }
-  }
-
-  /* Bookmarks */
-  .bookmarks-panel {
-    @apply rounded-lg bg-primaryLight/80 backdrop-blur-sm border border-primary/30 p-3 flex flex-col;
-    flex-shrink: 0;
-    max-height: 38%;
-  }
-  .bm-header {
-    @apply flex items-center justify-between mb-2 pb-2 border-b border-primary/20;
-  }
-  .bm-title {
-    @apply text-[11px] font-bold text-black/70 uppercase tracking-wider;
-  }
   .bm-count {
     @apply text-[10px] font-mono font-bold px-1.5 rounded bg-black/10 text-black/50;
   }
+
+  /* Modal shell */
+  .modal-overlay {
+    @apply fixed inset-0 z-50 flex items-center justify-center p-4;
+    background: rgba(0, 0, 0, 0.45);
+    backdrop-filter: blur(2px);
+  }
+  .modal {
+    @apply flex flex-col rounded-xl bg-primaryLight border border-primary/30 shadow-2xl overflow-hidden;
+    width: 100%;
+    max-height: 85vh;
+  }
+  .detail-modal {
+    max-width: 640px;
+  }
+  .bookmarks-modal {
+    max-width: 420px;
+  }
+  .modal-header {
+    @apply flex items-center gap-2 p-3 border-b border-primary/20 shrink-0;
+  }
+  .modal-title {
+    @apply flex-1 min-w-0 text-sm font-semibold text-black/90 truncate;
+  }
+  .modal-close {
+    @apply shrink-0 px-2 py-1 rounded text-sm text-black/50 bg-white/40 hover:bg-red-100 hover:text-red-700 transition cursor-pointer border border-transparent;
+  }
+  .modal-close::after {
+    content: "";
+  }
+  .modal-body {
+    @apply overflow-y-auto p-4;
+    min-height: 0;
+  }
+
+  /* Bookmarks list */
   .bm-empty {
     @apply text-xs text-black/40 italic;
   }
   .bm-list {
-    @apply flex flex-col gap-1 overflow-y-auto m-0 p-0 list-none;
-    min-height: 0;
+    @apply flex flex-col gap-1 m-0 p-0 list-none;
   }
   .bm-item {
     @apply flex items-stretch gap-1;
@@ -274,44 +317,12 @@
     content: "";
   }
 
-  /* Detail accordion */
-  .detail-accordion {
-    @apply rounded-lg bg-primaryLight/80 backdrop-blur-sm border border-primary/30 flex flex-col overflow-hidden;
-    flex: 1;
-    min-height: 0;
-  }
-  .detail-summary {
-    @apply flex items-center gap-2 p-3 cursor-pointer list-none border-b border-transparent;
-    flex-shrink: 0;
-  }
-  .detail-accordion[open] .detail-summary {
-    @apply border-primary/20;
-  }
-  .detail-summary::-webkit-details-marker {
-    display: none;
-  }
-  .detail-summary::before {
-    content: "▸";
-    @apply text-black/40 text-xs;
-  }
-  .detail-accordion[open] .detail-summary::before {
-    content: "▾";
-  }
+  /* Detail content */
   .detail-summary-label {
     @apply text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-primary/30 text-black/60 shrink-0;
   }
-  .detail-summary-title {
-    @apply text-sm font-semibold text-black/90 truncate;
-  }
-  .detail-summary-empty {
-    @apply text-black/40 font-normal italic;
-  }
   .detail-body {
-    @apply overflow-y-auto p-4 pt-2;
-    min-height: 0;
-  }
-  .detail-empty-body {
-    @apply text-sm text-black/40 italic;
+    @apply text-black/80;
   }
   .detail-actions {
     @apply flex justify-end mb-1;
@@ -323,12 +334,6 @@
     @apply bg-amber-100 border-amber-300 text-amber-900;
   }
   .bookmark-btn::after {
-    content: "";
-  }
-  .back-btn {
-    @apply text-[11px] px-2 py-0.5 rounded border border-primary/30 bg-white/60 text-black/70 cursor-pointer hover:bg-primary/20;
-  }
-  .back-btn::after {
     content: "";
   }
   .detail-header {
@@ -387,7 +392,7 @@
     @apply text-xs text-black/50 mt-2 italic;
   }
   .full-doc {
-    @apply mt-3 border-t border-primary/20 pt-3 max-h-[50vh] overflow-y-auto space-y-2;
+    @apply mt-3 border-t border-primary/20 pt-3 space-y-2;
   }
   .doc-info {
     @apply text-xs text-black/40 mb-2;

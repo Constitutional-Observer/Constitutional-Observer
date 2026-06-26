@@ -4,6 +4,7 @@
   import { TOPIC_STOPWORDS } from "$lib/topic-modelling/topic-stopwords.js";
   import { TOPIC_PHRASES, PHRASE_MERGED_SET, SEED_GROUPS } from "$lib/topic-modelling/topic-phrases.js";
   import { applyPhrases } from "$lib/topic-modelling/phrase-matcher.js";
+  import { renderHighlight } from "$lib/highlight.js";
 
   import { select as d3select } from "d3-selection";
   import { zoom as d3zoom, zoomIdentity } from "d3-zoom";
@@ -16,17 +17,6 @@
     const s = term.replace(/_/g, " ");
     return s.charAt(0).toUpperCase() + s.slice(1);
   };
-
-  // Strip all HTML except <strong>…</strong> so the API's highlight tags
-  // render safely via {@html} without allowing arbitrary markup.
-  function sanitizeHighlight(text) {
-    return text
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/&lt;strong&gt;/g, "<strong>")
-      .replace(/&lt;\/strong&gt;/g, "</strong>");
-  }
 
   // First matched chunk text with Meilisearch highlight tags, falling back to
   // plain text / __discussions. The highlighted form lets cluster excerpts show
@@ -877,7 +867,7 @@
           >
             <div class="tm-label-title">{hitTitle(r.hit, r.idx)}</div>
             {#if hitExcerpt(r.hit)}
-              <p class="tm-label-excerpt">{@html sanitizeHighlight(hitExcerpt(r.hit))}</p>
+              <p class="tm-label-excerpt">{@html renderHighlight(hitExcerpt(r.hit), selectedClusterTerms)}</p>
             {/if}
           </div>
         {/each}
@@ -887,7 +877,7 @@
           <div class="tm-hover-tip">
             <div class="tm-tip-title">{hitTitle(hov.hit, hov.idx)}</div>
             {#if hitExcerpt(hov.hit)}
-              <p class="tm-tip-excerpt">{@html sanitizeHighlight(hitExcerpt(hov.hit))}</p>
+              <p class="tm-tip-excerpt">{@html renderHighlight(hitExcerpt(hov.hit), selectedClusterTerms)}</p>
             {/if}
           </div>
         {/if}

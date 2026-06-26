@@ -3,6 +3,7 @@
   // paged result cards (desktop) / accordions (mobile). Reactive state lives on
   // the `pager` (ResultPager) and `panel` (DocPanel) instances passed in.
   import TopicMap from "$lib/components/search/TopicMap.svelte";
+  import { renderHighlight } from "$lib/highlight.js";
 
   let { pager, panel, query = "", paginationDone = true } = $props();
 </script>
@@ -63,7 +64,7 @@
                 {hit.title_en || hit.subject || "Untitled"}
               </h4>
             </div>
-            <p class="result-preview">{panel.hitPreview(hit)}</p>
+            <p class="result-preview">{@html renderHighlight(panel.hitPreview(hit), hitTopics(hit))}</p>
           </div>
         </div>
       </summary>

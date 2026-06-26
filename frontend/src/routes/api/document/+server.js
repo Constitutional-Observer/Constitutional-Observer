@@ -3,26 +3,49 @@ import { MEILI_HOST, MEILI_KEY } from "$env/static/private";
 
 /**
  * GET /api/document?index=state_legislature_debates_tn&file_name=xxx&highlight_chunks=3,7
- * Fetches all chunks for a given file_name from the index.
+ * GET /api/document?index=state_legislature_debates_tn&id=12345
+ *
+ * Fetches all chunks for a document. When `id` is given (e.g. opening a
+ * bookmark) the exact Meilisearch document is fetched by primary key first to
+ * resolve its file_name, then all sibling chunks are returned.
  */
 export async function GET({ url, fetch }) {
   const index = url.searchParams.get("index");
-  const fileName = url.searchParams.get("file_name");
+  const id = url.searchParams.get("id");
+  let fileName = url.searchParams.get("file_name");
   const highlightChunks = new Set(
     (url.searchParams.get("highlight_chunks") || "").split(",").map(Number).filter(Boolean)
   );
 
-  if (!index || !fileName) {
-    return json({ error: "index and file_name are required" }, { status: 400 });
+  const headers = {
+    "Content-Type": "application/json",
+    Authorization: `Bearer ${MEILI_KEY}`,
+  };
+
+  if (!index) {
+    return json({ error: "index is required" }, { status: 400 });
+  }
+
+  // Resolve file_name from the exact document when only an id is supplied.
+  if (!fileName && id) {
+    const docResp = await fetch(
+      `${MEILI_HOST}/indexes/${index}/documents/${encodeURIComponent(id)}`,
+      { headers }
+    );
+    if (docResp.ok) {
+      const doc = await docResp.json();
+      fileName = doc?.file_name || null;
+    }
+  }
+
+  if (!fileName) {
+    return json({ error: "file_name or a resolvable id is required" }, { status: 400 });
   }
 
   // No filter/sort configured on these indexes, so search by file_name as keyword
   const resp = await fetch(`${MEILI_HOST}/indexes/${index}/search`, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${MEILI_KEY}`,
-    },
+    headers,
     body: JSON.stringify({
       q: fileName,
       limit: 500,
@@ -48,5 +71,11 @@ export async function GET({ url, fetch }) {
       isHighlighted: highlightChunks.has(h.chunk_id),
     }));
 
-  return json({ chunks, total: chunks.length });
+  const first = chunks[0] || {};
+  return json({
+    chunks,
+    total: chunks.length,
+    file_name: fileName,
+    title_en: first.title_en || null,
+  });
 }

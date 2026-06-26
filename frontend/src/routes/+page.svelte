@@ -1,22 +1,23 @@
 <script>
   import WarningDialog from "$lib/components/general/WarningDialog.svelte";
   import Title from "$lib/components/general/Title.svelte";
+  import SearchApp from "$lib/components/search/SearchApp.svelte";
+  import { goto } from "$app/navigation";
   import { tick } from "svelte";
   import {themes} from "$lib/data/text.js";
 
+  let { data } = $props();
+
   let firstLoad = false;
 
-  let placeholderQuestion = $state("MGNREGA women");
-  let askUrl = $derived(`/ask?query=${encodeURIComponent(placeholderQuestion)}`);
-
   function slowScrollTo(el, duration = 3000) {
-    const start    = window.scrollY;
-    const target   = el.getBoundingClientRect().top + window.scrollY;
+    const start = window.scrollY;
+    const target = el.getBoundingClientRect().top + window.scrollY;
     const distance = target - start;
-    let   t0       = null;
+    let t0 = null;
 
     // ease-in-out cubic
-    const ease = p => p < 0.5 ? 4 * p * p * p : 1 - (-2 * p + 2) ** 3 / 2;
+    const ease = (p) => (p < 0.5 ? 4 * p * p * p : 1 - (-2 * p + 2) ** 3 / 2);
 
     function step(ts) {
       if (!t0) t0 = ts;
@@ -28,7 +29,13 @@
   }
 
   async function searchTheme(theme) {
-    placeholderQuestion = theme.query;
+    // Re-run the home SSR load with the theme's query, then scroll the inline
+    // search section into view.
+    await goto(`/?query=${encodeURIComponent(theme.query)}`, {
+      invalidateAll: true,
+      noScroll: true,
+      keepFocus: true,
+    });
     await tick();
     const el = document.getElementById("ask-section");
     if (el) slowScrollTo(el, 1800);
@@ -54,7 +61,11 @@
   <!-- Theme cards tile the whole page -->
   <section class="theme-grid h-screen">
     {#each themes as theme}
-      <button class="theme-card" style="background-image: url(/{theme.image})" onclick={() => searchTheme(theme)}>
+      <button
+        class="theme-card"
+        style="background-image: url(/{theme.image})"
+        onclick={() => searchTheme(theme)}
+      >
         <div class="theme-card-overlay">
           <div class="theme-card-terms">
             {#each theme.terms as term}
@@ -71,12 +82,8 @@
     <Title />
   </section>
 
-  <section id="ask-section" class="relative h-screen flex flex-col">
-    <iframe
-      src={askUrl}
-      title="Constitutional Observer search results"
-      class="ask-frame"
-    ></iframe>
+  <section id="ask-section" class="relative">
+    <SearchApp {data} basePath="/" />
   </section>
 </main>
 
@@ -102,11 +109,19 @@
     background-repeat: no-repeat;
     transition: filter 0.2s;
   }
-  .theme-card:hover { filter: brightness(1.12); }
-  .theme-card:hover .theme-card-overlay {
-    background: linear-gradient(to top, rgba(0,0,0,0.88), rgba(0,0,0,0.2));
+  .theme-card:hover {
+    filter: brightness(1.12);
   }
-  .theme-card:hover .theme-term { opacity: 1; }
+  .theme-card:hover .theme-card-overlay {
+    background: linear-gradient(
+      to top,
+      rgba(0, 0, 0, 0.88),
+      rgba(0, 0, 0, 0.2)
+    );
+  }
+  .theme-card:hover .theme-term {
+    opacity: 1;
+  }
 
   .theme-card-overlay,
   .exploration-card-overlay {
@@ -135,11 +150,6 @@
     @apply text-[9px] px-1.5 py-0.5 rounded-full bg-white/20 text-white/80 font-mono backdrop-blur-sm;
     opacity: 0.7;
     transition: opacity 0.15s;
-  }
-
-  .ask-frame {
-    @apply flex-1 w-full border-0;
-    min-height: 0;
   }
 
   :global(input[type="text"]) {

@@ -27,6 +27,9 @@
     paramHybrid = $bindable(false),
     paramSemanticRatio = $bindable(0.5),
     paramScoreThreshold = $bindable(0.1),
+    // Bookmarks
+    bookmarkCount = 0,
+    showBookmarks = $bindable(false),
     // Callback
     onsearch,
   } = $props();
@@ -90,6 +93,11 @@
     </div>
     <p class="loading-text">{loadProgress}</p>
   {/if}
+
+  <button class="bm-trigger" onclick={() => (showBookmarks = true)}>
+    <span>★ Bookmarks</span>
+    <span class="bm-trigger-count">{bookmarkCount}</span>
+  </button>
 
   <div class="filter-box">
     <!-- Map — no accordion -->
@@ -238,6 +246,17 @@
 
   .filter-box {
     @apply mt-3 bg-white/60 backdrop-blur-sm rounded-lg p-3 border border-primary/30 space-y-3;
+  }
+
+  /* Bookmarks trigger — sits below the title bar, above the filters */
+  .bm-trigger {
+    @apply mt-3 w-full flex items-center justify-between gap-2 rounded-lg px-3 py-2 cursor-pointer;
+    @apply bg-white/60 backdrop-blur-sm border border-primary/30 text-black/70 font-semibold text-xs;
+    @apply transition hover:bg-primary/20;
+  }
+  .bm-trigger::after { content: ""; }
+  .bm-trigger-count {
+    @apply text-[10px] font-mono font-bold px-1.5 rounded bg-black/10 text-black/50;
   }
 
   /* Accordion */

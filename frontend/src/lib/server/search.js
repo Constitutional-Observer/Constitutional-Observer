@@ -115,6 +115,72 @@ export async function searchIndices(indexUids, query, params = DEFAULT_SEARCH_PA
   }
 }
 
+// Shared SSR load for the search UI. Both the home page and the /ask route use
+// it so the same <SearchApp> component is server-rendered on each. `defaultQuery`
+// seeds a search when the URL carries no ?query= (the home page passes one so the
+// landing section shows results; /ask passes none).
+export function makeSearchLoad(defaultQuery = null) {
+  return async ({ url }) => {
+    const query = url.searchParams.get("query") || defaultQuery;
+
+    const startTime = Date.now();
+    const indicesWithDetails = await fetchIndicesWithDetails();
+    console.log(`Loaded ${indicesWithDetails.length} indices in ${Date.now() - startTime}ms`);
+
+    const collectionSet = new Set();
+    for (const idx of indicesWithDetails) {
+      collectionSet.add(idx.collection);
+    }
+    const collections = [...collectionSet].sort();
+    const allIndexUids = indicesWithDetails.map((idx) => idx.uid);
+
+    if (!query) {
+      return {
+        debates: [],
+        hitCount: 0,
+        totalEstimated: 0,
+        collections,
+        indices: indicesWithDetails,
+        searchParams: DEFAULT_SEARCH_PARAMS,
+      };
+    }
+
+    const hybrid = url.searchParams.get("hybrid") === "true";
+    const semanticRatio = parseFloat(url.searchParams.get("semanticRatio")) || DEFAULT_SEARCH_PARAMS.semanticRatio;
+    const limit = parseInt(url.searchParams.get("limit")) || DEFAULT_SEARCH_PARAMS.limit;
+    const scoreThreshold = parseFloat(url.searchParams.get("scoreThreshold")) || DEFAULT_SEARCH_PARAMS.scoreThreshold;
+
+    const activeParams = { ...DEFAULT_SEARCH_PARAMS, hybrid, semanticRatio, limit, scoreThreshold, offset: 0 };
+
+    const selectedParam = url.searchParams.get("indices");
+    const searchUids = selectedParam
+      ? selectedParam.split(",").filter((uid) => allIndexUids.includes(uid))
+      : allIndexUids;
+
+    const indexMetaMap = {};
+    for (const idx of indicesWithDetails) {
+      indexMetaMap[idx.uid] = idx;
+    }
+
+    console.log(`Search: query="${query}" indices=[${searchUids.join(",")}] hybrid=${activeParams.hybrid} limit=${activeParams.limit}`);
+    const searchStart = Date.now();
+    const { hits, totalEstimated } = await searchIndices(searchUids, query, activeParams, indexMetaMap);
+    console.log(`Search completed in ${Date.now() - searchStart}ms`);
+
+    const { docs, hitCount } = groupHitsIntoDocs(hits, scoreThreshold);
+    console.log(`Hits: ${totalEstimated} estimated, ${hits.length} returned, ${hitCount} above threshold (${scoreThreshold})`);
+
+    return {
+      debates: structuredClone(docs),
+      hitCount,
+      totalEstimated,
+      collections,
+      indices: indicesWithDetails,
+      searchParams: { ...activeParams, indexes: allIndexUids.length, query },
+    };
+  };
+}
+
 /** Group raw hits into merged documents by index+file_name */
 export function groupHitsIntoDocs(hits, scoreThreshold = 0.1) {
   const filtered = hits
