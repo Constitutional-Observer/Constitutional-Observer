@@ -3,7 +3,6 @@
   import Title from "$lib/components/general/Title.svelte";
   import SearchApp from "$lib/components/search/SearchApp.svelte";
   import { goto } from "$app/navigation";
-  import { tick } from "svelte";
   import {themes} from "$lib/data/text.js";
 
   let { data } = $props();
@@ -28,17 +27,15 @@
     requestAnimationFrame(step);
   }
 
-  async function searchTheme(theme) {
-    // Re-run the home SSR load with the theme's query, then scroll the inline
-    // search section into view.
-    await goto(`/?query=${encodeURIComponent(theme.query)}`, {
+  function searchTheme(theme) {
+    const el = document.getElementById("ask-section");
+    if (el) slowScrollTo(el, 1800);
+
+    goto(`/?query=${encodeURIComponent(theme.query)}`, {
       invalidateAll: true,
       noScroll: true,
       keepFocus: true,
     });
-    await tick();
-    const el = document.getElementById("ask-section");
-    if (el) slowScrollTo(el, 1800);
   }
 </script>
 
