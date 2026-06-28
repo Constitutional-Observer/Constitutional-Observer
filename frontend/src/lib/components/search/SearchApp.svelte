@@ -2,6 +2,7 @@
   import ResultsList from "$lib/components/search/ResultsList.svelte";
   import SearchSidebar from "$lib/components/search/SearchSidebar.svelte";
   import DetailPanel from "$lib/components/search/DetailPanel.svelte";
+  import { topicHighlight } from "$lib/components/search/topic-highlight.svelte.js";
   import { goto } from "$app/navigation";
   import { browser } from "$app/environment";
   import { tick, untrack, onMount } from "svelte";
@@ -505,8 +506,6 @@
   let searchInput = $state("");
   let searching = $state(false);
   let showBookmarks = $state(false);
-  // docKey → dominant-topic terms, surfaced by the topic map for highlighting.
-  let topicTermsByDoc = $state({});
   $effect(() => {
     searchInput = data.searchParams?.query || "";
   });
@@ -609,11 +608,10 @@
       {panel}
       query={data.searchParams?.query || ""}
       paginationDone={!loader.loading}
-      bind:topicTermsByDoc
     />
 
     <!-- Right column: bookmarks + collapsible detail accordion -->
-    <DetailPanel {panel} {bookmarks} {selectedHit} {topicTermsByDoc} bind:showBookmarks />
+    <DetailPanel {panel} {bookmarks} {selectedHit} bind:showBookmarks />
   </div>
 </div>
 

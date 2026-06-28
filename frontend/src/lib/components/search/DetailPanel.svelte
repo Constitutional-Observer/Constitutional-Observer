@@ -5,6 +5,7 @@
   // state lives on the `panel` (DocPanel) and `bookmarks` (Bookmarks) class
   // instances passed in as props.
   import { renderHighlight as renderHL } from "$lib/highlight.js";
+  import { topicHighlight } from "$lib/components/search/topic-highlight.svelte.js";
 
   let {
     panel,
@@ -13,12 +14,30 @@
     showBookmarks = $bindable(false),
   } = $props();
 
+  // The open document's dominant-topic terms — bookmarks store their docKey as
+  // `key`; selected hits resolve it via panel.docKey. Highlighting overlays the
+  // amber query terms with these topic terms.
+  let docTopics = $derived.by(() => {
+    const byDoc = topicHighlight.termsByDoc;
+    if (panel.openedBookmark) return byDoc[panel.openedBookmark.meta.key] || [];
+    if (selectedHit) return byDoc[panel.docKey(selectedHit)] || [];
+    return [];
+  });
+
   // Query-term + topic-term highlight for the open document.
   const renderHighlight = (text) => renderHL(text, docTopics);
 
   // Detail modal is open whenever something is selected (a result hit or an
   // opened bookmark). The bookmarks modal is toggled independently.
   let detailOpen = $derived(!!(panel.openedBookmark || selectedHit));
+
+  // Lock background scroll while either modal is open.
+  $effect(() => {
+    if (detailOpen || showBookmarks) {
+      document.body.style.overflow = "hidden";
+      return () => (document.body.style.overflow = "");
+    }
+  });
 
   function closeDetail() {
     panel.selectedHitIndex = null;
@@ -71,6 +90,7 @@
                     {#if bm.date}<span class="date-badge">{bm.date}</span>{/if}
                   </span>
                   <span class="bm-item-title">{bm.title}</span>
+                  {#if bm.docId}<span class="doc-id-badge">{bm.docId}</span>{/if}
                 </button>
                 <button
                   class="bm-remove"
@@ -119,6 +139,7 @@
               <span class="state-badge">{ob.meta.state}</span>
               {#if ob.meta.date}<span class="date-badge">{ob.meta.date}</span>{/if}
             </div>
+            {#if ob.meta.docId}<p class="doc-id-line">ID: <span class="doc-id-badge">{ob.meta.docId}</span></p>{/if}
           </div>
           {#if ob.loading}
             <p class="doc-loading">Loading document…</p>
@@ -158,6 +179,7 @@
                   >{panel.hitDate(selectedHit)}</span
                 >{/if}
             </div>
+            {#if panel.docId(selectedHit)}<p class="doc-id-line">ID: <span class="doc-id-badge">{panel.docId(selectedHit)}</span></p>{/if}
             <div class="meta-tags">
               {#each panel.metaTags(selectedHit) as tag (tag.key)}
                 <span class="meta-tag">{tag.label}: {tag.value}</span>
@@ -239,7 +261,7 @@
                   class:doc-chunk-highlight={chunk.isHighlighted}
                 >
                   <span class="chunk-id">#{chunk.chunk_id}</span>
-                  <p>{chunk.text}</p>
+                  <p>{@html renderHighlight(chunk.text)}</p>
                 </div>
               {/each}
             </div>
@@ -341,6 +363,12 @@
   }
   .detail-title {
     @apply text-base font-bold text-black/90;
+  }
+  .doc-id-line {
+    @apply text-[10px] text-black/40 mt-0.5;
+  }
+  .doc-id-badge {
+    @apply font-mono text-[10px] text-black/55 bg-black/5 px-1 py-0.5 rounded select-all break-all;
   }
 
   /* Shared document-display styles (also defined in the result list). */

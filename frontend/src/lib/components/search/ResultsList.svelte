@@ -2,10 +2,27 @@
   // Center column of the search page: the topic-map canvas, pagination, and the
   // paged result cards (desktop) / accordions (mobile). Reactive state lives on
   // the `pager` (ResultPager) and `panel` (DocPanel) instances passed in.
-  import TopicMap from "$lib/components/search/TopicMap.svelte";
+  import GeoClusterMap from "$lib/components/search/GeoClusterMap.svelte";
   import { renderHighlight } from "$lib/highlight.js";
+  import { topicHighlight } from "$lib/components/search/topic-highlight.svelte.js";
 
-  let { pager, panel, query = "", paginationDone = true } = $props();
+  let {
+    pager,
+    panel,
+    query = "",
+    paginationDone = true,
+  } = $props();
+
+  // The document's dominant-topic terms, for highlighting in its card.
+  const hitTopics = (hit) => topicHighlight.termsByDoc[panel.docKey(hit)] || [];
+
+  // When the map opens a cluster (topicHighlight.docKeys changes), jump back to
+  // the first page and clear any open detail. The pager itself reads docKeys.
+  $effect(() => {
+    topicHighlight.docKeys;
+    pager.currentPage = 0;
+    panel.selectedHitIndex = null;
+  });
 </script>
 
 {#snippet pagination(showInfo)}
@@ -37,14 +54,17 @@
   </nav>
 {/snippet}
 
-<main class="results-list">
-  <TopicMap
-    hits={pager.rankedHits}
+<main class="results-list-container">
+  <GeoClusterMap
+    hits={pager.allRankedHits}
     {query}
     {paginationDone}
-    onselect={(rank) => panel.select(pager.selectByRank(rank))}
+    onselect={(hit) => {
+      const i = pager.selectByHit(hit);
+      if (i >= 0) panel.select(i);
+    }}
   />
-
+<div class="results-list">
   <!-- Pagination top -->
   {#if pager.totalPages > 1}{@render pagination(true)}{/if}
 
@@ -92,12 +112,12 @@
                     : "Copy"}
                 </button>
               </div>
-              <p>{mc.text}</p>
+              <p>{@html renderHighlight(mc.textHL || mc.text, hitTopics(hit))}</p>
             </div>
           {/each}
         {:else}
           <blockquote class="result-excerpt">
-            {hit.__discussions || ""}
+            {@html renderHighlight(hit._formatted?.__discussions || hit.__discussions || "", hitTopics(hit))}
           </blockquote>
         {/if}
         {#if !panel.fullDocs[panel.docKey(hit)]}
@@ -172,14 +192,17 @@
 
   <!-- Pagination bottom -->
   {#if pager.totalPages > 1}{@render pagination(false)}{/if}
+  </div>
 </main>
 
 <style lang="postcss">
-  .results-list {
-    @apply flex-1 min-w-0 overflow-y-auto;
-    min-height: 0;
+  .results-list-container {
+    @apply flex-1 min-w-[60vw];
   }
 
+  .results-list{
+    @apply h-[50vh] overflow-y-auto ;
+  }
   .mobile-only {
     display: none;
   }
@@ -273,6 +296,14 @@
   }
   .result-excerpt {
     @apply text-sm text-black/80 border-l-[3px] border-primary/50 pl-3 py-1 my-2 whitespace-pre-wrap;
+  }
+  /* Meilisearch query-term highlights */
+  .matched-chunk :global(strong),
+  .result-excerpt :global(strong) {
+    background: rgba(251, 191, 36, 0.55);
+    border-radius: 2px;
+    padding: 0 1px;
+    font-weight: 700;
   }
   .load-doc-btn {
     @apply text-xs text-blue-700 underline mt-2 hover:text-blue-900;
