@@ -70,6 +70,36 @@ export let images = [
   },
 ];
 
+
+// On click, `query` is fired as the search — the question is just the prompt
+// shown to the reader. Derived from the themes below.
+export const thematicQuestions = [
+  { question: "Who must give environmental clearances?", query: "environment impact assessment EIA forest clearance biodiversity" },
+  { question: "How should we reform the way we vote?", query: "first past the post proportional representation electoral reform election commission" },
+  { question: "What power should villages have to govern themselves?", query: "panchayati raj gram sabha local self-government municipal elections" },
+  { question: "How much should the nation spend on health?", query: "health budget AYUSHMAN hospital funding public health" },
+  { question: "What are the powers of a Governor?", query: "governor powers President's Rule Article 356 constitutional role" },
+  { question: "Should caste be counted in the census?", query: "caste census OBC enumeration backward classes social classification" },
+  { question: "Should our cities make room for cycling?", query: "cycle lanes non-motorised transport urban mobility green transport" },
+  { question: "How fast should our cities be allowed to grow?", query: "urban growth migration smart cities municipal governance" },
+  { question: "How much should we invest in education?", query: "NEP education budget school funding higher education" },
+  { question: "How do we stop the loss of wildlife?", query: "tiger reserve endangered species habitat loss wildlife protection" },
+  { question: "Should education be free for everyone?", query: "RTE free schooling scholarship education subsidy" },
+  { question: "What is the right to information?", query: "RTI right to information transparency public disclosure whistleblower" },
+  { question: "Should the state guarantee rural work?", query: "MGNREGA NREGA rural wages employment guarantee" },
+  { question: "How should we tax the wealthy?", query: "wealth tax income tax capital gains super rich levy" },
+  { question: "Who is responsible for railway accidents?", query: "railway rail budget passenger services freight station modernisation" },
+  { question: "What are land ceiling laws?", query: "land reform land ceiling zamindari abolition land acquisition tenancy reform" },
+  { question: "Where does press freedom end?", query: "censorship Article 19 sedition media freedom press freedom" },
+  { question: "What turns the young toward extremism?", query: "extremism youth terror financing community harmony deradicalisation" },
+];
+
+export const headlines =[
+  "What are our representatives talking about in the parliament?",
+  "How did we debate before independance?",
+  "What are our MLAs talking about?",
+]
+
 export const themes = [
     {
       title: "Environmental impact of infrastructure",

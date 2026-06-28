@@ -3,7 +3,7 @@
   import Title from "$lib/components/general/Title.svelte";
   import SearchApp from "$lib/components/search/SearchApp.svelte";
   import { goto } from "$app/navigation";
-  import {themes} from "$lib/data/text.js";
+  import {thematicQuestions} from "$lib/data/text.js";
 
   let { data } = $props();
 
@@ -27,16 +27,57 @@
     requestAnimationFrame(step);
   }
 
-  function searchTheme(theme) {
+  function searchQuery(query) {
     const el = document.getElementById("ask-section");
     if (el) slowScrollTo(el, 1800);
 
-    goto(`/?query=${encodeURIComponent(theme.query)}`, {
+    goto(`/?query=${encodeURIComponent(query)}`, {
       invalidateAll: true,
       noScroll: true,
       keepFocus: true,
     });
   }
+
+  function searchTheme(theme) {
+    searchQuery(theme.query);
+  }
+
+  // Scatter the thematic questions at random positions within the viewport,
+  // keeping clear of the centred title box and not overlapping each other.
+  // Each box is sized in vw/vh; we retry until it fits. Computed once on load.
+  const BOX_W = 26; // vw, matches max-width of a question
+  const BOX_H = 14; // vh, allows for up to ~3 wrapped lines
+  const TITLE = { top: 35, left: 20, bottom: 65, right: 70 }; // centred title zone
+
+  function overlaps(a, b) {
+    return (
+      a.left < b.right &&
+      a.right > b.left &&
+      a.top < b.bottom &&
+      a.bottom > b.top
+    );
+  }
+
+  // Surface a random handful so the viewport doesn't get crowded.
+  const SHOW = 10;
+  const sample = [...thematicQuestions]
+    .sort(() => Math.random() - 0.5)
+    .slice(0, SHOW);
+
+  const placed = [];
+  const scattered = sample.map((q) => {
+    let box;
+    for (let i = 0; i < 200; i++) {
+      const top = 6 + Math.random() * (88 - BOX_H); // vh, padded from edges
+      const left = 4 + Math.random() * (92 - BOX_W); // vw
+      box = { top, left, bottom: top + BOX_H, right: left + BOX_W };
+      const clashes =
+        overlaps(box, TITLE) || placed.some((p) => overlaps(box, p));
+      if (!clashes) break;
+    }
+    placed.push(box);
+    return { ...q, top: box.top, left: box.left };
+  });
 </script>
 
 <svelte:head>
@@ -55,22 +96,15 @@
   <WarningDialog />
 {/if}
 <main class="">
-  <!-- Theme cards tile the whole page -->
-  <section class="theme-grid h-screen">
-    {#each themes as theme}
+  <!-- Thematic questions scattered randomly across the viewport -->
+  <section class="scatter-box h-screen">
+    {#each scattered as q}
       <button
-        class="theme-card"
-        style="background-image: url(/{theme.image})"
-        onclick={() => searchTheme(theme)}
+        class="scatter-question"
+        style="top: {q.top}vh; left: {q.left}vw"
+        onclick={() => searchQuery(q.query)}
       >
-        <div class="theme-card-overlay">
-          <div class="theme-card-terms">
-            {#each theme.terms as term}
-              <span class="theme-term">{term}</span>
-            {/each}
-          </div>
-          <h3 class="theme-card-title">{theme.title}</h3>
-        </div>
+        {q.question}
       </button>
     {/each}
   </section>
@@ -86,6 +120,23 @@
 
 
 <style lang="postcss">
+
+
+  .scatter-box {
+    @apply relative w-full overflow-hidden;
+  }
+
+  .scatter-question {
+    @apply absolute cursor-pointer border-0 bg-transparent p-1 text-left;
+    @apply text-base md:text-lg font-medium text-balance;
+    max-width: 26vw;
+    transition: color 0.2s, transform 0.2s;
+  }
+  .scatter-question:hover {
+    color: #c3b091;
+    transform: scale(1.05);
+  }
+
   .theme-grid {
     @apply grid gap-0;
     /* Tile the whole viewport: columns fill in, rows share the height. */
@@ -131,7 +182,8 @@
   }
 
   .exploration-card {
-    @apply relative w-full my-2 h-[200px] overflow-hidden border-4 border-solid border-primary;
+    @apply relative w-full my-2 h-[200px] overflow-hidden border-4 border-solid;
+    border-color: #c3b091;
     @apply bg-cover bg-center bg-no-repeat;
   }
 
@@ -149,7 +201,8 @@
     transition: opacity 0.15s;
   }
 
-  :global(input[type="text"]) {
-    @apply selection:bg-primary selection:text-black selection:font-bold;
+  :global(input[type="text"])::selection {
+    background-color: #c3b091;
+    @apply text-black font-bold;
   }
 </style>
