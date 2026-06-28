@@ -6,6 +6,12 @@
   import { browser } from "$app/environment";
   import { tick, untrack, onMount } from "svelte";
 
+  // A chunk's primary key is `<prefix>_<file>_<chunk_id>`; the document's stable
+  // id is that with the trailing _<chunk_id> removed. Used to fetch every chunk
+  // of a document by id (file_name is not filterable/searchable reliably).
+  const baseDocId = (idLike) => String(idLike ?? "").replace(/_\d+$/, "");
+  const docKeyOf = (h) => `${h._index || h.state_code}:${h.file_name}`;
+
   // ---------------------------------------------------------------------------
   // DocPanel — result selection, copy feedback, full-document cache
   // ---------------------------------------------------------------------------
@@ -67,14 +73,15 @@
       this.selectedHitIndex = null;
       this.openedBookmark = { loading: true, meta: { ...bm }, chunks: [] };
       try {
+        const did = bm.docId || baseDocId(bm.id);
         const params = new URLSearchParams({ index: bm.index });
-        if (bm.id != null) params.set("id", String(bm.id));
+        if (did) params.set("doc_id", did);
         else params.set("file_name", bm.file_name);
         const resp = await fetch(`/api/document?${params}`);
         const d = await resp.json();
         this.openedBookmark = {
           loading: false,
-          meta: { ...bm, file_name: d.file_name || bm.file_name },
+          meta: { ...bm, file_name: d.file_name || bm.file_name, docId: d.doc_id || did },
           chunks: d.chunks || [],
         };
       } catch {
@@ -83,6 +90,11 @@
     }
     docKey(hit) {
       return `${hit._index || hit.state_code}:${hit.file_name}`;
+    }
+
+    // Stable per-document id (chunk id with its trailing _<chunk_id> stripped).
+    docId(hit) {
+      return baseDocId(hit?.id ?? hit?.docId);
     }
 
     hitDate(hit) {
@@ -121,7 +133,8 @@
     async loadFullDocument(hit) {
       const key = this.docKey(hit);
       if (this.fullDocs[key]) return;
-      if (!hit._index || !hit.file_name) return;
+      const docId = this.docId(hit);
+      if (!hit._index || !docId) return;
 
       this.fullDocs[key] = { loading: true, chunks: [] };
       const highlightIds = (hit._matchedChunks || [])
@@ -130,7 +143,7 @@
 
       try {
         const resp = await fetch(
-          `/api/document?index=${encodeURIComponent(hit._index)}&file_name=${encodeURIComponent(hit.file_name)}&highlight_chunks=${highlightIds}`,
+          `/api/document?index=${encodeURIComponent(hit._index)}&doc_id=${encodeURIComponent(docId)}&highlight_chunks=${highlightIds}`,
         );
         const d = await resp.json();
         this.fullDocs[key] = { loading: false, chunks: d.chunks || [] };
@@ -193,6 +206,7 @@
           {
             key: k,
             id: hit.id ?? null,
+            docId: baseDocId(hit.id),
             index: hit._index,
             file_name: hit.file_name,
             title: hit.title_en || hit.subject || "Untitled",
@@ -413,10 +427,20 @@
       this.#filter = filter;
     }
 
-    get rankedHits() {
+    // Full ranked list (drives the topic map — must stay unfiltered by topic,
+    // else selecting a topic would re-run LDA on only that topic's docs).
+    get allRankedHits() {
       return [...this.#filter.filteredHits].sort(
         (a, b) => (b._bestScore || 0) - (a._bestScore || 0),
       );
+    }
+
+    // Ranked list actually paged/shown — narrowed to the cluster opened in the
+    // map (topicHighlight.docKeys), if any.
+    get rankedHits() {
+      const all = this.allRankedHits;
+      const keys = topicHighlight.docKeys;
+      return keys ? all.filter((h) => keys.has(docKeyOf(h))) : all;
     }
 
     get totalPages() {
@@ -451,8 +475,12 @@
       this.currentPage = 0;
     }
 
-    // Navigate to the page that contains rank `r` and return its within-page index.
-    selectByRank(r) {
+    // Navigate to the page containing `hit` (in the currently shown list) and
+    // return its within-page index, or -1 if it isn't in the shown list.
+    selectByHit(hit) {
+      const key = docKeyOf(hit);
+      const r = this.rankedHits.findIndex((h) => docKeyOf(h) === key);
+      if (r < 0) return -1;
       this.goTo(Math.floor(r / ResultPager.#PER_PAGE));
       return r % ResultPager.#PER_PAGE;
     }
@@ -477,6 +505,8 @@
   let searchInput = $state("");
   let searching = $state(false);
   let showBookmarks = $state(false);
+  // docKey → dominant-topic terms, surfaced by the topic map for highlighting.
+  let topicTermsByDoc = $state({});
   $effect(() => {
     searchInput = data.searchParams?.query || "";
   });
@@ -519,7 +549,7 @@
   let indices = $derived(data.indices || []);
 
   let subtitle = $derived(
-    `${pager.rankedHits.length} documents, ${loader.hitCount} results of ~${loader.estimated} total` +
+    `${pager.allRankedHits.length} documents, ${loader.hitCount} results of ~${loader.estimated} total` +
       (filter.isStateCollection ? `, ${filter.stateNames.length} states` : "") +
       (filter.activeCollection ? ` in ${filter.activeCollection}` : ""),
   );
@@ -559,7 +589,6 @@
       {loadPct}
       {indices}
       collectionDebates={filter.collectionDebates}
-      resultsByStateForMap={filter.resultsByState}
       isStateCollection={filter.isStateCollection}
       allStates={filter.allStates}
       bind:selectedStates={filter.selectedStates}
@@ -580,19 +609,17 @@
       {panel}
       query={data.searchParams?.query || ""}
       paginationDone={!loader.loading}
+      bind:topicTermsByDoc
     />
 
     <!-- Right column: bookmarks + collapsible detail accordion -->
-    <DetailPanel {panel} {bookmarks} {selectedHit} bind:showBookmarks />
+    <DetailPanel {panel} {bookmarks} {selectedHit} {topicTermsByDoc} bind:showBookmarks />
   </div>
 </div>
 
 <style lang="postcss">
   #container {
-    background-image: url("/Constitution_of_India_inside_4.webp");
-    background-repeat: no-repeat;
-    background-position: center;
-    background-size: cover;
+
     height: 150dvh;
     overflow: hidden;
     display: flex;

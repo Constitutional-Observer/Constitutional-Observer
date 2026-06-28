@@ -1,5 +1,4 @@
 <script>
-  import IndiaMap from "$lib/components/search/IndiaMap.svelte";
   import TimelineSlider from "$lib/components/search/TimelineSlider.svelte";
   import TitleWithNav from "$lib/components/general/TitleWithNav.svelte";
 
@@ -15,7 +14,6 @@
     // Data
     indices = [],
     collectionDebates = [],
-    resultsByStateForMap = {},
     isStateCollection = true,
     allStates = [],
     // Filters (bindable — parent reacts to changes)
@@ -50,11 +48,6 @@
     const next = new Set(selectedStates);
     next.has(s) ? next.delete(s) : next.add(s);
     selectedStates = next;
-  }
-
-  function handleStateClick(e) {
-    const state = e.detail?.state ?? e.state;
-    if (state) toggleState(state);
   }
 
   function toggleIndex(uid) {
@@ -100,11 +93,6 @@
   </button>
 
   <div class="filter-box">
-    <!-- Map — no accordion -->
-    {#if isStateCollection}
-      <IndiaMap resultsByState={resultsByStateForMap} {selectedStates} onstateclick={handleStateClick} />
-    {/if}
-
     <!-- Timeline — no accordion -->
     <TimelineSlider hits={collectionDebates} bind:yearMin bind:yearMax />
 
