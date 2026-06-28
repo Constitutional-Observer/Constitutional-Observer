@@ -355,7 +355,7 @@ const AGRICULTURE = [
   "seed", "fertilizer", "pesticide", "harvest", "yield",
   "drought", "flood", "monsoon", "kisan", "paddy",
   "dairy", "livestock", "horticulture", "fishery", "zamindari",
-  "tenancy", "cultivator",
+  "tenancy", "cultivator", "land lord"
 ];
 
 // ── Environment & Ecology ──
@@ -563,7 +563,7 @@ const HOME_AFFAIRS = [
 
 // ── Labour & Employment ──
 const LABOUR = [
-  "labour law", "labour reform",
+  "labour law", "labour reform", "labour force", "labor force",
   "employee state insurance", "provident fund",
   "employees provident fund organisation",
   "contract labour", "casual labour",
