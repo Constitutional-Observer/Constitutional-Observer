@@ -2,80 +2,86 @@ import { json } from "@sveltejs/kit";
 import { MEILI_HOST, MEILI_KEY } from "$env/static/private";
 
 /**
- * GET /api/document?index=state_legislature_debates_tn&file_name=xxx&highlight_chunks=3,7
- * GET /api/document?index=state_legislature_debates_tn&id=12345
+ * GET /api/document?index=state_legislature_debates_ls&doc_id=LS_lsd_..._pdf&highlight_chunks=3,7
+ * GET /api/document?index=state_legislature_debates_ls&id=LS_lsd_..._pdf_24   (a chunk id)
  *
- * Fetches all chunks for a document. When `id` is given (e.g. opening a
- * bookmark) the exact Meilisearch document is fetched by primary key first to
- * resolve its file_name, then all sibling chunks are returned.
+ * Every chunk of a debate is a separate Meilisearch document whose primary key
+ * is `<prefix>_<file>_<chunk_id>`. `file_name` is NOT filterable and a keyword
+ * search by file_name is unreliable (it ranks by relevance and the exact file
+ * rarely surfaces), so we fetch chunks by primary key instead:
+ *   1. strip the trailing _<chunk_id> from the supplied id to get the doc's base
+ *   2. fetch `${base}_0, ${base}_1, …` via the documents/fetch endpoint
+ * Non-chunked indexes (id has no _<n> suffix) fall back to a single-document get.
  */
+
+const BATCH = 500;        // chunk ids requested per documents/fetch call
+const MAX_CHUNKS = 3000;  // hard ceiling so a bad id can't loop forever
+const FIELDS = ["id", "chunk_id", "file_name", "title_en", "__discussions"];
+
 export async function GET({ url, fetch }) {
   const index = url.searchParams.get("index");
-  const id = url.searchParams.get("id");
-  let fileName = url.searchParams.get("file_name");
+  const rawId = url.searchParams.get("doc_id") || url.searchParams.get("id");
   const highlightChunks = new Set(
-    (url.searchParams.get("highlight_chunks") || "").split(",").map(Number).filter(Boolean)
+    (url.searchParams.get("highlight_chunks") || "")
+      .split(",")
+      .map(Number)
+      .filter((n) => !Number.isNaN(n)),
   );
+
+  if (!index) return json({ error: "index is required" }, { status: 400 });
+  if (!rawId) return json({ error: "doc_id or id is required" }, { status: 400 });
 
   const headers = {
     "Content-Type": "application/json",
     Authorization: `Bearer ${MEILI_KEY}`,
   };
 
-  if (!index) {
-    return json({ error: "index is required" }, { status: 400 });
-  }
+  const baseId = String(rawId).replace(/_\d+$/, "");
 
-  // Resolve file_name from the exact document when only an id is supplied.
-  if (!fileName && id) {
-    const docResp = await fetch(
-      `${MEILI_HOST}/indexes/${index}/documents/${encodeURIComponent(id)}`,
-      { headers }
-    );
-    if (docResp.ok) {
-      const doc = await docResp.json();
-      fileName = doc?.file_name || null;
+  // Fetch contiguous chunk ids in batches until a short batch signals the end.
+  const results = [];
+  for (let start = 0; start < MAX_CHUNKS; start += BATCH) {
+    const ids = Array.from({ length: BATCH }, (_, i) => `${baseId}_${start + i}`);
+    const resp = await fetch(`${MEILI_HOST}/indexes/${index}/documents/fetch`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ ids, limit: BATCH, fields: FIELDS }),
+    });
+    if (!resp.ok) {
+      const err = await resp.text();
+      console.error("Meilisearch doc fetch error:", err);
+      return json({ error: "Failed to fetch document" }, { status: 502 });
     }
+    const data = await resp.json();
+    const batch = data.results || [];
+    results.push(...batch);
+    if (batch.length < BATCH) break; // reached the last chunk
   }
 
-  if (!fileName) {
-    return json({ error: "file_name or a resolvable id is required" }, { status: 400 });
+  // Fallback for non-chunked indexes: fetch the single document by its id.
+  if (results.length === 0) {
+    const docResp = await fetch(
+      `${MEILI_HOST}/indexes/${index}/documents/${encodeURIComponent(rawId)}`,
+      { headers },
+    );
+    if (docResp.ok) results.push(await docResp.json());
   }
 
-  // No filter/sort configured on these indexes, so search by file_name as keyword
-  const resp = await fetch(`${MEILI_HOST}/indexes/${index}/search`, {
-    method: "POST",
-    headers,
-    body: JSON.stringify({
-      q: fileName,
-      limit: 500,
-    }),
-  });
-
-  if (!resp.ok) {
-    const err = await resp.text();
-    console.error("Meilisearch doc fetch error:", err);
-    return json({ error: "Failed to fetch document" }, { status: 502 });
-  }
-
-  const data = await resp.json();
-
-  // Filter to only chunks from this exact file, then sort by chunk_id
-  const chunks = (data.hits || [])
-    .filter((h) => h.file_name === fileName)
+  const chunks = results
     .sort((a, b) => (a.chunk_id || 0) - (b.chunk_id || 0))
     .map((h) => ({
-      chunk_id: h.chunk_id,
+      chunk_id: h.chunk_id ?? 0,
       text: h.__discussions || "",
       title_en: h.title_en,
       isHighlighted: highlightChunks.has(h.chunk_id),
     }));
 
-  const first = chunks[0] || {};
+  const first = results[0] || {};
   return json({
     chunks,
     total: chunks.length,
-    file_name: fileName,
+    doc_id: baseId,
+    file_name: first.file_name || null,
     title_en: first.title_en || null,
   });
 }
