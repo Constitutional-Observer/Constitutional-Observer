@@ -6,8 +6,12 @@
 // Only ever written in the browser (topic modelling is client-only), so it
 // stays at its defaults during SSR — no cross-request state leak.
 export const topicHighlight = $state({
-  // docKey → that document's dominant-topic terms (for highlighting)
+  // docKey → union of every above-threshold topic's terms for that document
+  // (a doc can belong to several topics; highlighting overlays them all)
   termsByDoc: {},
+  // docKey → [{ topic, prob, terms }] every topic the document belongs to,
+  // strongest-first (drives the detail panel's topic list)
+  topicsByDoc: {},
   // Set of docKeys for the cluster opened in the map (null = none selected)
   docKeys: null,
 });

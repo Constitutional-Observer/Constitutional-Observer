@@ -272,17 +272,26 @@
     untrack(() => geo.build(hits, query));
   });
 
-  // Map every modeled document (across all groups) to its dominant cluster's
-  // λ-ranked terms, for highlighting in the result list / detail panel.
+  // Publish per-doc topic data (across all groups) for the result list / detail
+  // panel: topicsByDoc = its topics strongest-first; termsByDoc = the union of
+  // their terms, so highlighting covers every member topic, not just one.
   $effect(() => {
-    const next = {};
+    const terms = {};
+    const topics = {};
     for (const g of geo.groups) {
-      for (const c of g.pipeline.clusters) {
-        const terms = c.terms.map((t) => t.term);
-        for (const it of c.items) next[docKey(it.hit)] = terms;
+      for (const { hit, topics: ts } of g.pipeline.docTopics) {
+        const key = docKey(hit);
+        topics[key] = ts;
+        const seen = new Set();
+        const union = [];
+        for (const t of ts)
+          for (const term of t.terms)
+            if (!seen.has(term)) { seen.add(term); union.push(term); }
+        terms[key] = union;
       }
     }
-    topicHighlight.termsByDoc = next;
+    topicHighlight.termsByDoc = terms;
+    topicHighlight.topicsByDoc = topics;
   });
 
   // Restrict the result list to the opened cluster's documents.

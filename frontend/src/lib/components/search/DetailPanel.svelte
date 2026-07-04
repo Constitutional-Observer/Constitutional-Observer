@@ -14,18 +14,25 @@
     showBookmarks = $bindable(false),
   } = $props();
 
-  // The open document's dominant-topic terms — bookmarks store their docKey as
-  // `key`; selected hits resolve it via panel.docKey. Highlighting overlays the
-  // amber query terms with these topic terms.
-  let docTopics = $derived.by(() => {
-    const byDoc = topicHighlight.termsByDoc;
-    if (panel.openedBookmark) return byDoc[panel.openedBookmark.meta.key] || [];
-    if (selectedHit) return byDoc[panel.docKey(selectedHit)] || [];
-    return [];
+  // The open document's docKey — bookmarks store it as `key`; selected hits
+  // resolve it via panel.docKey.
+  let openDocKey = $derived.by(() => {
+    if (panel.openedBookmark) return panel.openedBookmark.meta.key;
+    if (selectedHit) return panel.docKey(selectedHit);
+    return null;
   });
 
+  // The open document's topics (strongest-first) and the union of their terms.
+  // Highlighting overlays the amber query terms with every member topic's terms.
+  let docTopicList = $derived(
+    openDocKey ? topicHighlight.topicsByDoc[openDocKey] || [] : [],
+  );
+  let highlightTerms = $derived(
+    openDocKey ? topicHighlight.termsByDoc[openDocKey] || [] : [],
+  );
+
   // Query-term + topic-term highlight for the open document.
-  const renderHighlight = (text) => renderHL(text, docTopics);
+  const renderHighlight = (text) => renderHL(text, highlightTerms);
 
   // Detail modal is open whenever something is selected (a result hit or an
   // opened bookmark). The bookmarks modal is toggled independently.
@@ -57,6 +64,26 @@
 </script>
 
 <svelte:window onkeydown={onKeydown} />
+
+<!-- One chip per topic the document belongs to (strongest first), showing the
+     topic's share and its top terms. -->
+{#snippet topicMembership()}
+  {#if docTopicList.length}
+    <div class="doc-topics">
+      <span class="doc-topics-label"
+        >In {docTopicList.length} topic{docTopicList.length > 1 ? "s" : ""}</span
+      >
+      <div class="doc-topics-chips">
+        {#each docTopicList as t, ti (t.topic)}
+          <span class="topic-chip" class:topic-chip-dom={ti === 0}>
+            <span class="topic-chip-pct">{Math.round(t.prob * 100)}%</span>
+            {t.terms.slice(0, 3).join(" · ")}
+          </span>
+        {/each}
+      </div>
+    </div>
+  {/if}
+{/snippet}
 
 <!-- Bookmarks modal -->
 {#if showBookmarks}
@@ -140,6 +167,7 @@
               {#if ob.meta.date}<span class="date-badge">{ob.meta.date}</span>{/if}
             </div>
             {#if ob.meta.docId}<p class="doc-id-line">ID: <span class="doc-id-badge">{ob.meta.docId}</span></p>{/if}
+            {@render topicMembership()}
           </div>
           {#if ob.loading}
             <p class="doc-loading">Loading document…</p>
@@ -192,6 +220,7 @@
                 >
               {/if}
             </div>
+            {@render topicMembership()}
           </div>
 
           {#if selectedHit._matchedChunks?.length}
@@ -366,6 +395,26 @@
   }
   .doc-id-line {
     @apply text-[10px] text-black/40 mt-0.5;
+  }
+
+  /* Multi-topic membership chips */
+  .doc-topics {
+    @apply flex flex-col gap-1 mt-1;
+  }
+  .doc-topics-label {
+    @apply text-[9px] font-bold uppercase tracking-wider text-black/40;
+  }
+  .doc-topics-chips {
+    @apply flex flex-wrap gap-1;
+  }
+  .topic-chip {
+    @apply flex items-center gap-1 text-[10px] text-black/60 bg-primary/15 border border-primary/25 rounded px-1.5 py-0.5;
+  }
+  .topic-chip-dom {
+    @apply bg-primary/30 text-black/80 font-medium;
+  }
+  .topic-chip-pct {
+    @apply font-mono font-bold text-[9px] text-black/45;
   }
   .doc-id-badge {
     @apply font-mono text-[10px] text-black/55 bg-black/5 px-1 py-0.5 rounded select-all break-all;
