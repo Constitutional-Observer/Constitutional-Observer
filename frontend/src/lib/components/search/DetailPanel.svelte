@@ -7,12 +7,96 @@
   import { renderHighlight as renderHL } from "$lib/highlight.js";
   import { topicHighlight } from "$lib/components/search/topic-highlight.svelte.js";
 
+  // ── RelatedSearch ────────────────────────────────────────────────────────────
+  // Clicking a highlighted term (interactive only in this panel) searches the
+  // already-loaded documents locally — no server call, no parent-search rewrite —
+  // and surfaces matches in the panel's right section. Modelled as a state class,
+  // like DocPanel / ResultPager / LazyLoader in SearchApp.
+  class RelatedSearch {
+    active = $state(false); // keeps the panel open even with no document loaded
+    term   = $state("");
+    tab    = $state("scoped"); // "scoped" (current view) | "all" (everything loaded)
+
+    open(term) {
+      const t = String(term || "").replace(/_/g, " ").trim();
+      if (!t) return;
+      this.term = t;
+      this.active = true;
+    }
+    close() {
+      this.active = false;
+      this.term = "";
+    }
+
+    // use:related.action — delegate clicks on injected .hl-btn highlights to this
+    // search. Arrow field so `this` stays bound when used as a Svelte action. The
+    // buttons stay keyboard-focusable; stop/preventDefault keep an enclosing
+    // element from also reacting.
+    action = (node) => {
+      const handler = (e) => {
+        const btn = e.target.closest?.(".hl-btn");
+        if (!btn) return;
+        e.preventDefault();
+        e.stopPropagation();
+        this.open(btn.textContent || "");
+      };
+      node.addEventListener("click", handler);
+      return { destroy: () => node.removeEventListener("click", handler) };
+    };
+
+    // The searchable text held for a hit (matched chunks + discussions); full
+    // document bodies aren't loaded client-side, so this is best-effort.
+    static #hitText(hit) {
+      const chunks = (hit._matchedChunks || []).map((c) => c.text).filter(Boolean);
+      return [...chunks, hit.__discussions || ""].filter(Boolean).join("\n");
+    }
+
+    // Hits whose held text contains the term, each with a match count and up to
+    // three clickable highlighted snippets, sorted by count. Word boundaries,
+    // case-insensitive; underscores treated as spaces (merged phrases).
+    search(hits) {
+      const q = this.term.replace(/_/g, " ").trim();
+      if (!q || !hits?.length) return [];
+      const esc = q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const re = new RegExp(`\\b${esc}\\b`, "gi");
+      const results = [];
+      for (const hit of hits) {
+        const text = RelatedSearch.#hitText(hit);
+        if (!text) continue;
+        re.lastIndex = 0;
+        const snippets = [];
+        let count = 0, m;
+        while ((m = re.exec(text))) {
+          count++;
+          if (snippets.length < 3) {
+            const start = Math.max(0, m.index - 60);
+            const end = Math.min(text.length, m.index + m[0].length + 60);
+            const raw = (start > 0 ? "…" : "") + text.slice(start, end) +
+              (end < text.length ? "…" : "");
+            snippets.push(renderHL(raw, [q], true));
+          }
+          if (m.index === re.lastIndex) re.lastIndex++; // guard empty match
+        }
+        if (count) results.push({ hit, count, snippets });
+      }
+      results.sort((a, b) => b.count - a.count);
+      return results;
+    }
+  }
+
   let {
     panel,
     bookmarks,
     selectedHit,
     showBookmarks = $bindable(false),
+    allHits = [],
+    scopedHits = [],
+    onOpenDoc,
   } = $props();
+
+  const related = new RelatedSearch();
+  let relatedHits = $derived(related.tab === "all" ? allHits : scopedHits);
+  let relatedResults = $derived(related.search(relatedHits));
 
   // The open document's docKey — bookmarks store it as `key`; selected hits
   // resolve it via panel.docKey.
@@ -31,12 +115,15 @@
     openDocKey ? topicHighlight.termsByDoc[openDocKey] || [] : [],
   );
 
-  // Query-term + topic-term highlight for the open document.
-  const renderHighlight = (text) => renderHL(text, highlightTerms);
+  // Query-term + topic-term highlight for the open document. Clickable — the
+  // detail panel is the one place a highlight is interactive.
+  const renderHighlight = (text) => renderHL(text, highlightTerms, true);
 
-  // Detail modal is open whenever something is selected (a result hit or an
-  // opened bookmark). The bookmarks modal is toggled independently.
-  let detailOpen = $derived(!!(panel.openedBookmark || selectedHit));
+  // Detail modal is open whenever there's a document to read (a result hit or an
+  // opened bookmark) OR an active related-term search (which can be started from
+  // a result card with no document open yet). The bookmarks modal is independent.
+  let hasReader = $derived(!!(panel.openedBookmark || selectedHit));
+  let detailOpen = $derived(hasReader || related.active);
 
   // Lock background scroll while either modal is open.
   $effect(() => {
@@ -49,6 +136,7 @@
   function closeDetail() {
     panel.selectedHitIndex = null;
     panel.closeBookmark();
+    related.close();
   }
 
   function openBookmark(bm) {
@@ -77,7 +165,7 @@
         {#each docTopicList as t, ti (t.topic)}
           <span class="topic-chip" class:topic-chip-dom={ti === 0}>
             <span class="topic-chip-pct">{Math.round(t.prob * 100)}%</span>
-            {t.terms.slice(0, 3).join(" · ")}
+            {t.terms.slice(0, 3).map((x) => x.replace(/_/g, " ")).join(" · ")}
           </span>
         {/each}
       </div>
@@ -153,11 +241,15 @@
           <span class="modal-title"
             >{selectedHit.title_en || selectedHit.subject || "Untitled"}</span
           >
+        {:else}
+          <span class="detail-summary-label">Related</span>
+          <span class="modal-title">Documents mentioning &ldquo;{related.term}&rdquo;</span>
         {/if}
         <button class="modal-close" title="Close" onclick={closeDetail}>✕</button>
       </header>
 
-      <div class="modal-body detail-body">
+      <div class="detail-split">
+        <div class="modal-body detail-body reader-pane">
         {#if panel.openedBookmark}
           {@const ob = panel.openedBookmark}
           <div class="detail-header">
@@ -180,7 +272,7 @@
                   class:doc-chunk-highlight={chunk.isHighlighted}
                 >
                   <span class="chunk-id">#{chunk.chunk_id}</span>
-                  <p>{@html renderHighlight(chunk.text)}</p>
+                  <p use:related.action>{@html renderHighlight(chunk.text)}</p>
                 </div>
               {/each}
             </div>
@@ -246,11 +338,11 @@
                       : "Copy"}
                   </button>
                 </div>
-                <p>{@html renderHighlight(mc.textHL || mc.text)}</p>
+                <p use:related.action>{@html renderHighlight(mc.textHL || mc.text)}</p>
               </div>
             {/each}
           {:else}
-            <blockquote class="result-excerpt">
+            <blockquote class="result-excerpt" use:related.action>
               {@html renderHighlight(
                 selectedHit._formatted?.__discussions ||
                   selectedHit.__discussions ||
@@ -290,14 +382,68 @@
                   class:doc-chunk-highlight={chunk.isHighlighted}
                 >
                   <span class="chunk-id">#{chunk.chunk_id}</span>
-                  <p>{@html renderHighlight(chunk.text)}</p>
+                  <p use:related.action>{@html renderHighlight(chunk.text)}</p>
                 </div>
               {/each}
             </div>
           {:else}
             <p class="doc-loading">Could not load document.</p>
           {/if}
+        {:else}
+          <p class="reader-placeholder">
+            Pick a related document on the right to read it here.
+          </p>
         {/if}
+        </div>
+
+        <aside class="related-pane">
+          <header class="related-header">
+            <span class="related-title">Related documents</span>
+            {#if related.term}
+              <span class="related-term">&ldquo;{related.term}&rdquo;</span>
+              <span class="related-count">{relatedResults.length}</span>
+            {/if}
+          </header>
+
+          {#if !related.term}
+            <p class="related-hint">
+              Click a highlighted term in the document to find other documents
+              that mention it.
+            </p>
+          {:else}
+            <div class="related-tabs">
+              <button class="related-tab" class:related-tab-active={related.tab === "scoped"} onclick={() => (related.tab = "scoped")}
+                >In current results ({scopedHits.length})</button
+              >
+              <button class="related-tab" class:related-tab-active={related.tab === "all"} onclick={() => (related.tab = "all")}
+                >All loaded ({allHits.length})</button
+              >
+            </div>
+
+            <div class="related-body" use:related.action>
+              {#if !relatedResults.length}
+                <p class="related-empty">
+                  No other documents mention &ldquo;{related.term}&rdquo;.
+                </p>
+              {:else}
+                {#each relatedResults as r (r.hit.id || r.hit.file_name)}
+                  <div class="related-result">
+                    <button class="related-open" onclick={() => onOpenDoc?.(r.hit)}>
+                      <span class="related-doc-title">{r.hit.title_en || r.hit.subject || "Untitled"}</span>
+                      <span class="related-meta">
+                        <span class="state-badge">{r.hit.state || "Unknown"}</span>
+                        <span class="related-hits">{r.count} hit{r.count === 1 ? "" : "s"}</span>
+                      </span>
+                    </button>
+                    {#each r.snippets as s}
+                      <p class="related-snippet">{@html s}</p>
+                    {/each}
+                  </div>
+                {/each}
+              {/if}
+            </div>
+          {/if}
+        </aside>
       </div>
     </div>
   </div>
@@ -320,10 +466,87 @@
     max-height: 85vh;
   }
   .detail-modal {
-    max-width: 640px;
+    max-width: 1040px;
   }
   .bookmarks-modal {
     max-width: 420px;
+  }
+
+  /* Two sections: the document reader (left) + related documents (right). */
+  .detail-split {
+    @apply flex min-h-0 flex-1;
+  }
+  .reader-pane {
+    @apply flex-[1.7] min-w-0;
+  }
+  .related-pane {
+    @apply flex-1 min-w-0 flex flex-col overflow-hidden p-3 border-l border-primary/20 bg-black/[0.02];
+  }
+  .related-header {
+    @apply flex items-center gap-2 mb-2 shrink-0;
+  }
+  .related-title {
+    @apply text-[11px] font-bold uppercase tracking-wider text-black/50;
+  }
+  .related-term {
+    @apply text-xs font-semibold text-black/80 truncate;
+  }
+  .related-count {
+    @apply text-[10px] font-mono font-bold px-1.5 rounded bg-black/10 text-black/50;
+  }
+  .related-hint {
+    @apply text-xs text-black/40 italic;
+  }
+  .related-tabs {
+    @apply flex gap-1 mb-2 shrink-0;
+  }
+  .related-tab {
+    @apply text-[11px] px-2 py-1 rounded border border-primary/20 bg-white/40 text-black/60 cursor-pointer transition hover:bg-primary/15;
+  }
+  .related-tab::after {
+    content: "";
+  }
+  .related-tab-active {
+    @apply bg-primary/30 text-black/90 font-semibold border-primary/40;
+  }
+  .related-body {
+    @apply overflow-y-auto space-y-2 min-h-0;
+  }
+  .related-empty {
+    @apply text-xs text-black/40 italic;
+  }
+  .related-result {
+    @apply rounded-lg bg-white/50 border border-primary/15 p-2;
+  }
+  .related-open {
+    @apply w-full text-left cursor-pointer bg-transparent border-0 p-0 mb-1;
+  }
+  .related-open::after {
+    content: "";
+  }
+  .related-doc-title {
+    @apply block text-[13px] font-semibold text-black/85 hover:underline;
+  }
+  .related-meta {
+    @apply flex items-center gap-2 mt-0.5;
+  }
+  .related-hits {
+    @apply text-[10px] font-mono text-black/40;
+  }
+  .related-snippet {
+    @apply text-[12px] text-black/70 leading-relaxed border-l-2 border-primary/30 pl-2 whitespace-pre-wrap;
+  }
+  .reader-placeholder {
+    @apply text-sm text-black/40 italic;
+  }
+  @media (max-width: 768px) {
+    /* Stack the two sections and let the modal scroll as one column. */
+    .detail-split {
+      @apply flex-col overflow-y-auto;
+    }
+    .related-pane {
+      @apply border-l-0 border-t;
+    }
   }
   .modal-header {
     @apply flex items-center gap-2 p-3 border-b border-primary/20 shrink-0;
@@ -450,14 +673,6 @@
   }
   .result-excerpt {
     @apply text-sm text-black/80 border-l-[3px] border-primary/50 pl-3 py-1 my-2 whitespace-pre-wrap;
-  }
-  /* Meilisearch highlight tags (search terms) */
-  .matched-chunk :global(strong),
-  .result-excerpt :global(strong) {
-    background: rgba(251, 191, 36, 0.55);
-    border-radius: 2px;
-    padding: 0 1px;
-    font-weight: 700;
   }
   .load-doc-btn {
     @apply text-xs text-blue-700 underline mt-2 hover:text-blue-900;

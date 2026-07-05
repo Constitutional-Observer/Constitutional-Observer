@@ -12,13 +12,29 @@ body {
   @apply selection:bg-primaryDark selection:font-bold;
 }
 
-/* Topic-term highlight (injected via {@html}, so it must be global).
-   Distinct from the amber query-term highlight: a teal underline mark. */
+/* Highlighted terms are injected via {@html} as <button>s (so they must be
+   styled globally). Each is a one-click "search this term" affordance: the base
+   .hl-btn resets button chrome, then .topic-hl / .query-hl carry the two looks —
+   a teal underline for topic terms, amber fill for query terms. */
+.hl-btn {
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  border: 0;
+  background: none;
+  border-radius: 2px;
+  padding: 0 1px;
+}
+.hl-btn:hover {
+  filter: brightness(0.9);
+}
 .topic-hl {
   background: rgba(13, 148, 136, 0.12);
   border-bottom: 2px solid rgba(13, 148, 136, 0.65);
-  border-radius: 2px;
-  padding: 0 1px;
+}
+.query-hl {
+  background: rgba(251, 191, 36, 0.55);
+  font-weight: 700;
 }
 
 .im-fell-dw-pica-regular {

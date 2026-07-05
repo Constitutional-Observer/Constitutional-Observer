@@ -36,6 +36,11 @@
     // current result set.
     openedBookmark = $state(null);
 
+    #pager;
+    constructor(pager) {
+      this.#pager = pager;
+    }
+
     effectiveIndex(pageHits) {
       return this.selectedHitIndex != null &&
         this.selectedHitIndex < pageHits.length
@@ -57,6 +62,27 @@
     select(i) {
       this.openedBookmark = null;
       this.selectedHitIndex = i;
+    }
+
+    // Open a document in the reader (used by the related-documents section).
+    // Prefer the in-results selection path (stays in sync with the pager); fall
+    // back to fetching by id for a document outside the current filtered view.
+    openHit(hit) {
+      const i = this.#pager.selectByHit(hit);
+      if (i >= 0) {
+        this.select(i);
+        return;
+      }
+      this.openById({
+        key: this.docKey(hit),
+        id: hit.id ?? null,
+        docId: this.docId(hit),
+        index: hit._index,
+        file_name: hit.file_name,
+        title: hit.title_en || hit.subject || "Untitled",
+        state: hit.state || "Unknown",
+        date: this.hitDate(hit),
+      });
     }
     reset() {
       this.selectedHitIndex = null;
@@ -489,11 +515,11 @@
 
   // ---------------------------------------------------------------------------
 
-  const panel = new DocPanel();
   const loader = new LazyLoader();
   const search = new SearchParams();
   const filter = new ResultFilter(loader);
   const pager = new ResultPager(filter);
+  const panel = new DocPanel(pager);
   const bookmarks = new Bookmarks();
 
   onMount(() => bookmarks.load());
@@ -575,6 +601,7 @@
       invalidateAll: true,
     });
   }
+
 </script>
 
 <div id="container">
@@ -611,7 +638,15 @@
     />
 
     <!-- Right column: bookmarks + collapsible detail accordion -->
-    <DetailPanel {panel} {bookmarks} {selectedHit} bind:showBookmarks />
+    <DetailPanel
+      {panel}
+      {bookmarks}
+      {selectedHit}
+      bind:showBookmarks
+      allHits={loader.docs}
+      scopedHits={pager.rankedHits}
+      onOpenDoc={(hit) => panel.openHit(hit)}
+    />
   </div>
 </div>
 

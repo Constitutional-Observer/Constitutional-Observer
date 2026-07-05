@@ -297,14 +297,6 @@
   .result-excerpt {
     @apply text-sm text-black/80 border-l-[3px] border-primary/50 pl-3 py-1 my-2 whitespace-pre-wrap;
   }
-  /* Meilisearch query-term highlights */
-  .matched-chunk :global(strong),
-  .result-excerpt :global(strong) {
-    background: rgba(251, 191, 36, 0.55);
-    border-radius: 2px;
-    padding: 0 1px;
-    font-weight: 700;
-  }
   .load-doc-btn {
     @apply text-xs text-blue-700 underline mt-2 hover:text-blue-900;
   }

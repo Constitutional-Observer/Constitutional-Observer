@@ -38,21 +38,30 @@ function buildTopicRegex(terms) {
 
 // Wrap topic-term occurrences in already-built highlight HTML, leaving the
 // <strong> query tags untouched (we only transform the text between tags).
-export function applyTopicHighlight(html, terms) {
+export function applyTopicHighlight(html, terms, clickable) {
   const re = buildTopicRegex(terms);
   if (!re) return html;
+  const open = clickable ? '<button type="button" class="hl-btn topic-hl">' : '<span class="topic-hl">';
+  const close = clickable ? "</button>" : "</span>";
   return html
     .split(/(<\/?strong>)/)
     .map((seg) =>
       seg === "<strong>" || seg === "</strong>"
         ? seg
-        : seg.replace(re, '<span class="topic-hl">$1</span>'),
+        : seg.replace(re, `${open}$1${close}`),
     )
     .join("");
 }
 
 // Combined: query-term highlight + topic-term highlight. `terms` is the list of
 // the document's topic terms (may be empty/omitted to highlight queries only).
-export function renderHighlight(text, terms) {
-  return applyTopicHighlight(escapeRestoreStrong(text), terms);
+export function renderHighlight(text, terms, clickable = false) {
+  const html = applyTopicHighlight(escapeRestoreStrong(text), terms, clickable);
+  return clickable
+    ? html
+        .replace(/<strong>/g, '<button type="button" class="hl-btn query-hl">')
+        .replace(/<\/strong>/g, "</button>")
+    : html
+        .replace(/<strong>/g, '<span class="query-hl">')
+        .replace(/<\/strong>/g, "</span>");
 }
