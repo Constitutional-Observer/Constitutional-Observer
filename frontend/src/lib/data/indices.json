@@ -89,6 +89,16 @@
     "searchField": "__discussions",
     "titleField": "title_en"
   },
+    {
+    "uid": "state_legislature_debates_kl",
+    "collection": "State Legislatures",
+    "stateCode": "KL",
+    "state": "Keralam",
+    "label": "Keralam Assembly",
+    "annotation": "Keralam Legislative Assembly proceedings. Index exists but holds no documents yet.",
+    "searchField": "__discussions",
+    "titleField": "title_en"
+  },
   {
     "uid": "state_legislature_debates_ls",
     "collection": "Parliament",

@@ -653,7 +653,7 @@
 <style lang="postcss">
   #container {
     @apply !w-screen;
-    height: 150dvh;
+    height: 200dvh;
     overflow: hidden;
     display: flex;
     flex-direction: column;

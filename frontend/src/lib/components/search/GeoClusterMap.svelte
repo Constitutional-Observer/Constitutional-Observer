@@ -1,73 +1,33 @@
 <script>
-  import { browser } from "$app/environment";
   import { navigating } from "$app/state";
   import { untrack, tick } from "svelte";
   import { TopicPipeline } from "$lib/topic-modelling/topic-pipeline.svelte.js";
-  import { states, toSvgCoords } from "$lib/data/india-states.js";
   import { renderHighlight } from "$lib/highlight.js";
   import { topicHighlight } from "$lib/components/search/topic-highlight.svelte.js";
 
   import { select as d3select } from "d3-selection";
   import { zoom as d3zoom, zoomIdentity } from "d3-zoom";
 
-  // SVG coordinate space of the India map (matches india-states.js / IndiaMap).
-  const MAP_W = 360, MAP_H = 390;
   const MIN_GROUP_DOCS = 4;
-
-  // National bodies have no state — anchored near Delhi (the seat of the central
-  // institutions), with small offsets so the four don't land on one point. The
-  // greedy card placement spreads their boxes around that anchor.
-  const DELHI = toSvgCoords(28.7, 77.1);
-  const NATIONAL_ANCHORS = {
-    "Lok Sabha":            { x: DELHI.x - 6, y: DELHI.y - 4 },
-    "Rajya Sabha":          { x: DELHI.x + 6, y: DELHI.y - 4 },
-    "Constituent Assembly": { x: DELHI.x - 6, y: DELHI.y + 4 },
-    "Court Judgements":     { x: DELHI.x + 6, y: DELHI.y + 4 },
-  };
-  const NATIONAL_FALLBACK = { x: DELHI.x, y: DELHI.y + 10 };
 
   const humanTerm = (term) => {
     const s = term.replace(/_/g, " ");
     return s.charAt(0).toUpperCase() + s.slice(1);
   };
-  const hitTitle = (hit, i) => hit.title_en || hit.subject || `Document ${i + 1}`;
+  const hitTitle = (hit, i) => hit._title || `Document ${i + 1}`;
   const hitExcerpt = (hit) =>
     hit._matchedChunks?.[0]?.textHL ||
     hit._matchedChunks?.[0]?.text ||
     hit._formatted?.__discussions ||
     hit.__discussions ||
     "";
-  const docKey = (hit) => `${hit._index || hit.state_code}:${hit.file_name}`;
-
-  // Which geo group a hit belongs to, and where it sits on the map. State
-  // legislatures and high courts are placed at their state; the national houses
-  // sit at fixed anchors.
-  function groupOf(hit) {
-    const col = hit._collection || "Other";
-    const st = hit.state && states[hit.state] ? hit.state : null;
-
-    if (col === "State Legislatures") {
-      if (st) {
-        const { x, y } = toSvgCoords(states[st].lat, states[st].lng);
-        return { key: `assembly:${st}`, label: `${st} · Assembly`, type: "state", state: st, code: states[st].code, x, y };
-      }
-      return { key: "assembly:other", label: "Other Assemblies", type: "national", ...NATIONAL_FALLBACK };
-    }
-    if (col === "Court Judgements") {
-      if (st) {
-        const { x, y } = toSvgCoords(states[st].lat, states[st].lng);
-        return { key: `court:${st}`, label: `${st} · High Court`, type: "state", state: st, code: states[st].code, x, y };
-      }
-      return { key: "court:national", label: "Court Judgements", type: "national", ...(NATIONAL_ANCHORS["Court Judgements"]) };
-    }
-    const anchor = NATIONAL_ANCHORS[col] || NATIONAL_FALLBACK;
-    return { key: `nat:${col}`, label: col, type: "national", x: anchor.x, y: anchor.y };
-  }
+  // Must agree with SearchApp's docKeyOf — these keys address the same maps.
+  const docKey = (hit) => hit._docId || String(hit?.id ?? "").replace(/_\d+$/, "");
 
   // ── GeoGroups ── partition hits, hold a pipeline per group, model lazily ──
   // Each group's LDA runs in a sequential background queue (largest first) so
-  // the page never freezes; boxes fill in as their model completes. t-SNE is
-  // NOT run here — only when a cluster box is opened.
+  // the page never freezes; tiles fill in as their model completes. t-SNE is
+  // NOT run here — only when a topic is selected (lazy project()).
   class GeoGroups {
     groups = $state([]);
     #pipelines = new Map();
@@ -75,28 +35,47 @@
     #running = false;
     #query = "";
 
-    build(hits, query) {
+    // One square per index — the index registry is what defines a source, so a
+    // hit's `_index` places it. Indices this query returned nothing from still
+    // get a square: an empty cell is itself a finding.
+    //
+    // Counts/partition are rebuilt on every call (so doc counts update live as
+    // pagination streams in); topic modelling only starts once `readyToModel`
+    // is true, so LDA isn't repeatedly restarted mid-pagination.
+    build(hits, query, indices = [], readyToModel = true) {
       this.#query = query;
+      const meta = new Map(indices.map((i) => [i.uid, i]));
       const map = new Map();
       for (const hit of hits) {
-        const g = groupOf(hit);
-        let e = map.get(g.key);
-        if (!e) { e = { ...g, items: [] }; map.set(g.key, e); }
+        let e = map.get(hit._index);
+        if (!e) {
+          const m = meta.get(hit._index);
+          e = { key: hit._index, label: m?.label || hit._index, annotation: m?.annotation || "", items: [] };
+          map.set(hit._index, e);
+        }
         e.items.push(hit);
+      }
+      for (const i of indices) {
+        if (!map.has(i.uid))
+          map.set(i.uid, { key: i.uid, label: i.label, annotation: i.annotation || "", items: [] });
       }
       const groups = [...map.values()].map((e) => {
         let p = this.#pipelines.get(e.key);
         if (!p) { p = new TopicPipeline(); this.#pipelines.set(e.key, p); }
         return { ...e, count: e.items.length, pipeline: p };
       });
-      groups.sort((a, b) => b.count - a.count);
+      groups.sort((a, b) => a.label.localeCompare(b.label));
       this.groups = groups;
       for (const k of [...this.#pipelines.keys()]) if (!map.has(k)) this.#pipelines.delete(k);
-      this.#enqueue();
+      if (readyToModel) this.#enqueue();
     }
 
     #enqueue() {
-      this.#queue = this.groups.filter((g) => g.count >= MIN_GROUP_DOCS);
+      // Display order is alphabetical, but modelling still runs largest-first
+      // (better perceived UX — bigger groups' topics land sooner).
+      this.#queue = this.groups
+        .filter((g) => g.count >= MIN_GROUP_DOCS)
+        .sort((a, b) => b.count - a.count);
       if (!this.#running) this.#drain();
     }
     async #drain() {
@@ -109,7 +88,7 @@
     }
   }
 
-  // ── ClusterScatter ── zoomable t-SNE canvas for ONE opened cluster ────────
+  // ── ClusterScatter ── zoomable t-SNE canvas for ONE selected topic ────────
   class ClusterScatter {
     static #PAD = 32;
     static #SCALE_MIN = 0.2;
@@ -194,10 +173,10 @@
         const hover = this.hoveredCircle?.j === it.j;
         ctx.beginPath();
         ctx.arc(cx, cy, hover ? radius + 2 : radius, 0, Math.PI * 2);
-        ctx.fillStyle = hover ? "rgba(0,0,0,1)" : "rgba(0,0,0,0.65)";
+        ctx.fillStyle = hover ? "rgba(184,134,11,1)" : "rgba(0,0,0,0.62)";
         ctx.fill();
         ctx.lineWidth = hover ? 2 : 0.8;
-        ctx.strokeStyle = hover ? "#000" : "rgba(0,0,0,0.25)";
+        ctx.strokeStyle = hover ? "#6b5335" : "rgba(0,0,0,0.25)";
         ctx.stroke();
       }
       if (!this.rect || this.rect.width !== w || this.rect.height !== h) {
@@ -210,7 +189,7 @@
       if (!this.rect || !this.items.length) return [];
       const { width: w, height: h } = this.rect;
       const tr = this.transform, pad = ClusterScatter.#PAD;
-      const N = 80, LW = 200, LH = 80, GAP = 6;
+      const N = 80, LW = 200, LH = 78, GAP = 6;
       const placed = [], result = [];
       for (let rank = 0; rank < Math.min(N, this.items.length); rank++) {
         const it = this.items[rank];
@@ -242,6 +221,7 @@
   let {
     hits = [],
     query = "",
+    indices = [],
     onselect,
     paginationDone = true,
   } = $props();
@@ -249,27 +229,32 @@
   const geo = new GeoGroups();
   const scatter = new ClusterScatter();
 
-  // The opened cluster: which group + which cluster index within it. null = the
-  // geo overview (no scatter). λ is shared across the opened group.
-  let openGroupKey = $state(null);
-  let openClusterIdx = $state(null);
-  let containerW = $state(0);
-  let containerH = $state(0);
+  // Which source square's topics are previewed. Hovering a square opens it and it
+  // stays open until another is hovered.
+  let openKey = $state(null);
+  let selectedTopic = $state(null); // { groupKey, idx } | null
 
-  let openGroup = $derived(geo.groups.find((g) => g.key === openGroupKey) || null);
-  let openPipeline = $derived(openGroup?.pipeline || null);
-  let openCluster = $derived(
-    openPipeline && openClusterIdx != null ? openPipeline.clusters[openClusterIdx] : null,
+  // Sources sorted alphabetically (already the build order) — the Tableau grid.
+  let sortedGroups = $derived(geo.groups);
+  let openGroup = $derived(openKey ? geo.groups.find((g) => g.key === openKey) || null : null);
+
+  let selectedGroup = $derived(
+    selectedTopic ? geo.groups.find((g) => g.key === selectedTopic.groupKey) || null : null,
   );
-  let selectedClusterTerms = $derived((openCluster?.terms || []).map((t) => t.term));
+  let selectedPipeline = $derived(selectedGroup?.pipeline || null);
+  let selectedCluster = $derived(
+    selectedGroup ? selectedGroup.pipeline.clusters[selectedTopic.idx] || null : null,
+  );
+  let selectedClusterTerms = $derived((selectedCluster?.terms || []).map((t) => t.term));
 
-  let loading = $derived(!!navigating.to || !paginationDone);
+  let loading = $derived(!!navigating.to);
 
-  // (Re)build groups whenever the final result set is ready.
+  // Rebuild the source/count partition on every batch so doc counts update
+  // live during pagination; topic modelling itself only kicks off once the
+  // final result set is in (paginationDone), so LDA isn't restarted per batch.
   $effect(() => {
-    hits; query; paginationDone;
-    if (!paginationDone) return;
-    untrack(() => geo.build(hits, query));
+    hits; query; indices; paginationDone;
+    untrack(() => geo.build(hits, query, indices, paginationDone));
   });
 
   // Publish per-doc topic data (across all groups) for the result list / detail
@@ -294,151 +279,23 @@
     topicHighlight.topicsByDoc = topics;
   });
 
-  // Restrict the result list to the opened cluster's documents.
+  // Restrict the result list to the selected topic's documents.
   $effect(() => {
-    topicHighlight.docKeys = openCluster
-      ? new Set(openCluster.items.map((it) => docKey(it.hit)))
+    topicHighlight.docKeys = selectedCluster
+      ? new Set(selectedCluster.items.map((it) => docKey(it.hit)))
       : null;
   });
 
-  const COLLAPSED_CLUSTERS = 2;   // cards show this many topics, then accordion
-
-  // Everything lives on one large pannable/zoomable plane. The India map sits at
-  // a fixed rectangle in the centre of the plane; cluster cards are placed right
-  // next to their map anchor (states at their location, central bodies near
-  // Delhi). The plane is bigger than the viewport so cards have room — the user
-  // pans/zooms to explore.
-  const PLANE_W = 1680, PLANE_H = 1480;
-  const MAP_PLANE_W = 540;
-  const MAP_PLANE_H = MAP_PLANE_W * (MAP_H / MAP_W);
-  const MAP_X0 = (PLANE_W - MAP_PLANE_W) / 2;
-  const MAP_Y0 = (PLANE_H - MAP_PLANE_H) / 2;
-  const BOX_W = 168;
-
-  const anchorPx = (g) => ({
-    ax: MAP_X0 + (g.x / MAP_W) * MAP_PLANE_W,
-    ay: MAP_Y0 + (g.y / MAP_H) * MAP_PLANE_H,
-  });
-
-  // Cards are accordions: only the first COLLAPSED_CLUSTERS topics show until
-  // the group is expanded. Keyed by group key.
-  let expandedGroups = $state(new Set());
-  const isExpanded = (key) => expandedGroups.has(key);
-  function toggleExpanded(key) {
-    const next = new Set(expandedGroups);
-    next.has(key) ? next.delete(key) : next.add(key);
-    expandedGroups = next;
-  }
-  const visibleClusterCount = (g) => {
-    const n = g.pipeline.topicCount;
-    return isExpanded(g.key) ? n : Math.min(COLLAPSED_CLUSTERS, n);
-  };
-
-  // Height estimate (head + visible grid rows + accordion toggle) used to size
-  // the ring slot before the DOM measures the card.
-  function boxHeight(g) {
-    const n = g.pipeline.topicCount;
-    if (g.count < MIN_GROUP_DOCS || n === 0) return 40;
-    const rows = Math.ceil(visibleClusterCount(g) / 2);
-    return 24 + rows * 30 + (n > COLLAPSED_CLUSTERS ? 18 : 0) + 6;
-  }
-
-  // Cards fill the empty space NEAR the dots. A grid covers the map (plus a
-  // margin); cells close to any anchor — i.e. over the landmass/labels — are
-  // reserved, and every other cell (open sea like the Bay of Bengal, inter-state
-  // gaps, the exterior) is a free slot. Each group claims the nearest free slot
-  // to its anchor, so a southern state can sit in the open water right beside it.
-  const CELL_W = BOX_W + 14;   // ~one card wide
-  const CELL_H = 112;          // ~one collapsed card tall
-  const RESERVE_R = 100;       // keep slots this far from any dot (landmass halo)
-  const AREA_MARGIN = BOX_W;   // how far outside the map the grid extends
-
-  let placedGroups = $derived.by(() => {
-    geo.groups; expandedGroups; // reactive deps
-    const groups = geo.groups;
-    if (!groups.length) return [];
-    const anchors = groups.map((g) => anchorPx(g));
-
-    const gx0 = MAP_X0 - AREA_MARGIN, gy0 = MAP_Y0 - AREA_MARGIN;
-    const cols = Math.ceil((MAP_PLANE_W + 2 * AREA_MARGIN) / CELL_W);
-    const rows = Math.ceil((MAP_PLANE_H + 2 * AREA_MARGIN) / CELL_H);
-    const R2 = RESERVE_R * RESERVE_R;
-
-    // Free slots = cells whose centre is clear of every dot.
-    const slots = [];
-    for (let r = 0; r < rows; r++)
-      for (let c = 0; c < cols; c++) {
-        const sx = gx0 + (c + 0.5) * CELL_W, sy = gy0 + (r + 0.5) * CELL_H;
-        if (anchors.some((a) => (a.ax - sx) ** 2 + (a.ay - sy) ** 2 < R2)) continue;
-        slots.push({ cx: sx, cy: sy, used: false });
-      }
-
-    const result = [];
-    for (const g of [...groups].sort((a, b) => b.count - a.count)) {
-      const { ax, ay } = anchorPx(g);
-      let best = null, bd = Infinity;
-      for (const s of slots) {
-        if (s.used) continue;
-        const d = (s.cx - ax) ** 2 + (s.cy - ay) ** 2;
-        if (d < bd) { bd = d; best = s; }
-      }
-      if (!best) break;
-      best.used = true;
-      const bh = boxHeight(g);
-      const bx = best.cx - BOX_W / 2, by = best.cy - bh / 2;
-      // Leader port = point on the card rect nearest the anchor (shortest line).
-      const lx2 = Math.max(bx, Math.min(ax, bx + BOX_W));
-      const ly2 = Math.max(by, Math.min(ay, by + bh));
-      result.push({ group: g, ax, ay, bx, by, bw: BOX_W, bh, lx2, ly2 });
-    }
-    return result;
-  });
-
-  // ── Pan / zoom of the whole plane (d3-zoom on the viewport) ───────────────
-  let planeEl = $state(null);
-  let plane = $state({ x: 0, y: 0, k: 1 });
-  let planeZoom = null;
-  let planeReady = false;
-
-  function planeFitTransform() {
-    const w = containerW || 800, h = containerH || 600;
-    const k0 = Math.max(0.4, Math.min(1.1, (h * 0.82) / MAP_PLANE_H));
-    const cx = MAP_X0 + MAP_PLANE_W / 2, cy = MAP_Y0 + MAP_PLANE_H / 2;
-    return zoomIdentity.translate(w / 2 - cx * k0, h / 2 - cy * k0).scale(k0);
-  }
+  // Lazily project the selected group's θ into 2-D for the scatter.
   $effect(() => {
-    if (!planeEl || planeReady || !containerW) return;
-    planeReady = true;
-    untrack(() => {
-      planeZoom = d3zoom()
-        .scaleExtent([0.3, 2.5])
-        .filter((ev) => ev.type !== "wheel" || ev.ctrlKey)
-        .on("zoom", (ev) => { plane = { x: ev.transform.x, y: ev.transform.y, k: ev.transform.k }; });
-      const sel = d3select(planeEl).call(planeZoom);
-      sel.call(planeZoom.transform, planeFitTransform());
-    });
+    const p = selectedPipeline;
+    if (p) untrack(() => p.project());
   });
-  const planeZoomBy = (f) => { if (planeZoom && planeEl) d3select(planeEl).call(planeZoom.scaleBy, f); };
-  const planeRecenter = () => { if (planeZoom && planeEl) d3select(planeEl).call(planeZoom.transform, planeFitTransform()); };
 
-  function openClusterView(groupKey, idx) {
-    const g = geo.groups.find((gg) => gg.key === groupKey);
-    if (!g) return;
-    openGroupKey = groupKey;
-    openClusterIdx = idx;
-    scatter.resetView();
-    g.pipeline.project(); // lazy t-SNE — fills coords for the scatter
-  }
-  function closeClusterView() {
-    openGroupKey = null;
-    openClusterIdx = null;
-    scatter.hoveredCircle = null;
-  }
-
-  // Feed the opened cluster's items into the scatter once projected.
+  // Feed the selected cluster's items into the scatter once projected.
   $effect(() => {
-    const c = openCluster;
-    const projected = openPipeline?.projected;
+    const c = selectedCluster;
+    const projected = selectedPipeline?.projected;
     scatter.items = c && projected ? c.items : [];
   });
 
@@ -454,173 +311,196 @@
     scatter.items; scatter.transform; scatter.rect;
     return scatter.computeLabels();
   });
+
+  function selectTopic(groupKey, idx) {
+    selectedTopic =
+      selectedTopic?.groupKey === groupKey && selectedTopic?.idx === idx
+        ? null
+        : { groupKey, idx };
+    scatter.resetView();
+  }
+  const isSelected = (groupKey, idx) =>
+    selectedTopic?.groupKey === groupKey && selectedTopic?.idx === idx;
 </script>
 
-<svelte:window onkeydown={(e) => { if (e.key === "Escape" && openGroupKey) closeClusterView(); }} />
+<svelte:window
+  onkeydown={(e) => {
+    if (e.key === "Escape") { selectedTopic = null; openKey = null; }
+  }}
+/>
+
+<!-- {#snippet topicPreviews(groups)}
+  {#each groups as g (g.key)}
+    {@const pl = g.pipeline}
+    <div class="gm-prev-sec">
+      <div class="gm-prev-head">
+        <span class="gm-prev-title">{g.label}</span>
+        <span class="gm-prev-count">{g.count} docs</span>
+      </div>
+      {#if g.annotation}<p class="gm-prev-annot">{g.annotation}</p>{/if}
+      {#if g.count < MIN_GROUP_DOCS}
+        <p class="gm-prev-note">Too few documents to model topics.</p>
+      {:else if !paginationDone}
+        <p class="gm-prev-note"><span class="gm-spin"></span>Counting results…</p>
+      {:else if pl.processing && pl.topicCount === 0}
+        <p class="gm-prev-note"><span class="gm-spin"></span>{pl.progress || "modelling…"}</p>
+      {:else if pl.topicCount === 0}
+        <p class="gm-prev-note">Waiting to model…</p>
+      {:else}
+        <div class="gm-prev-grid">
+          {#each pl.clusters as c, ci (c.topic)}
+            <button
+              class="gm-prev-card"
+              class:gm-prev-card-selected={isSelected(g.key, ci)}
+              onclick={() => selectTopic(g.key, ci)}
+            >
+              <div class="gm-prev-terms">
+                {#each c.terms.slice(0, 6) as t (t.term)}
+                  <span class="gm-prev-term">{humanTerm(t.term)}</span>
+                {/each}
+              </div>
+              <div class="gm-prev-meta">
+                <span class="gm-prev-docs">{c.count} docs</span>
+                <span class="gm-prev-go">project →</span>
+              </div>
+            </button>
+          {/each}
+        </div>
+      {/if}
+    </div>
+  {/each}
+{/snippet} -->
 
 <section class="geo-map">
   <div class="gm-header">
-    <span class="gm-title">Topic map by source</span>
-    {#if openCluster}
-      <button class="gm-back" onclick={() => closeClusterView()}>← Back to map</button>
+    <span class="gm-title">Topics by source</span>
+    {#if selectedCluster}
       <h3 class="gm-open-terms">
-        {#each (openCluster.terms || []) as t (t.term)}
+        {#each (selectedCluster.terms || []).slice(0, 8) as t (t.term)}
           <span class="gm-open-term">{humanTerm(t.term)}</span>
         {/each}
       </h3>
-      <span class="gm-open-meta">{openGroup?.label} · {openCluster.count} docs</span>
-      <label class="gm-lambda" title="LDAvis relevance: λ=1 common, λ=0 distinctive.">
-        Mix
-        <input type="range" min="0" max="1" step="0.05" bind:value={openPipeline.lambda} class="gm-slider" />
-        <span class="gm-lambda-val">λ {openPipeline.lambda.toFixed(2)}</span>
-      </label>
+      <span class="gm-open-meta">{selectedGroup?.label} · {selectedCluster.count} docs</span>
       <div class="gm-zoom-btns">
         <button class="gm-zoom-btn" onclick={() => scatter.zoomBy(1.4)}>+</button>
         <button class="gm-zoom-btn" onclick={() => scatter.zoomBy(1 / 1.4)}>−</button>
         <button class="gm-zoom-btn" onclick={() => scatter.resetView()}>⟲</button>
       </div>
+      <button class="gm-clear" onclick={() => (selectedTopic = null)}>Clear ✕</button>
     {:else}
       <span class="gm-hint">
-        Topics modelled per source, near their place on the map · drag to pan ·
-        Ctrl + scroll to zoom · click a cluster for its t-SNE.
+        Click a topic inside a cell to project its documents.
       </span>
-      <div class="gm-zoom-btns">
-        <button class="gm-zoom-btn" onclick={() => planeZoomBy(1.3)}>+</button>
-        <button class="gm-zoom-btn" onclick={() => planeZoomBy(1 / 1.3)}>−</button>
-        <button class="gm-zoom-btn" onclick={() => planeRecenter()}>⟲</button>
-      </div>
     {/if}
   </div>
 
-  <div
-    class="gm-body"
-    bind:this={planeEl}
-    bind:clientWidth={containerW}
-    bind:clientHeight={containerH}
-  >
-    {#snippet clusterBox(g)}
-      {@const pl = g.pipeline}
-      {@const n = pl.topicCount}
-      <div class="gm-box-head">
-        <span class="gm-box-label">{g.label}</span>
-        <span class="gm-box-count">{g.count}</span>
-      </div>
-      {#if g.count < MIN_GROUP_DOCS}
-        <div class="gm-box-note">too few docs to cluster</div>
-      {:else if pl.processing && n === 0}
-        <div class="gm-box-note"><span class="gm-spin"></span>{pl.progress || "modelling…"}</div>
-      {:else if n === 0}
-        <div class="gm-box-note">waiting…</div>
-      {:else}
-        {@const cl = pl.clusters}
-        <div class="gm-grid">
-          {#each cl.slice(0, visibleClusterCount(g)) as c, ci (c.topic)}
-            <button
-              class="gm-cell"
-              class:gm-cell-open={g.key === openGroupKey && ci === openClusterIdx}
-              title={`${c.count} docs`}
-              onclick={() => openClusterView(g.key, ci)}
-            >
-              <span class="gm-cell-terms">{c.terms.slice(0, 3).map((t) => humanTerm(t.term)).join(" · ")}</span>
-              <span class="gm-cell-count">{c.count}</span>
-            </button>
-          {/each}
-        </div>
-        {#if n > COLLAPSED_CLUSTERS}
-          <button class="gm-accordion" onclick={(e) => { e.stopPropagation(); toggleExpanded(g.key); }}>
-            {isExpanded(g.key) ? "− less" : `+ ${n - COLLAPSED_CLUSTERS} more`}
-          </button>
-        {/if}
-      {/if}
-    {/snippet}
-
-    <!-- Pannable / zoomable plane holding the map, leaders and all cards -->
-    <div
-      class="gm-plane"
-      style="width: {PLANE_W}px; height: {PLANE_H}px; transform: translate({plane.x}px, {plane.y}px) scale({plane.k})"
-    >
-      <!-- India base map: anchors + state names with doc counts -->
-      <svg
-        class="gm-india"
-        viewBox="0 0 {MAP_W} {MAP_H}"
-        style="left: {MAP_X0}px; top: {MAP_Y0}px; width: {MAP_PLANE_W}px; height: {MAP_PLANE_H}px"
-        xmlns="http://www.w3.org/2000/svg"
-        aria-hidden="true"
-      >
-        {#each placedGroups as p (p.group.key)}
-          <g class="gm-anchor-g" class:gm-anchor-open={p.group.key === openGroupKey}>
-            <circle cx={p.group.x} cy={p.group.y} r="3.5" class="gm-anchor" />
-            {#if p.group.type === "state"}
-              <text x={p.group.x} y={p.group.y - 6} text-anchor="middle" class="gm-anchor-label">
-                {p.group.state} · {p.group.count}
-              </text>
-            {/if}
-          </g>
-        {/each}
-      </svg>
-
-      <!-- Leader lines anchor → card -->
-      <svg class="gm-leaders" viewBox="0 0 {PLANE_W} {PLANE_H}" aria-hidden="true">
-        {#each placedGroups as p (p.group.key)}
-          <line x1={p.ax} y1={p.ay} x2={p.lx2} y2={p.ly2} class="gm-leader" />
-        {/each}
-      </svg>
-
-      <!-- Cluster cards next to their anchors -->
-      {#each placedGroups as p (p.group.key)}
-        <div class="gm-box" style="left: {p.bx}px; top: {p.by}px; width: {BOX_W}px">
-          {@render clusterBox(p.group)}
-        </div>
-      {/each}
-    </div>
-
-    <!-- t-SNE scatter overlay for the opened cluster ("the map moves to the box") -->
-    {#if openGroupKey}
-      <div class="gm-scatter">
-        {#if openPipeline?.projecting || (!openPipeline?.projected)}
-          <div class="gm-scatter-loading">
-            <span class="gm-spin gm-spin-lg"></span>
-            <span>Projecting cluster…</span>
-          </div>
-        {/if}
-        <canvas
-          bind:this={scatter.canvas}
-          class="gm-scatter-canvas"
-          onmousemove={(e) => scatter.onMove(e)}
-          onmouseleave={() => scatter.onLeave()}
-          onclick={(e) => scatter.onClick(e, onselect)}
-        ></canvas>
-
-        <svg class="gm-scatter-leaders" aria-hidden="true">
-          {#each scatterLabels as r (r.j)}
-            <line x1={r.cx} y1={r.cy} x2={r.lx < r.cx ? r.lx + 200 : r.lx} y2={r.ly + 10} class="gm-scatter-leader" />
-          {/each}
-        </svg>
-
-        {#each scatterLabels as r (r.j)}
+  <div class="gm-body">
+    {#if !selectedCluster}
+      <!-- Accordion collapsed: frequency-sized source squares (Tableau grid) at
+           half width, topic previews for the hovered source on the other half. -->
+      <div class="gm-grid-pane">
+        {#each sortedGroups as g (g.key)}
+          {@const pl = g.pipeline}
+          <!-- svelte-ignore a11y_no_static_element_interactions -->
           <div
-            class="gm-label-card"
-            style="left: {r.lx}px; top: {r.ly}px"
-            role="button" tabindex="0"
-            onclick={(e) => { e.stopPropagation(); onselect?.(r.hit); }}
-            onkeydown={(e) => { if (e.key === "Enter") onselect?.(r.hit); }}
+            class="gm-cell"
+            class:gm-cell-open={g.key === openKey}
+            class:gm-cell-empty={g.count === 0}
+            class:gm-cell-selected={selectedGroup?.key === g.key}
+            title={`${g.label} · ${g.count} docs${g.annotation ? `\n\n${g.annotation}` : ""}`}
+            onmouseenter={() => (openKey = g.key)}
           >
-            <div class="gm-label-title">{hitTitle(r.hit, r.idx)}</div>
-            {#if hitExcerpt(r.hit)}
-              <p class="gm-label-excerpt">{@html renderHighlight(hitExcerpt(r.hit), selectedClusterTerms)}</p>
+            <div class="gm-cell-head">
+              <span class="gm-cell-name">{g.label}</span>
+              <span class="gm-cell-count">{g.count}</span>
+            </div>
+
+            <!-- Once the group's model finishes, its topics live in the cell. -->
+            {#if g.count === 0}
+              <span class="gm-cell-note">no results</span>
+            {:else if g.count < MIN_GROUP_DOCS}
+              <span class="gm-cell-note">too few to model</span>
+            {:else if !paginationDone}
+              <span class="gm-cell-note"><span class="gm-spin"></span>counting…</span>
+            {:else if pl.topicCount === 0}
+              <span class="gm-cell-note"><span class="gm-spin"></span>modelling…</span>
+            {:else}
+              <div class="gm-cell-topics">
+                {#each pl.clusters as c, ci (c.topic)}
+                  <button
+                    class="gm-cell-topic"
+                    class:gm-cell-topic-selected={isSelected(g.key, ci)}
+                    title={`${c.count} docs`}
+                    onclick={() => selectTopic(g.key, ci)}
+                  >
+                    {c.terms.slice(0, 3).map((t) => humanTerm(t.term)).join(" · ")}
+                  </button>
+                {/each}
+              </div>
             {/if}
           </div>
         {/each}
+      </div>
 
-        {#if scatter.hoveredCircle}
-          {@const hov = scatter.hoveredCircle}
-          <div class="gm-hover-tip">
-            <div class="gm-tip-title">{hitTitle(hov.hit, hov.idx)}</div>
-            {#if hitExcerpt(hov.hit)}
-              <p class="gm-tip-excerpt">{@html renderHighlight(hitExcerpt(hov.hit), selectedClusterTerms)}</p>
-            {/if}
+      <!-- <div class="gm-right">
+        {#if openGroup}
+          <div class="gm-previews">
+            {@render topicPreviews([openGroup])}
+          </div>
+        {:else}
+          <div class="gm-scatter-empty">
+            <p>Hover a source square to preview its topics, then pick one to project its documents.</p>
           </div>
         {/if}
+      </div> -->
+    {:else}
+      <!-- Accordion expanded: the t-SNE projection takes the full width. -->
+      <div class="gm-right gm-right-full">
+        <div class="gm-scatter">
+          {#if selectedPipeline?.projecting || !selectedPipeline?.projected}
+            <div class="gm-scatter-loading">
+              <span class="gm-spin gm-spin-lg"></span><span>Projecting cluster…</span>
+            </div>
+          {/if}
+          <canvas
+            bind:this={scatter.canvas}
+            class="gm-scatter-canvas"
+            onmousemove={(e) => scatter.onMove(e)}
+            onmouseleave={() => scatter.onLeave()}
+            onclick={(e) => scatter.onClick(e, onselect)}
+          ></canvas>
+
+          <svg class="gm-scatter-leaders" aria-hidden="true">
+            {#each scatterLabels as r (r.j)}
+              <line x1={r.cx} y1={r.cy} x2={r.lx < r.cx ? r.lx + 200 : r.lx} y2={r.ly + 10} class="gm-scatter-leader" />
+            {/each}
+          </svg>
+
+          {#each scatterLabels as r (r.j)}
+            <div
+              class="gm-label-card"
+              style="left: {r.lx}px; top: {r.ly}px"
+              role="button" tabindex="0"
+              onclick={(e) => { e.stopPropagation(); onselect?.(r.hit); }}
+              onkeydown={(e) => { if (e.key === "Enter") onselect?.(r.hit); }}
+            >
+              <div class="gm-label-title">{hitTitle(r.hit, r.idx)}</div>
+              {#if hitExcerpt(r.hit)}
+                <p class="gm-label-excerpt">{@html renderHighlight(hitExcerpt(r.hit), selectedClusterTerms)}</p>
+              {/if}
+            </div>
+          {/each}
+
+          {#if scatter.hoveredCircle}
+            {@const hov = scatter.hoveredCircle}
+            <div class="gm-hover-tip">
+              <div class="gm-tip-title">{hitTitle(hov.hit, hov.idx)}</div>
+              {#if hitExcerpt(hov.hit)}
+                <p class="gm-tip-excerpt">{@html renderHighlight(hitExcerpt(hov.hit), selectedClusterTerms)}</p>
+              {/if}
+            </div>
+          {/if}
+        </div>
       </div>
     {/if}
 
@@ -631,97 +511,105 @@
 </section>
 
 <style lang="postcss">
-  .geo-map { @apply relative mb-3 bg-white/60 backdrop-blur-sm rounded-lg border border-primary/30; }
+  .geo-map {
+    @apply relative mb-3 grid bg-white/60 backdrop-blur-sm rounded-lg border border-primary/30 h-[80dvh];
+    grid-template-rows: auto minmax(0, 1fr);
+  }
 
   .gm-header { @apply flex items-center gap-3 px-3 py-2 border-b border-primary/20 flex-wrap; }
-  .gm-title { @apply text-[11px] font-bold text-black/70 uppercase tracking-wider; }
+  .gm-title { @apply text-[11px] font-bold text-black/70 uppercase tracking-wider shrink-0; }
   .gm-hint { @apply text-[10px] text-black/45 italic; }
-  .gm-back {
-    @apply text-[11px] px-2 py-0.5 rounded border border-primary/30 bg-white/60 text-black/70 cursor-pointer hover:bg-primary/20;
-  }
-  .gm-back::after { content: ""; }
   .gm-open-terms { @apply flex flex-wrap gap-1 text-sm; }
-  .gm-open-term { @apply font-semibold px-1.5 py-0.5 rounded bg-black/10 text-black/70; }
+  .gm-open-term { @apply font-semibold px-1.5 py-0.5 rounded bg-black/10 text-black/70 text-[11px]; }
   .gm-open-meta { @apply text-[10px] text-black/50 font-mono; }
-  .gm-lambda { @apply flex items-center gap-1 text-[10px] font-semibold text-black/60 uppercase tracking-wider ml-auto; }
-  .gm-slider { @apply w-20 align-middle; }
-  .gm-lambda-val { @apply text-[10px] font-mono text-black/60; }
-  .gm-zoom-btns { @apply flex items-center rounded border border-primary/30 overflow-hidden; }
+  .gm-zoom-btns { @apply flex items-center rounded border border-primary/30 overflow-hidden ml-auto; }
   .gm-zoom-btn {
     @apply text-[13px] px-2 py-0.5 bg-white/60 text-black/70 cursor-pointer leading-none hover:bg-primary/20;
     border: none;
   }
   .gm-zoom-btn::after { content: ""; }
   .gm-zoom-btn + .gm-zoom-btn { border-left: 1px solid rgba(0,0,0,0.1); }
+  .gm-clear {
+    @apply text-[11px] px-2 py-0.5 rounded border border-primary/30 bg-white/60 text-black/70 cursor-pointer hover:bg-primary/20 shrink-0;
+  }
+  .gm-clear::after { content: ""; }
 
   .gm-body {
-    @apply relative rounded-lg border border-primary/20 bg-white/40 overflow-hidden mx-3 mb-3;
-    height: 660px;
-    cursor: grab;
-    touch-action: none;
+    @apply relative grid rounded-lg border border-primary/20 bg-white/40 m-1 h-full;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr);
   }
-  .gm-body:active { cursor: grabbing; }
 
-  /* The transformed plane that pans/zooms as one unit. */
-  .gm-plane { @apply absolute top-0 left-0; transform-origin: 0 0; }
-
-  .gm-india { @apply absolute; opacity: 0.95; }
-  .gm-anchor { fill: #c3b091; stroke: #8b7355; stroke-width: 0.8; }
-  .gm-anchor-label { font-size: 8px; fill: #6b5335; font-weight: 700; font-family: inherit; }
-  .gm-anchor-open .gm-anchor { fill: #b8860b; stroke: #6b5335; stroke-width: 1.4; }
-  .gm-anchor-open .gm-anchor-label { fill: #000; }
-
-  .gm-leaders { @apply absolute top-0 left-0 w-full h-full pointer-events-none; z-index: 2; }
-  .gm-leader { stroke: rgba(0,0,0,0.22); stroke-width: 1.2; stroke-dasharray: 4 3; }
-
-  .gm-box {
-    @apply absolute z-10 bg-white/95 rounded-md shadow-sm overflow-hidden text-left;
-    border: 1px solid rgba(0,0,0,0.14);
+  /* Full-width Tableau grid of equal squares, shaded by document count ──── */
+  .gm-grid-pane {
+    @apply grid content-start gap-2 overflow-y-auto grid-cols-6 h-full min-h-0;
   }
-  .gm-box:hover { @apply z-20 shadow-md; }
-  .gm-box-head {
-    @apply flex items-center justify-between gap-1 px-2 py-1 bg-primary/15;
-    border-bottom: 1px solid rgba(0,0,0,0.06);
-  }
-  .gm-box-label { @apply text-[10px] font-bold text-black/75 truncate; }
-  .gm-box-count { @apply text-[9px] font-mono text-black/45 bg-black/5 rounded-full px-1 shrink-0; }
-  .gm-box-note { @apply flex items-center gap-1.5 px-2 py-1 text-[9px] text-black/45 italic; }
-  .gm-grid { @apply grid grid-cols-2 gap-0.5 p-1; }
+
   .gm-cell {
-    @apply flex flex-col items-start text-left px-1.5 py-1 rounded bg-primaryLight/70 cursor-pointer transition-colors;
-    @apply hover:bg-primary/40;
+    @apply relative flex flex-col text-left p-1.5 transition-all overflow-hidden min-h-[200px] bg-white/50;
+    border: 5px solid rgba(139, 115, 85, 0.8);
+  }
+  .gm-cell:hover { @apply shadow-sm; border-color: rgba(139, 115, 85, 0.55); }
+  .gm-cell-open { border-color: rgba(139, 115, 85, 0.8); }
+  .gm-cell-selected { border-color: #b8860b !important; box-shadow: 0 0 0 2px rgba(184, 134, 11, 0.4); }
+  .gm-cell-empty { border-style: dashed; @apply opacity-80; }
+
+  .gm-cell-head { @apply flex items-start justify-between gap-1 shrink-0; }
+  .gm-cell-name {
+    @apply text-[0.9em] font-bold text-black/80 leading-tight pb-2;
+    overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+  }
+  .gm-cell-count { @apply text-[12px] font-mono font-bold text-black/60 leading-none shrink-0; }
+  .gm-cell-note { @apply flex items-center gap-1 text-[12px] text-black/40 italic; }
+
+  .gm-cell-topics { @apply flex flex-col gap-0.5 overflow-y-auto -mr-1 pr-1; }
+  .gm-cell-topic {
+    @apply text-left text-[13px] leading-tight px-1 py-0.5 rounded cursor-pointer transition-colors shrink-0;
+    @apply bg-primary/50 text-black/65 hover:bg-white/90 hover:text-black/85;
     border: 1px solid transparent;
   }
-  .gm-cell::after { content: ""; }
-  .gm-cell-open { @apply bg-primary/50 border-primary; }
-  .gm-cell-terms { @apply text-[9px] font-semibold text-black/75 leading-tight; }
-  .gm-cell-count { @apply text-[8px] font-mono text-black/45; }
-  .gm-accordion {
-    @apply w-full text-center text-[8px] font-semibold uppercase tracking-wide text-black/45 cursor-pointer;
-    @apply px-1 py-0.5 bg-black/[0.03] hover:bg-primary/20 hover:text-black/70 transition-colors;
-    border: none; border-top: 1px solid rgba(0,0,0,0.05);
-  }
-  .gm-accordion::after { content: ""; }
+  .gm-cell-topic::after { content: ""; }
+  .gm-cell-topic-selected { @apply bg-white text-black/85 font-semibold; border-color: #b8860b; }
 
-  .gm-spin {
-    @apply inline-block rounded-full shrink-0;
-    width: 0.7rem; height: 0.7rem;
-    border: 2px solid rgba(0,0,0,0.15);
-    border-top-color: #c3b091;
-    animation: gm-spin 0.7s linear infinite;
-  }
-  .gm-spin-lg { width: 1.6rem; height: 1.6rem; border-width: 3px; }
-  @keyframes gm-spin { to { transform: rotate(360deg); } }
+  /* Right half (previews) / full width (t-SNE) ─────────────────────────── */
+  .gm-right { @apply relative flex-1 rounded-md border border-primary/20 bg-white/70 overflow-hidden; }
+  .gm-right-full { @apply w-full; }
 
-  /* Scatter overlay — the lazily-projected t-SNE for one cluster */
-  .gm-scatter { @apply absolute inset-0 z-20 bg-white/95; }
+  .gm-previews { @apply absolute inset-0 overflow-y-auto p-2 flex flex-col gap-3; }
+  .gm-prev-sec { @apply flex flex-col gap-1.5; }
+  .gm-prev-head { @apply flex items-baseline justify-between gap-2 pb-1 border-b border-primary/20; }
+  .gm-prev-title { @apply text-[12px] font-bold text-black/80 truncate; }
+  .gm-prev-count { @apply text-[10px] font-mono text-black/45 shrink-0; }
+  .gm-prev-note { @apply flex items-center gap-1.5 text-[11px] text-black/45 italic py-1; }
+  .gm-prev-annot { @apply text-[10px] text-black/50 leading-snug; }
+  .gm-prev-grid {
+    @apply grid gap-2;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  }
+  .gm-prev-card {
+    @apply flex flex-col gap-1.5 text-left p-2 rounded-md bg-primaryLight/50 cursor-pointer transition-colors;
+    @apply hover:bg-primary/25;
+    border: 1.5px solid transparent;
+  }
+  .gm-prev-card::after { content: ""; }
+  .gm-prev-card-selected { @apply bg-primary/30; border-color: #b8860b; }
+  .gm-prev-terms { @apply flex flex-wrap gap-1; }
+  .gm-prev-term { @apply text-[10px] font-semibold px-1.5 py-0.5 rounded bg-black/10 text-black/70; }
+  .gm-prev-meta { @apply flex items-center justify-between mt-auto pt-0.5; }
+  .gm-prev-docs { @apply text-[9px] font-mono text-black/45; }
+  .gm-prev-go { @apply text-[9px] font-semibold text-primary/80 uppercase tracking-wide; }
+
+  /* t-SNE scatter fills the right pane ─────────────────────────────────── */
+  .gm-scatter { @apply absolute inset-0 overflow-hidden; }
+  .gm-scatter-empty {
+    @apply absolute inset-0 flex items-center justify-center text-center px-6 text-[12px] text-black/40 italic;
+  }
   .gm-scatter-canvas { @apply absolute inset-0 w-full h-full; cursor: grab; touch-action: none; }
   .gm-scatter-canvas:active { cursor: grabbing; }
   .gm-scatter-loading {
     @apply absolute inset-0 z-30 flex flex-col items-center justify-center gap-2 text-[12px] text-black/55 italic;
     background: rgba(255,255,255,0.7);
   }
-
   .gm-scatter-leaders { @apply absolute inset-0 w-full h-full pointer-events-none; z-index: 5; }
   .gm-scatter-leader { stroke: rgba(0,0,0,0.2); stroke-width: 1; stroke-dasharray: 3 3; fill: none; }
 
@@ -738,7 +626,7 @@
   }
   .gm-label-excerpt {
     @apply px-2 py-1.5 text-[9px] text-black/50 leading-snug;
-    display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
+    display: -webkit-box; -webkit-line-clamp: 10; -webkit-box-orient: vertical; overflow: hidden;
   }
   .gm-label-excerpt :global(strong),
   .gm-tip-excerpt :global(strong) {
@@ -756,8 +644,24 @@
     display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden;
   }
 
+  .gm-spin {
+    @apply inline-block rounded-full shrink-0;
+    width: 0.7rem; height: 0.7rem;
+    border: 2px solid rgba(0,0,0,0.15);
+    border-top-color: #c3b091;
+    animation: gm-spin 0.7s linear infinite;
+  }
+  .gm-spin-lg { width: 1.6rem; height: 1.6rem; border-width: 3px; }
+  @keyframes gm-spin { to { transform: rotate(360deg); } }
+
   .gm-loading {
     @apply absolute inset-0 z-40 flex flex-col items-center justify-center gap-2 text-[12px] text-black/60 italic;
     background: rgba(240, 233, 218, 0.82);
+  }
+
+  @media (max-width: 768px) {
+    .gm-body { @apply flex-col h-auto; }
+    .gm-mapcol { @apply w-full; }
+    .gm-scatter { height: 360px; }
   }
 </style>

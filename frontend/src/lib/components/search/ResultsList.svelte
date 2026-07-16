@@ -202,6 +202,10 @@
     @apply flex-1 min-w-[60vw];
   }
 
+  .geo-map{
+    @apply h-[80vh];
+  }
+
   .results-list{
     @apply h-[50vh] overflow-y-auto ;
   }
