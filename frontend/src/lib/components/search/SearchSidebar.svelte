@@ -175,6 +175,7 @@
               <button
                 class="idx-row"
                 class:idx-row-selected={selectedIndexIds.has(idx.uid)}
+                title={idx.annotation || idx.uid}
                 onclick={() => toggleIndex(idx.uid)}
               >
                 <span
@@ -182,7 +183,7 @@
                   class:idx-dot-semantic={idx.semanticSearch}
                   title={idx.semanticSearch ? `Embedders: ${idx.embedders.join(', ')}` : 'Keyword only'}
                 ></span>
-                <span class="idx-name">{idx.uid}</span>
+                <span class="idx-name" title={idx.uid}>{idx.label || idx.uid}</span>
                 <span class="idx-docs">{(idx.numberOfDocuments || 0).toLocaleString()}</span>
                 {#if idx.isIndexing}
                   <span class="idx-indexing" title="Currently indexing">...</span>

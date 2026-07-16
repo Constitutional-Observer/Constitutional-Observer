@@ -1,5 +1,6 @@
 import { json } from "@sveltejs/kit";
 import { MEILI_HOST, MEILI_KEY } from "$env/static/private";
+import { fieldsOf, baseDocId, INDEX_BY_UID } from "$lib/server/search.js";
 
 /**
  * GET /api/document?index=state_legislature_debates_ls&doc_id=LS_lsd_..._pdf&highlight_chunks=3,7
@@ -16,7 +17,6 @@ import { MEILI_HOST, MEILI_KEY } from "$env/static/private";
 
 const BATCH = 500;        // chunk ids requested per documents/fetch call
 const MAX_CHUNKS = 3000;  // hard ceiling so a bad id can't loop forever
-const FIELDS = ["id", "chunk_id", "file_name", "title_en", "__discussions"];
 
 export async function GET({ url, fetch }) {
   const index = url.searchParams.get("index");
@@ -30,13 +30,18 @@ export async function GET({ url, fetch }) {
 
   if (!index) return json({ error: "index is required" }, { status: 400 });
   if (!rawId) return json({ error: "doc_id or id is required" }, { status: 400 });
+  // Restrict `index` (from the query string) to registered indices.
+  if (!INDEX_BY_UID[index]) return json({ error: "unknown index" }, { status: 400 });
+
+  const { searchField, titleField } = fieldsOf(index);
+  const FIELDS = ["id", "chunk_id", "file_name", titleField, searchField];
 
   const headers = {
     "Content-Type": "application/json",
     Authorization: `Bearer ${MEILI_KEY}`,
   };
 
-  const baseId = String(rawId).replace(/_\d+$/, "");
+  const baseId = baseDocId(rawId);
 
   // Fetch contiguous chunk ids in batches until a short batch signals the end.
   const results = [];
@@ -71,8 +76,8 @@ export async function GET({ url, fetch }) {
     .sort((a, b) => (a.chunk_id || 0) - (b.chunk_id || 0))
     .map((h) => ({
       chunk_id: h.chunk_id ?? 0,
-      text: h.__discussions || "",
-      title_en: h.title_en,
+      text: h[searchField] || "",
+      title_en: h[titleField],
       isHighlighted: highlightChunks.has(h.chunk_id),
     }));
 
@@ -82,6 +87,6 @@ export async function GET({ url, fetch }) {
     total: chunks.length,
     doc_id: baseId,
     file_name: first.file_name || null,
-    title_en: first.title_en || null,
+    title_en: first[titleField] || null,
   });
 }

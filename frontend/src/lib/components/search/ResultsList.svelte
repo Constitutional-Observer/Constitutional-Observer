@@ -10,6 +10,7 @@
     pager,
     panel,
     query = "",
+    indices = [],
     paginationDone = true,
   } = $props();
 
@@ -58,6 +59,7 @@
   <GeoClusterMap
     hits={pager.allRankedHits}
     {query}
+    {indices}
     {paginationDone}
     onselect={(hit) => {
       const i = pager.selectByHit(hit);
@@ -81,7 +83,7 @@
                   >{panel.hitDate(hit)}</span
                 >{/if}
               <h4 class="result-title">
-                {hit.title_en || hit.subject || "Untitled"}
+                {hit._title || "Untitled"}
               </h4>
             </div>
             <p class="result-preview">{@html renderHighlight(panel.hitPreview(hit), hitTopics(hit))}</p>
@@ -163,7 +165,7 @@
                 >{panel.hitDate(hit)}</span
               >{/if}
             <h4 class="result-title">
-              {hit.title_en || hit.subject || "Untitled"}
+              {hit._title || "Untitled"}
             </h4>
           </div>
           <p class="result-preview">{panel.hitPreview(hit)}</p>

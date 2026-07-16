@@ -239,7 +239,7 @@
         {:else if selectedHit}
           <span class="detail-summary-label">Selected</span>
           <span class="modal-title"
-            >{selectedHit.title_en || selectedHit.subject || "Untitled"}</span
+            >{selectedHit._title || "Untitled"}</span
           >
         {:else}
           <span class="detail-summary-label">Related</span>
@@ -291,7 +291,7 @@
               </button>
             </div>
             <h3 class="detail-title">
-              {selectedHit.title_en || selectedHit.subject || "Untitled"}
+              {selectedHit._title || "Untitled"}
             </h3>
             <div class="result-head">
               <span class="state-badge">{selectedHit.state || "Unknown"}</span>
@@ -429,7 +429,7 @@
                 {#each relatedResults as r (r.hit.id || r.hit.file_name)}
                   <div class="related-result">
                     <button class="related-open" onclick={() => onOpenDoc?.(r.hit)}>
-                      <span class="related-doc-title">{r.hit.title_en || r.hit.subject || "Untitled"}</span>
+                      <span class="related-doc-title">{r.hit._title || "Untitled"}</span>
                       <span class="related-meta">
                         <span class="state-badge">{r.hit.state || "Unknown"}</span>
                         <span class="related-hits">{r.count} hit{r.count === 1 ? "" : "s"}</span>

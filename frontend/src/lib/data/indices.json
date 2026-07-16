@@ -1,0 +1,122 @@
+[
+  {
+    "uid": "state_legislature_debates_ap",
+    "collection": "State Legislatures",
+    "stateCode": "AP",
+    "state": "Andhra Pradesh",
+    "label": "Andhra Pradesh Assembly",
+    "annotation": "Andhra Pradesh Legislative Assembly proceedings, chunked by discussion.",
+    "searchField": "__discussions",
+    "titleField": "title_en"
+  },
+  {
+    "uid": "state_legislature_debates_as",
+    "collection": "State Legislatures",
+    "stateCode": "AS",
+    "state": "Assam",
+    "label": "Assam Assembly",
+    "annotation": "Assam Legislative Assembly proceedings, chunked by discussion.",
+    "searchField": "__discussions",
+    "titleField": "title_en"
+  },
+  {
+    "uid": "state_legislature_debates_ka",
+    "collection": "State Legislatures",
+    "stateCode": "KA",
+    "state": "Karnataka",
+    "label": "Karnataka Assembly",
+    "annotation": "Karnataka Legislative Assembly proceedings, chunked by discussion. Carries Kannada-language fields alongside English.",
+    "searchField": "__discussions",
+    "titleField": "title_en"
+  },
+  {
+    "uid": "state_legislature_debates_ml",
+    "collection": "State Legislatures",
+    "stateCode": "ML",
+    "state": "Meghalaya",
+    "label": "Meghalaya Assembly",
+    "annotation": "Meghalaya Legislative Assembly proceedings, chunked by discussion.",
+    "searchField": "__discussions",
+    "titleField": "title_en"
+  },
+  {
+    "uid": "state_legislature_debates_py",
+    "collection": "State Legislatures",
+    "stateCode": "PY",
+    "state": "Puducherry",
+    "label": "Puducherry Assembly",
+    "annotation": "Puducherry Legislative Assembly proceedings, chunked by discussion.",
+    "searchField": "__discussions",
+    "titleField": "title_en"
+  },
+  {
+    "uid": "state_legislature_debates_rj",
+    "collection": "State Legislatures",
+    "stateCode": "RJ",
+    "state": "Rajasthan",
+    "label": "Rajasthan Assembly",
+    "annotation": "Rajasthan Legislative Assembly proceedings. Index exists but holds no documents yet.",
+    "searchField": "__discussions",
+    "titleField": "title_en"
+  },
+  {
+    "uid": "state_legislature_debates_tn",
+    "collection": "State Legislatures",
+    "stateCode": "TN",
+    "state": "Tamil Nadu",
+    "label": "Tamil Nadu Assembly",
+    "annotation": "Tamil Nadu Legislative Assembly proceedings, chunked by discussion.",
+    "searchField": "__discussions",
+    "titleField": "title_en"
+  },
+  {
+    "uid": "state_legislature_debates_up",
+    "collection": "State Legislatures",
+    "stateCode": "UP",
+    "state": "Uttar Pradesh",
+    "label": "Uttar Pradesh Assembly",
+    "annotation": "Uttar Pradesh Legislative Assembly proceedings. Index exists but holds no documents yet.",
+    "searchField": "__discussions",
+    "titleField": "title_en"
+  },
+  {
+    "uid": "state_legislature_debates_wb",
+    "collection": "State Legislatures",
+    "stateCode": "WB",
+    "state": "West Bengal",
+    "label": "West Bengal Assembly",
+    "annotation": "West Bengal Legislative Assembly proceedings. Index exists but holds no documents yet.",
+    "searchField": "__discussions",
+    "titleField": "title_en"
+  },
+  {
+    "uid": "state_legislature_debates_ls",
+    "collection": "Parliament",
+    "stateCode": "LS",
+    "state": null,
+    "label": "Lok Sabha",
+    "annotation": "Lower house of Parliament. Filed under a state_legislature_debates_* uid despite being national. Index exists but holds no documents yet.",
+    "searchField": "__discussions",
+    "titleField": "title_en"
+  },
+  {
+    "uid": "state_legislature_debates_rs",
+    "collection": "Parliament",
+    "stateCode": "RS",
+    "state": null,
+    "label": "Rajya Sabha",
+    "annotation": "Upper house of Parliament. Filed under a state_legislature_debates_* uid despite being national.",
+    "searchField": "__discussions",
+    "titleField": "title_en"
+  },
+   {
+    "uid": "parivesh_agenda_mom",
+    "collection": "central_institution",
+    "stateCode": "",
+    "state": null,
+    "label": "Parivesh, Environmental Clearances",
+    "annotation": "",
+    "searchField": "content",
+    "titleField": "date"
+  }
+]

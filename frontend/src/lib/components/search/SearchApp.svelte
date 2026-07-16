@@ -7,11 +7,12 @@
   import { browser } from "$app/environment";
   import { tick, untrack, onMount } from "svelte";
 
-  // A chunk's primary key is `<prefix>_<file>_<chunk_id>`; the document's stable
-  // id is that with the trailing _<chunk_id> removed. Used to fetch every chunk
-  // of a document by id (file_name is not filterable/searchable reliably).
+  // Document id: the chunk id (`<STATE_CODE>_<file>_<chunk_id>`) with its
+  // trailing _<chunk_id> removed. Keys every per-document map here and is the
+  // doc_id /api/document fetches by. The server stamps it as `_docId`; fall back
+  // to computing it for hits that lack one.
   const baseDocId = (idLike) => String(idLike ?? "").replace(/_\d+$/, "");
-  const docKeyOf = (h) => `${h._index || h.state_code}:${h.file_name}`;
+  const docKeyOf = (h) => h._docId || baseDocId(h?.id);
 
   // ---------------------------------------------------------------------------
   // DocPanel — result selection, copy feedback, full-document cache
@@ -79,7 +80,7 @@
         docId: this.docId(hit),
         index: hit._index,
         file_name: hit.file_name,
-        title: hit.title_en || hit.subject || "Untitled",
+        title: hit._title || "Untitled",
         state: hit.state || "Unknown",
         date: this.hitDate(hit),
       });
@@ -116,12 +117,12 @@
       }
     }
     docKey(hit) {
-      return `${hit._index || hit.state_code}:${hit.file_name}`;
+      return docKeyOf(hit);
     }
 
-    // Stable per-document id (chunk id with its trailing _<chunk_id> stripped).
+    // Per-document id, matching docKey. Bookmarks carry it as `docId`.
     docId(hit) {
-      return baseDocId(hit?.id ?? hit?.docId);
+      return hit?._docId || baseDocId(hit?.id ?? hit?.docId);
     }
 
     hitDate(hit) {
@@ -197,7 +198,7 @@
     items = $state([]);
 
     static #key(hit) {
-      return `${hit._index || hit.state_code}:${hit.file_name}`;
+      return docKeyOf(hit);
     }
     static #dateOf(hit) {
       if (!hit.year) return null;
@@ -233,10 +234,10 @@
           {
             key: k,
             id: hit.id ?? null,
-            docId: baseDocId(hit.id),
+            docId: docKeyOf(hit),
             index: hit._index,
             file_name: hit.file_name,
-            title: hit.title_en || hit.subject || "Untitled",
+            title: hit._title || "Untitled",
             state: hit.state || "Unknown",
             date: Bookmarks.#dateOf(hit),
             score: hit._bestScore || 0,
@@ -299,11 +300,9 @@
           if (!batch.docs?.length) break;
           if (this.#activeQuery !== query) break;
 
-          const docMap = new Map(
-            this.docs.map((d) => [`${d._index}:${d.file_name}`, d]),
-          );
+          const docMap = new Map(this.docs.map((d) => [docKeyOf(d), d]));
           for (const doc of batch.docs) {
-            const key = `${doc._index}:${doc.file_name}`;
+            const key = docKeyOf(doc);
             if (docMap.has(key)) {
               const existing = docMap.get(key);
               const existingChunkIds = new Set(
@@ -634,6 +633,7 @@
       {pager}
       {panel}
       query={data.searchParams?.query || ""}
+      {indices}
       paginationDone={!loader.loading}
     />
 
@@ -652,7 +652,7 @@
 
 <style lang="postcss">
   #container {
-
+    @apply !w-screen;
     height: 150dvh;
     overflow: hidden;
     display: flex;
@@ -660,11 +660,10 @@
   }
 
   .page-layout {
-    @apply flex gap-4 px-4 mx-auto;
+    @apply flex gap-4 px-4 mx-2;
     flex: 1;
     min-height: 0;       /* allows flex children to shrink and scroll */
     overflow: hidden;
-    max-width: 1600px;
     padding-top: 1.5rem;
     padding-bottom: 1.5rem;
     align-items: stretch;
