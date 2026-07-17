@@ -4,6 +4,7 @@
   import { TopicPipeline } from "$lib/topic-modelling/topic-pipeline.svelte.js";
   import { renderHighlight } from "$lib/highlight.js";
   import { topicHighlight } from "$lib/components/search/topic-highlight.svelte.js";
+  import Tooltip from "$lib/components/general/Tooltip.svelte";
 
   import { select as d3select } from "d3-selection";
   import { zoom as d3zoom, zoomIdentity } from "d3-zoom";
@@ -21,27 +22,31 @@
     hit._formatted?.__discussions ||
     hit.__discussions ||
     "";
-  // Must agree with SearchApp's docKeyOf — these keys address the same maps.
+  // Must agree with SearchApp's docKeyOf.
   const docKey = (hit) => hit._docId || String(hit?.id ?? "").replace(/_\d+$/, "");
 
-  // ── GeoGroups ── partition hits, hold a pipeline per group, model lazily ──
-  // Each group's LDA runs in a sequential background queue (largest first) so
-  // the page never freezes; tiles fill in as their model completes. t-SNE is
-  // NOT run here — only when a topic is selected (lazy project()).
+  // Partitions hits into one group per source index, holds a TopicPipeline per
+  // group, and models each in a sequential background queue (largest first).
+  // Past MAIN_CAP groups, the lowest-scored overflow into a single accordion
+  // column instead of growing the grid.
   class GeoGroups {
+    static #MAIN_COLS = 5; // grid's 6 columns minus 1 reserved for the accordion
+    static #MAIN_CAP = 12;
+
     groups = $state([]);
+    cellGroups = $state([]);
+    accordionGroups = $state([]);
     #pipelines = new Map();
     #queue = [];
     #running = false;
     #query = "";
 
-    // One square per index — the index registry is what defines a source, so a
-    // hit's `_index` places it. Indices this query returned nothing from still
-    // get a square: an empty cell is itself a finding.
-    //
-    // Counts/partition are rebuilt on every call (so doc counts update live as
-    // pagination streams in); topic modelling only starts once `readyToModel`
-    // is true, so LDA isn't repeatedly restarted mid-pagination.
+    get overflowing() { return this.accordionGroups.length > 0; }
+    get mainRows() { return Math.max(1, Math.ceil(this.cellGroups.length / GeoGroups.#MAIN_COLS)); }
+
+    // Rebuilds the partition on every call so doc counts update live during
+    // pagination; topic modelling only starts once readyToModel is true, so
+    // LDA isn't restarted mid-pagination.
     build(hits, query, indices = [], readyToModel = true) {
       this.#query = query;
       const meta = new Map(indices.map((i) => [i.uid, i]));
@@ -66,13 +71,24 @@
       });
       groups.sort((a, b) => a.label.localeCompare(b.label));
       this.groups = groups;
+
+      if (groups.length > GeoGroups.#MAIN_CAP) {
+        const keep = new Set(
+          [...groups].sort((a, b) => b.count - a.count).slice(0, GeoGroups.#MAIN_CAP).map((g) => g.key),
+        );
+        this.cellGroups = groups.filter((g) => keep.has(g.key));
+        this.accordionGroups = groups.filter((g) => !keep.has(g.key)).sort((a, b) => a.count - b.count);
+      } else {
+        this.cellGroups = groups;
+        this.accordionGroups = [];
+      }
+
       for (const k of [...this.#pipelines.keys()]) if (!map.has(k)) this.#pipelines.delete(k);
       if (readyToModel) this.#enqueue();
     }
 
     #enqueue() {
-      // Display order is alphabetical, but modelling still runs largest-first
-      // (better perceived UX — bigger groups' topics land sooner).
+      // Display order is alphabetical; modelling still runs largest-first.
       this.#queue = this.groups
         .filter((g) => g.count >= MIN_GROUP_DOCS)
         .sort((a, b) => b.count - a.count);
@@ -88,7 +104,7 @@
     }
   }
 
-  // ── ClusterScatter ── zoomable t-SNE canvas for ONE selected topic ────────
+  // Zoomable t-SNE canvas for one selected topic.
   class ClusterScatter {
     static #PAD = 32;
     static #SCALE_MIN = 0.2;
@@ -137,14 +153,15 @@
       for (const it of this.items) {
         const { cx, cy } = this.#toPx(it, rect.width, rect.height);
         const d = (cx - mx) ** 2 + (cy - my) ** 2;
-        if (d < bestD) { bestD = d; best = it; }
+        if (d < bestD) { bestD = d; best = { ...it, cx, cy }; }
       }
       return best;
     }
     onMove(e) {
       const p = this.pick(e.clientX, e.clientY);
       if (!p && this.hoveredCircle) { this.hoveredCircle = null; return; }
-      if (p && this.hoveredCircle?.j !== p.j) this.hoveredCircle = p;
+      if (p && (this.hoveredCircle?.j !== p.j || this.hoveredCircle?.cx !== p.cx || this.hoveredCircle?.cy !== p.cy))
+        this.hoveredCircle = p;
     }
     onLeave() { this.hoveredCircle = null; }
     onClick(e, onselect) {
@@ -229,14 +246,9 @@
   const geo = new GeoGroups();
   const scatter = new ClusterScatter();
 
-  // Which source square's topics are previewed. Hovering a square opens it and it
-  // stays open until another is hovered.
+  // Hovering a square opens (and grows) it; it closes on mouseleave of the grid.
   let openKey = $state(null);
   let selectedTopic = $state(null); // { groupKey, idx } | null
-
-  // Sources sorted alphabetically (already the build order) — the Tableau grid.
-  let sortedGroups = $derived(geo.groups);
-  let openGroup = $derived(openKey ? geo.groups.find((g) => g.key === openKey) || null : null);
 
   let selectedGroup = $derived(
     selectedTopic ? geo.groups.find((g) => g.key === selectedTopic.groupKey) || null : null,
@@ -249,17 +261,13 @@
 
   let loading = $derived(!!navigating.to);
 
-  // Rebuild the source/count partition on every batch so doc counts update
-  // live during pagination; topic modelling itself only kicks off once the
-  // final result set is in (paginationDone), so LDA isn't restarted per batch.
   $effect(() => {
     hits; query; indices; paginationDone;
     untrack(() => geo.build(hits, query, indices, paginationDone));
   });
 
-  // Publish per-doc topic data (across all groups) for the result list / detail
-  // panel: topicsByDoc = its topics strongest-first; termsByDoc = the union of
-  // their terms, so highlighting covers every member topic, not just one.
+  // termsByDoc unions terms across a doc's member topics, so highlighting
+  // isn't limited to just one.
   $effect(() => {
     const terms = {};
     const topics = {};
@@ -279,27 +287,23 @@
     topicHighlight.topicsByDoc = topics;
   });
 
-  // Restrict the result list to the selected topic's documents.
   $effect(() => {
     topicHighlight.docKeys = selectedCluster
       ? new Set(selectedCluster.items.map((it) => docKey(it.hit)))
       : null;
   });
 
-  // Lazily project the selected group's θ into 2-D for the scatter.
   $effect(() => {
     const p = selectedPipeline;
     if (p) untrack(() => p.project());
   });
 
-  // Feed the selected cluster's items into the scatter once projected.
   $effect(() => {
     const c = selectedCluster;
     const projected = selectedPipeline?.projected;
     scatter.items = c && projected ? c.items : [];
   });
 
-  // Wire d3-zoom when the scatter canvas mounts; redraw on any change.
   $effect(() => { if (scatter.canvas) untrack(() => scatter.attachZoom()); });
   $effect(() => {
     scatter.items; scatter.transform; scatter.hoveredCircle;
@@ -329,51 +333,43 @@
   }}
 />
 
-<!-- {#snippet topicPreviews(groups)}
-  {#each groups as g (g.key)}
-    {@const pl = g.pipeline}
-    <div class="gm-prev-sec">
-      <div class="gm-prev-head">
-        <span class="gm-prev-title">{g.label}</span>
-        <span class="gm-prev-count">{g.count} docs</span>
-      </div>
-      {#if g.annotation}<p class="gm-prev-annot">{g.annotation}</p>{/if}
-      {#if g.count < MIN_GROUP_DOCS}
-        <p class="gm-prev-note">Too few documents to model topics.</p>
-      {:else if !paginationDone}
-        <p class="gm-prev-note"><span class="gm-spin"></span>Counting results…</p>
-      {:else if pl.processing && pl.topicCount === 0}
-        <p class="gm-prev-note"><span class="gm-spin"></span>{pl.progress || "modelling…"}</p>
-      {:else if pl.topicCount === 0}
-        <p class="gm-prev-note">Waiting to model…</p>
-      {:else}
-        <div class="gm-prev-grid">
-          {#each pl.clusters as c, ci (c.topic)}
-            <button
-              class="gm-prev-card"
-              class:gm-prev-card-selected={isSelected(g.key, ci)}
-              onclick={() => selectTopic(g.key, ci)}
-            >
-              <div class="gm-prev-terms">
-                {#each c.terms.slice(0, 6) as t (t.term)}
-                  <span class="gm-prev-term">{humanTerm(t.term)}</span>
-                {/each}
-              </div>
-              <div class="gm-prev-meta">
-                <span class="gm-prev-docs">{c.count} docs</span>
-                <span class="gm-prev-go">project →</span>
-              </div>
-            </button>
-          {/each}
-        </div>
-      {/if}
-    </div>
-  {/each}
-{/snippet} -->
 
-<section class="geo-map">
-  <div class="gm-header">
-    <span class="gm-title">Topics by source</span>
+{#snippet groupStatus(g)}
+  {@const pl = g.pipeline}
+  {#if g.count === 0}
+    <span class="gm-cell-note">no results</span>
+  {:else if g.count < MIN_GROUP_DOCS}
+    <span class="gm-cell-note">too few to model</span>
+  {:else if !paginationDone}
+    <span class="gm-cell-note"><span class="gm-spin"></span>counting…</span>
+  {:else if pl.topicCount === 0}
+    <span class="gm-cell-note"><span class="gm-spin"></span>modelling…</span>
+  {:else}
+    <div class="gm-cell-topics">
+      {#each pl.clusters as c, ci (c.topic)}
+        <button
+          class="gm-cell-topic"
+          class:gm-cell-topic-selected={isSelected(g.key, ci)}
+          title={`${c.count} docs`}
+          onclick={() => selectTopic(g.key, ci)}
+        >
+          {c.terms.slice(0, 3).map((t) => humanTerm(t.term)).join(" · ")}
+        </button>
+      {/each}
+    </div>
+  {/if}
+{/snippet}
+
+{#snippet cellBody(g)}
+  <div class="gm-cell-head">
+    <span class="gm-cell-name">{g.label}</span>
+    <span class="gm-cell-count">{g.count}</span>
+  </div>
+  {@render groupStatus(g)}
+{/snippet}
+
+<div class="gm-header">
+    <h2 class="">Search Results {#if selectedGroup} within { selectedGroup.label} {/if}</h2>
     {#if selectedCluster}
       <h3 class="gm-open-terms">
         {#each (selectedCluster.terms || []).slice(0, 8) as t (t.term)}
@@ -394,14 +390,15 @@
     {/if}
   </div>
 
+<section class="geo-map">
   <div class="gm-body">
     {#if !selectedCluster}
-      <!-- Accordion collapsed: frequency-sized source squares (Tableau grid) at
-           half width, topic previews for the hovered source on the other half. -->
-      <div class="gm-grid-pane">
-        {#each sortedGroups as g (g.key)}
-          {@const pl = g.pipeline}
-          <!-- svelte-ignore a11y_no_static_element_interactions -->
+      <div
+        class="gm-grid-pane"
+        class:gm-grid-pane-overflow={geo.overflowing}
+        onmouseleave={() => (openKey = null)}
+      >
+        {#each geo.cellGroups as g (g.key)}
           <div
             class="gm-cell"
             class:gm-cell-open={g.key === openKey}
@@ -410,49 +407,30 @@
             title={`${g.label} · ${g.count} docs${g.annotation ? `\n\n${g.annotation}` : ""}`}
             onmouseenter={() => (openKey = g.key)}
           >
-            <div class="gm-cell-head">
-              <span class="gm-cell-name">{g.label}</span>
-              <span class="gm-cell-count">{g.count}</span>
-            </div>
-
-            <!-- Once the group's model finishes, its topics live in the cell. -->
-            {#if g.count === 0}
-              <span class="gm-cell-note">no results</span>
-            {:else if g.count < MIN_GROUP_DOCS}
-              <span class="gm-cell-note">too few to model</span>
-            {:else if !paginationDone}
-              <span class="gm-cell-note"><span class="gm-spin"></span>counting…</span>
-            {:else if pl.topicCount === 0}
-              <span class="gm-cell-note"><span class="gm-spin"></span>modelling…</span>
-            {:else}
-              <div class="gm-cell-topics">
-                {#each pl.clusters as c, ci (c.topic)}
-                  <button
-                    class="gm-cell-topic"
-                    class:gm-cell-topic-selected={isSelected(g.key, ci)}
-                    title={`${c.count} docs`}
-                    onclick={() => selectTopic(g.key, ci)}
-                  >
-                    {c.terms.slice(0, 3).map((t) => humanTerm(t.term)).join(" · ")}
-                  </button>
-                {/each}
-              </div>
-            {/if}
+            {@render cellBody(g)}
           </div>
         {/each}
-      </div>
 
-      <!-- <div class="gm-right">
-        {#if openGroup}
-          <div class="gm-previews">
-            {@render topicPreviews([openGroup])}
-          </div>
-        {:else}
-          <div class="gm-scatter-empty">
-            <p>Hover a source square to preview its topics, then pick one to project its documents.</p>
+        {#if geo.overflowing}
+          <div class="gm-accordion-col" style={`grid-row: 1 / span ${geo.mainRows};`}>
+            <span class="gm-accordion-head">{geo.accordionGroups.length} more sources</span>
+            <div class="gm-accordion-list">
+              {#each geo.accordionGroups as g (g.key)}
+                <details class="gm-accordion-item">
+                  <summary class="gm-accordion-summary">
+                    <span class="gm-accordion-label">{g.label}</span>
+                    <span class="gm-accordion-count">{g.count}</span>
+                  </summary>
+                  <div class="gm-accordion-body">
+                    {@render groupStatus(g)}
+                  </div>
+                </details>
+              {/each}
+            </div>
           </div>
         {/if}
-      </div> -->
+      </div>
+
     {:else}
       <!-- Accordion expanded: the t-SNE projection takes the full width. -->
       <div class="gm-right gm-right-full">
@@ -493,7 +471,7 @@
 
           {#if scatter.hoveredCircle}
             {@const hov = scatter.hoveredCircle}
-            <div class="gm-hover-tip">
+            <div class="gm-hover-tip" style="left: {hov.cx}px; top: {hov.cy}px">
               <div class="gm-tip-title">{hitTitle(hov.hit, hov.idx)}</div>
               {#if hitExcerpt(hov.hit)}
                 <p class="gm-tip-excerpt">{@html renderHighlight(hitExcerpt(hov.hit), selectedClusterTerms)}</p>
@@ -511,157 +489,104 @@
 </section>
 
 <style lang="postcss">
-  .geo-map {
-    @apply relative mb-3 grid bg-white/60 backdrop-blur-sm rounded-lg border border-primary/30 h-[80dvh];
-    grid-template-rows: auto minmax(0, 1fr);
-  }
+  @reference "../../../app.css";
 
-  .gm-header { @apply flex items-center gap-3 px-3 py-2 border-b border-primary/20 flex-wrap; }
-  .gm-title { @apply text-[11px] font-bold text-black/70 uppercase tracking-wider shrink-0; }
+  .geo-map {
+    @apply relative mb-3 grid bg-primary backdrop-blur-sm border border-primary/30 h-[80dvh];
+  }
+  .gm-header { @apply flex items-center gap-3 px-3 py-4 border-b border-primary/20 flex-wrap; }
   .gm-hint { @apply text-[10px] text-black/45 italic; }
   .gm-open-terms { @apply flex flex-wrap gap-1 text-sm; }
   .gm-open-term { @apply font-semibold px-1.5 py-0.5 rounded bg-black/10 text-black/70 text-[11px]; }
   .gm-open-meta { @apply text-[10px] text-black/50 font-mono; }
   .gm-zoom-btns { @apply flex items-center rounded border border-primary/30 overflow-hidden ml-auto; }
-  .gm-zoom-btn {
-    @apply text-[13px] px-2 py-0.5 bg-white/60 text-black/70 cursor-pointer leading-none hover:bg-primary/20;
-    border: none;
-  }
-  .gm-zoom-btn::after { content: ""; }
+  .gm-zoom-btn { @apply text-[13px] px-2 py-0.5 bg-white/60 text-black/70 cursor-pointer leading-none hover:bg-primary/20; border: none; }
   .gm-zoom-btn + .gm-zoom-btn { border-left: 1px solid rgba(0,0,0,0.1); }
-  .gm-clear {
-    @apply text-[11px] px-2 py-0.5 rounded border border-primary/30 bg-white/60 text-black/70 cursor-pointer hover:bg-primary/20 shrink-0;
-  }
-  .gm-clear::after { content: ""; }
+  .gm-clear { @apply text-[11px] px-2 py-0.5 rounded border border-primary/30 bg-white/60 text-black/70 cursor-pointer hover:bg-primary/20 shrink-0; }
+  .gm-zoom-btn::after, .gm-clear::after, .gm-cell-topic::after, .gm-label-card::after { content: ""; }
 
   .gm-body {
-    @apply relative grid rounded-lg border border-primary/20 bg-white/40 m-1 h-full;
+    @apply relative grid border border-primary/20 m-1 h-full;
     grid-template-columns: minmax(0, 1fr);
     grid-template-rows: minmax(0, 1fr);
   }
 
-  /* Full-width Tableau grid of equal squares, shaded by document count ──── */
-  .gm-grid-pane {
-    @apply grid content-start gap-2 overflow-y-auto grid-cols-6 h-full min-h-0;
-  }
+  .gm-grid-pane { @apply grid content-start gap-2 overflow-y-auto grid-cols-6 h-full min-h-0; }
+  /* 5 major columns + 1 reserved for the accordion, all equal width. */
+  .gm-grid-pane-overflow { grid-template-columns: repeat(6, minmax(1, 1fr)); grid-auto-flow: row; }
 
-  .gm-cell {
-    @apply relative flex flex-col text-left p-1.5 transition-all overflow-hidden min-h-[200px] bg-white/50;
-    border: 5px solid rgba(139, 115, 85, 0.8);
-  }
+  .gm-cell { @apply relative flex flex-col text-left p-1.5 transition-all overflow-hidden h-[200px] bg-white/50; border: 5px solid rgba(139, 115, 85, 0.8); }
   .gm-cell:hover { @apply shadow-sm; border-color: rgba(139, 115, 85, 0.55); }
   .gm-cell-open { border-color: rgba(139, 115, 85, 0.8); }
+  /* Pure transform, no grid reflow — scales in place above its neighbors. */
+  .gm-cell-open:not(.gm-cell-empty) { transform: scale(1.02); z-index: 5; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.22); }
   .gm-cell-selected { border-color: #b8860b !important; box-shadow: 0 0 0 2px rgba(184, 134, 11, 0.4); }
-  .gm-cell-empty { border-style: dashed; @apply opacity-80; }
+  .gm-cell-empty { border-style: solid; @apply opacity-20; }
+
+  .gm-accordion-col {
+    @apply flex flex-col gap-1.5 overflow-y-auto min-h-0 min-w-0 rounded-md border border-primary/20 bg-white/40 p-1.5;
+    /* -1 as a start line can't span backwards and falls into a new implicit
+       column; "span 1 / -1" correctly lands in the real last column. */
+    grid-column: span 1 / -1;
+  }
+  .gm-accordion-head { @apply text-[0.8em] font-bold uppercase tracking-wider text-black/40 px-0.5; }
+  .gm-accordion-list { @apply flex flex-col gap-1 overflow-y-auto; }
+  .gm-accordion-item { @apply rounded border border-primary/15 bg-white/60; }
+  .gm-accordion-summary { @apply flex items-center justify-between gap-1 px-1.5 py-1 text-[10px] font-semibold text-black/70 cursor-pointer list-none; }
+  .gm-accordion-summary::-webkit-details-marker { display: none; }
+  .gm-accordion-count { @apply font-mono text-black/40 shrink-0; }
+  .gm-accordion-body { @apply px-1.5 pb-1.5; }
 
   .gm-cell-head { @apply flex items-start justify-between gap-1 shrink-0; }
-  .gm-cell-name {
-    @apply text-[0.9em] font-bold text-black/80 leading-tight pb-2;
-    overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
-  }
+  .gm-cell-name { @apply text-[0.9em] font-bold text-black/80 leading-tight pb-2; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
   .gm-cell-count { @apply text-[12px] font-mono font-bold text-black/60 leading-none shrink-0; }
   .gm-cell-note { @apply flex items-center gap-1 text-[12px] text-black/40 italic; }
 
-  .gm-cell-topics { @apply flex flex-col gap-0.5 overflow-y-auto -mr-1 pr-1; }
+  .gm-cell-topics { @apply flex flex-col flex-1 min-h-0 gap-0.5 overflow-y-auto -mr-1 pr-1; }
   .gm-cell-topic {
-    @apply text-left text-[13px] leading-tight px-1 py-0.5 rounded cursor-pointer transition-colors shrink-0;
+    @apply text-left text-[0.9em] leading-tight px-1 py-0.5 rounded cursor-pointer transition-colors shrink-0;
     @apply bg-primary/50 text-black/65 hover:bg-white/90 hover:text-black/85;
     border: 1px solid transparent;
   }
-  .gm-cell-topic::after { content: ""; }
   .gm-cell-topic-selected { @apply bg-white text-black/85 font-semibold; border-color: #b8860b; }
 
-  /* Right half (previews) / full width (t-SNE) ─────────────────────────── */
-  .gm-right { @apply relative flex-1 rounded-md border border-primary/20 bg-white/70 overflow-hidden; }
-  .gm-right-full { @apply w-full; }
+  .gm-right { @apply relative flex-1 rounded-md border border-primary/20 bg-white/70 h-full; }
+  .gm-right-full { @apply w-full h-full; }
 
-  .gm-previews { @apply absolute inset-0 overflow-y-auto p-2 flex flex-col gap-3; }
-  .gm-prev-sec { @apply flex flex-col gap-1.5; }
-  .gm-prev-head { @apply flex items-baseline justify-between gap-2 pb-1 border-b border-primary/20; }
-  .gm-prev-title { @apply text-[12px] font-bold text-black/80 truncate; }
-  .gm-prev-count { @apply text-[10px] font-mono text-black/45 shrink-0; }
-  .gm-prev-note { @apply flex items-center gap-1.5 text-[11px] text-black/45 italic py-1; }
-  .gm-prev-annot { @apply text-[10px] text-black/50 leading-snug; }
-  .gm-prev-grid {
-    @apply grid gap-2;
-    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-  }
-  .gm-prev-card {
-    @apply flex flex-col gap-1.5 text-left p-2 rounded-md bg-primaryLight/50 cursor-pointer transition-colors;
-    @apply hover:bg-primary/25;
-    border: 1.5px solid transparent;
-  }
-  .gm-prev-card::after { content: ""; }
-  .gm-prev-card-selected { @apply bg-primary/30; border-color: #b8860b; }
-  .gm-prev-terms { @apply flex flex-wrap gap-1; }
-  .gm-prev-term { @apply text-[10px] font-semibold px-1.5 py-0.5 rounded bg-black/10 text-black/70; }
-  .gm-prev-meta { @apply flex items-center justify-between mt-auto pt-0.5; }
-  .gm-prev-docs { @apply text-[9px] font-mono text-black/45; }
-  .gm-prev-go { @apply text-[9px] font-semibold text-primary/80 uppercase tracking-wide; }
-
-  /* t-SNE scatter fills the right pane ─────────────────────────────────── */
   .gm-scatter { @apply absolute inset-0 overflow-hidden; }
-  .gm-scatter-empty {
-    @apply absolute inset-0 flex items-center justify-center text-center px-6 text-[12px] text-black/40 italic;
-  }
   .gm-scatter-canvas { @apply absolute inset-0 w-full h-full; cursor: grab; touch-action: none; }
   .gm-scatter-canvas:active { cursor: grabbing; }
-  .gm-scatter-loading {
-    @apply absolute inset-0 z-30 flex flex-col items-center justify-center gap-2 text-[12px] text-black/55 italic;
-    background: rgba(255,255,255,0.7);
-  }
+  .gm-scatter-loading { @apply absolute inset-0 z-30 flex flex-col items-center justify-center gap-2 text-[12px] text-black/55 italic; background: rgba(255,255,255,0.7); }
   .gm-scatter-leaders { @apply absolute inset-0 w-full h-full pointer-events-none; z-index: 5; }
   .gm-scatter-leader { stroke: rgba(0,0,0,0.2); stroke-width: 1; stroke-dasharray: 3 3; fill: none; }
 
-  .gm-label-card {
-    @apply absolute z-10 bg-white/95 rounded-md shadow-sm cursor-pointer overflow-hidden text-left;
-    border: 1px solid rgba(0,0,0,0.12);
-    width: 200px;
-  }
-  .gm-label-card:hover { @apply bg-white shadow-md; border-color: rgba(0,0,0,0.22); }
-  .gm-label-card::after { content: ""; }
-  .gm-label-title {
-    @apply px-2 pt-1.5 pb-1 text-[11px] font-semibold text-black/80 leading-tight truncate;
-    border-bottom: 1px solid rgba(0,0,0,0.06);
-  }
-  .gm-label-excerpt {
-    @apply px-2 py-1.5 text-[9px] text-black/50 leading-snug;
-    display: -webkit-box; -webkit-line-clamp: 10; -webkit-box-orient: vertical; overflow: hidden;
-  }
-  .gm-label-excerpt :global(strong),
-  .gm-tip-excerpt :global(strong) {
+  .gm-label-card { @apply absolute z-10 bg-white/95 rounded-md shadow-sm cursor-pointer overflow-hidden text-[1em] text-left; border: 1px solid rgba(0,0,0,0.12); width: 200px; }
+  .gm-label-card:hover { @apply bg-white shadow-lg z-30; border-color: rgba(0,0,0,0.22); }
+  .gm-label-title { @apply px-2 pt-1.5 pb-1 text-[1em] font-semibold text-black/80 leading-tight truncate; border-bottom: 1px solid rgba(0,0,0,0.06); }
+  .gm-label-excerpt, .gm-tip-excerpt { display: -webkit-box; -webkit-box-orient: vertical; overflow: hidden; }
+  .gm-label-excerpt { @apply px-2 py-1.5 text-[0.78em] text-black/50 leading-snug; -webkit-line-clamp: 10; }
+  .gm-label-excerpt :global(strong), .gm-tip-excerpt :global(strong) {
     background: rgba(251, 191, 36, 0.45); border-radius: 2px; padding: 0 1px; font-weight: inherit;
   }
 
   .gm-hover-tip {
-    @apply absolute top-2 left-2 rounded bg-white/95 border border-primary/30 shadow-sm pointer-events-none z-20;
-    max-width: 280px;
+    @apply absolute rounded bg-white/95 border border-primary/30 shadow-sm pointer-events-none z-20;
+    max-width: 280px; transform: translate(-50%, calc(-100% - 10px));
   }
-  .gm-tip-title { @apply px-2.5 pt-2 pb-1 text-[11px] font-semibold text-black/80 leading-tight; }
+  .gm-tip-title { @apply px-2.5 pt-2 pb-1 text-[1em] font-semibold text-black/80 leading-tight; }
   .gm-tip-excerpt {
-    @apply px-2.5 pb-2 text-[10px] text-black/55 leading-snug;
-    border-top: 1px solid rgba(0,0,0,0.06); padding-top: 5px; margin-top: 0;
-    display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden;
+    @apply px-2.5 pb-2 text-[0.78em] text-black/55 leading-snug;
+    border-top: 1px solid rgba(0,0,0,0.06); padding-top: 5px; margin-top: 0; -webkit-line-clamp: 4;
   }
 
-  .gm-spin {
-    @apply inline-block rounded-full shrink-0;
-    width: 0.7rem; height: 0.7rem;
-    border: 2px solid rgba(0,0,0,0.15);
-    border-top-color: #c3b091;
-    animation: gm-spin 0.7s linear infinite;
-  }
+  .gm-spin { @apply inline-block rounded-full shrink-0; width: 0.7rem; height: 0.7rem; border: 2px solid rgba(0,0,0,0.15); border-top-color: #c3b091; animation: gm-spin 0.7s linear infinite; }
   .gm-spin-lg { width: 1.6rem; height: 1.6rem; border-width: 3px; }
   @keyframes gm-spin { to { transform: rotate(360deg); } }
 
-  .gm-loading {
-    @apply absolute inset-0 z-40 flex flex-col items-center justify-center gap-2 text-[12px] text-black/60 italic;
-    background: rgba(240, 233, 218, 0.82);
-  }
+  .gm-loading { @apply absolute inset-0 z-40 flex flex-col items-center justify-center gap-2 text-[12px] text-black/60 italic; background: rgba(240, 233, 218, 0.82); }
 
   @media (max-width: 768px) {
     .gm-body { @apply flex-col h-auto; }
-    .gm-mapcol { @apply w-full; }
     .gm-scatter { height: 360px; }
   }
 </style>

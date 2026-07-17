@@ -189,6 +189,8 @@
   </main>
   
   <style>
+    @reference "../../app.css";
+
     main {
       @apply md:w-3/4 w-full md:mx-auto;
     }

@@ -651,28 +651,23 @@
 </div>
 
 <style lang="postcss">
+  @reference "../../../app.css";
+
   #container {
     @apply !w-screen;
-    height: 200dvh;
-    overflow: hidden;
     display: flex;
     flex-direction: column;
   }
 
   .page-layout {
-    @apply flex gap-4 px-4 mx-2;
-    flex: 1;
-    min-height: 0;       /* allows flex children to shrink and scroll */
-    overflow: hidden;
+    @apply flex gap-4 px-4 mx-2 h-auto items-start;
     padding-top: 1.5rem;
     padding-bottom: 1.5rem;
-    align-items: stretch;
   }
 
   @media (max-width: 768px) {
     /* On small screens let the page scroll naturally as a column */
-    #container { height: auto; overflow: visible; }
-    .page-layout { @apply flex-col; flex: none; overflow: visible; padding-bottom: 2rem; }
+    .page-layout { @apply flex-col; padding-bottom: 2rem; }
   }
 
   :global(input[type="text"]) {

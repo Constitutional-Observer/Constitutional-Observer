@@ -120,6 +120,8 @@
 
 
 <style lang="postcss">
+  @reference "../app.css";
+
 
 
   .scatter-box {

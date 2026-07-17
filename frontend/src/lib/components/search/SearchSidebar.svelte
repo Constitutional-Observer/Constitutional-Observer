@@ -212,10 +212,11 @@
 </aside>
 
 <style lang="postcss">
+  @reference "../../../app.css";
+
   .sidebar {
-    @apply shrink-0 overflow-y-auto;
+    @apply shrink-0 sticky top-0 self-start max-h-full overflow-y-auto;
     width: 280px;
-    min-height: 0;
   }
 
   @media (max-width: 768px) {
@@ -293,7 +294,7 @@
   /* States */
   .state-filters { @apply flex flex-wrap gap-1; }
   .state-filter-btn {
-    @apply text-[9px] px-1.5 py-0.5 rounded border border-primary/20 bg-white/60 text-black/60 transition-all;
+    @apply text-[0.8em] px-1.5 py-0.5 rounded border border-primary/20 bg-white/60 text-black/60 transition-all;
     @apply hover:bg-primary/20;
   }
   .state-filter-btn::after { content: ""; }

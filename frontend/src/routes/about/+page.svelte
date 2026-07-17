@@ -30,6 +30,8 @@
 
 
 <style lang="postcss">
+  @reference "../../app.css";
+
   :global(ol) {
     @apply list-decimal pl-10;
   }

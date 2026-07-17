@@ -450,6 +450,8 @@
 {/if}
 
 <style lang="postcss">
+  @reference "../../../app.css";
+
   .bm-count {
     @apply text-[10px] font-mono font-bold px-1.5 rounded bg-black/10 text-black/50;
   }

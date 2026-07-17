@@ -33,10 +33,15 @@
 </nav>
 
 <style lang="postcss">
+  @reference "../../../app.css";
+
   nav {
-    @apply absolute top-0 sticky md:px-[10%] px-10 py-4   z-20 bg-primaryLight text-sm text-black/70 border-b-4 border-primary;
+    @apply absolute top-0 sticky md:px-[10%] px-10 py-4 z-20 bg-primaryLight text-sm text-black/70 border-b-4 border-primary;
   }
   .active {
     @apply font-bold text-black/90 underline;
+  }
+  a{
+    @apply text-[1em]
   }
 </style>

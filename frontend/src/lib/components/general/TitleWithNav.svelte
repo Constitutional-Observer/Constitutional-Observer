@@ -32,6 +32,8 @@
 </section>
 
 <style lang="postcss">
+  @reference "../../../app.css";
+
   a {
     @apply underline;
   }

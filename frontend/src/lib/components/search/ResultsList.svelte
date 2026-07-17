@@ -198,8 +198,10 @@
 </main>
 
 <style lang="postcss">
+  @reference "../../../app.css";
+
   .results-list-container {
-    @apply flex-1 min-w-[60vw];
+    @apply flex-1 min-w-[60vw] ;
   }
 
   .geo-map{
@@ -207,7 +209,7 @@
   }
 
   .results-list{
-    @apply h-[50vh] overflow-y-auto ;
+    @apply h-[60vh] overflow-y-auto ;
   }
   .mobile-only {
     display: none;
@@ -262,7 +264,7 @@
     @apply shrink-0 text-sm font-mono font-bold px-2 py-1 rounded-md bg-emerald-100 text-emerald-900 border border-emerald-300;
   }
   .result-info {
-    @apply flex-1 min-w-0;
+    @apply flex-1 flex-col min-w-0;
   }
   .state-badge {
     @apply text-[11px] font-semibold px-2 py-0.5 rounded bg-blue-100 text-blue-800 border border-blue-200;
@@ -274,10 +276,10 @@
     @apply text-[11px] font-mono font-bold px-2 py-0.5 rounded bg-amber-100 text-amber-900 border border-amber-300;
   }
   .result-title {
-    @apply text-sm font-semibold text-black/90;
+    @apply text-[1em] font-semibold text-black/90;
   }
   .result-preview {
-    @apply text-[11px] text-black/50 mt-1 line-clamp-2 leading-relaxed;
+    @apply text-[0.9em] text-black/50 mt-1 line-clamp-2 leading-relaxed;
   }
   .meta-tags {
     @apply flex flex-wrap gap-1.5 mt-1;

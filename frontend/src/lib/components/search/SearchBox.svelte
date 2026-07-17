@@ -164,6 +164,8 @@
 </div>
 
 <style lang="postcss">
+  @reference "../../../app.css";
+
   button,
   input[type="text"] {
     @apply disabled:opacity-60 disabled:cursor-not-allowed disabled:cursor-default;

@@ -19,6 +19,8 @@
 </svelte:head>
 <Footer/>
 <style lang="postcss">
+  @reference "../app.css";
+
   .size-disclaimer {
     @apply text-left  z-50  px-5 py-2 bg-primary md:hidden;
   }

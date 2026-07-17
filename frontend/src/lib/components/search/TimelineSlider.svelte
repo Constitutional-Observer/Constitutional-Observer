@@ -159,6 +159,8 @@
 {/if}
 
 <style lang="postcss">
+  @reference "../../../app.css";
+
   .tl-root {
     @apply space-y-1.5;
   }
