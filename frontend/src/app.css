@@ -1,9 +1,16 @@
 @import url('https://fonts.googleapis.com/css2?family=IM+Fell+Double+Pica:ital@0;1&display=swap');
 
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+@plugin "@tailwindcss/typography";
+@custom-variant dark (&:where(.dark, .dark *));
 
+@theme {
+  --color-primary: #c3b091;
+  --color-primaryLight: #f0e9da;
+  --color-primaryDark: #ded2bd;
+  --color-secondary: #c39791;
+  --color-tertiary: #bdc391;
+}
 
 body {
   font-family: "IM Fell English", serif;
