@@ -4,7 +4,6 @@
   import { TopicPipeline } from "$lib/topic-modelling/topic-pipeline.svelte.js";
   import { renderHighlight } from "$lib/highlight.js";
   import { topicHighlight } from "$lib/components/search/topic-highlight.svelte.js";
-  import Tooltip from "$lib/components/general/Tooltip.svelte";
 
   import { select as d3select } from "d3-selection";
   import { zoom as d3zoom, zoomIdentity } from "d3-zoom";
