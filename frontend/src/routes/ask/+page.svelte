@@ -100,12 +100,14 @@
             <details class="accordion">
               <summary>
                 <div>
+                  <p>{debate.content}</p>
                   <h4>{debate.speaker_name || "Unknown speaker"}</h4>
                   <span>{new Date(debate.date).toDateString()}</span>
+
                 </div>
               </summary>
 
-              <blockquote class="mt-2">
+              <blockquote class="mt-2 !text-[1.2em] line-[1.2em]">
                 {debate.content}
               </blockquote>
             </details>
@@ -127,14 +129,15 @@
           {#each questions as question}
             <details class="accordion">
               <summary>
+                
+                <p>{question.txt}</p>
                 <span>
                   {new Date(question.index[0].Date).toDateString()}
                 </span>
               </summary>
 
-              <div class="mt-2">
-                <p>{question.txt}</p>
-                <a href={question.link} target="_blank">Read more</a>
+              <div class="mt-2 !text-[1.2em] line-[1.2em] ">
+                {question.txt}
               </div>
             </details>
           {/each}
@@ -186,4 +189,16 @@ summary {
 blockquote {
   @apply text-sm mt-2;
 }
+
+details p {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 7;
+  overflow: hidden;
+  font-size: 1.3em!important;
+  line-height: 1.5em !important;
+  margin: 1em 2em;
+}
+
+
 </style>

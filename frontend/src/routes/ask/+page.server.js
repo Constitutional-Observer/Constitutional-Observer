@@ -1,9 +1,5 @@
-let apiLink = "";
-if (import.meta.env.MODE === "development") {
-  apiLink = "http://127.0.0.1:5000";
-} else {
-  apiLink = "https://constitutional-observer-backend.adhavansivaraj.xyz";
-}
+let apiLink =  "https://constitutional-observer-backend.adhavansivaraj.xyz";
+
 
 export const load = async ({ url, fetch }) => {
   async function debates(query) {
