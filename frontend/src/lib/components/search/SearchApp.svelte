@@ -527,30 +527,54 @@
   // lives on so searches navigate back to the same page ("/ask" or "/").
   let { data, basePath = "/ask" } = $props();
 
+  /** @type {any} */
+  const EMPTY_SEARCH_DATA = {
+    debates: [],
+    hitCount: 0,
+    totalEstimated: 0,
+    collections: [],
+    indices: [],
+    searchParams: {},
+  };
+  let resolved = $state(EMPTY_SEARCH_DATA);
+
   // UI state — search bar + loading flag
   let searchInput = $state("");
   let searching = $state(false);
   let showBookmarks = $state(false);
+
   $effect(() => {
-    searchInput = data.searchParams?.query || "";
+    const source = data.streamed ?? data;
+    searching = true;
+    let cancelled = false;
+    Promise.resolve(source).then((value) => {
+      if (!cancelled) resolved = value;
+    });
+    return () => {
+      cancelled = true;
+    };
   });
 
-  // Seed loader + reset everything when server returns new data
   $effect(() => {
-    loader.seed(data);
+    searchInput = resolved.searchParams?.query || "";
+  });
+
+  // Seed loader + reset everything when the resolved data changes
+  $effect(() => {
+    loader.seed(resolved);
     pager.reset();
     panel.reset();
     searching = false;
 
-    const query = data.searchParams?.query;
-    if (query && (data.totalEstimated || 0) > (data.hitCount || 0)) {
+    const query = resolved.searchParams?.query;
+    if (query && (resolved.totalEstimated || 0) > (resolved.hitCount || 0)) {
       untrack(() =>
         loader.fetchRemaining(query, {
-          hybrid: String(data.searchParams?.hybrid || false),
-          semanticRatio: String(data.searchParams?.semanticRatio || 0.5),
-          scoreThreshold: String(data.searchParams?.scoreThreshold || 0.4),
-          ...(data.searchParams?.indices
-            ? { indices: data.searchParams.indices }
+          hybrid: String(resolved.searchParams?.hybrid || false),
+          semanticRatio: String(resolved.searchParams?.semanticRatio || 0.5),
+          scoreThreshold: String(resolved.searchParams?.scoreThreshold || 0.4),
+          ...(resolved.searchParams?.indices
+            ? { indices: resolved.searchParams.indices }
             : {}),
         }),
       );
@@ -569,8 +593,8 @@
 
   // --- Derived (only what can't live in a class) ---
 
-  let hasQuery = $derived(!!data.searchParams?.query);
-  let indices = $derived(data.indices || []);
+  let hasQuery = $derived(!!resolved.searchParams?.query);
+  let indices = $derived(resolved.indices || []);
 
   let subtitle = $derived(
     `${pager.allRankedHits.length} documents, ${loader.hitCount} results of ~${loader.estimated} total` +
@@ -632,7 +656,7 @@
     <ResultsList
       {pager}
       {panel}
-      query={data.searchParams?.query || ""}
+      query={resolved.searchParams?.query || ""}
       {indices}
       paginationDone={!loader.loading}
     />

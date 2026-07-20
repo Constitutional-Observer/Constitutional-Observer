@@ -168,49 +168,58 @@ export async function searchIndices(indexUids, query, params = DEFAULT_SEARCH_PA
   }
 }
 
-// SSR load for the search UI, shared by the home page and /ask. `defaultQuery`
-// seeds a search when the URL carries no ?query=.
-export function makeSearchLoad(defaultQuery = null) {
-  return async ({ url }) => {
-    const query = url.searchParams.get("query") || defaultQuery;
+// Runs the actual index-details fetch + search for the search UI. Shared by
+// the blocking load (below) and the streamed load, which calls this without
+// awaiting it so the page can render before the search resolves.
+async function runSearchLoad({ url }, defaultQuery) {
+  const query = url.searchParams.get("query") || defaultQuery;
 
-    const startTime = Date.now();
-    const indicesWithDetails = await fetchIndicesWithDetails();
-    console.log(`Loaded ${indicesWithDetails.length} indices in ${Date.now() - startTime}ms`);
+  const startTime = Date.now();
+  const indicesWithDetails = await fetchIndicesWithDetails();
+  console.log(`Loaded ${indicesWithDetails.length} indices in ${Date.now() - startTime}ms`);
 
-    if (!query) {
-      return {
-        debates: [],
-        hitCount: 0,
-        totalEstimated: 0,
-        collections: COLLECTIONS,
-        indices: indicesWithDetails,
-        searchParams: DEFAULT_SEARCH_PARAMS,
-      };
-    }
-
-    // Serves the first page only; the client pages through the rest via
-    // /api/search, so this always starts at offset 0.
-    const activeParams = { ...parseSearchParams(url), offset: 0 };
-    const searchUids = resolveSearchUids(url);
-
-    console.log(`Search: query="${query}" indices=[${searchUids.join(",")}] hybrid=${activeParams.hybrid} limit=${activeParams.limit}`);
-    const searchStart = Date.now();
-    const { hits, totalEstimated } = await searchIndices(searchUids, query, activeParams);
-    console.log(`Search completed in ${Date.now() - searchStart}ms`);
-
-    const { docs, hitCount } = groupHitsIntoDocs(hits, activeParams.scoreThreshold);
-    console.log(`Hits: ${totalEstimated} estimated, ${hits.length} returned, ${hitCount} above threshold (${activeParams.scoreThreshold})`);
-
+  if (!query) {
     return {
-      debates: structuredClone(docs),
-      hitCount,
-      totalEstimated,
+      debates: [],
+      hitCount: 0,
+      totalEstimated: 0,
       collections: COLLECTIONS,
       indices: indicesWithDetails,
-      searchParams: { ...activeParams, indexes: SEARCH_INDEX_UIDS.length, query },
+      searchParams: DEFAULT_SEARCH_PARAMS,
     };
+  }
+
+  // Serves the first page only; the client pages through the rest via
+  // /api/search, so this always starts at offset 0.
+  const activeParams = { ...parseSearchParams(url), offset: 0 };
+  const searchUids = resolveSearchUids(url);
+
+  console.log(`Search: query="${query}" indices=[${searchUids.join(",")}] hybrid=${activeParams.hybrid} limit=${activeParams.limit}`);
+  const searchStart = Date.now();
+  const { hits, totalEstimated } = await searchIndices(searchUids, query, activeParams);
+  console.log(`Search completed in ${Date.now() - searchStart}ms`);
+
+  const { docs, hitCount } = groupHitsIntoDocs(hits, activeParams.scoreThreshold);
+  console.log(`Hits: ${totalEstimated} estimated, ${hits.length} returned, ${hitCount} above threshold (${activeParams.scoreThreshold})`);
+
+  return {
+    debates: structuredClone(docs),
+    hitCount,
+    totalEstimated,
+    collections: COLLECTIONS,
+    indices: indicesWithDetails,
+    searchParams: { ...activeParams, indexes: SEARCH_INDEX_UIDS.length, query },
   };
+}
+
+// SSR load for the search UI, shared by the home page and /ask. 
+export function makeSearchLoad(defaultQuery = null) {
+  return (event) => runSearchLoad(event, defaultQuery);
+}
+
+// Same search, but returned as an unawaited promise under `streamed` so
+export function makeStreamedSearchLoad(defaultQuery = null) {
+  return (event) => ({ streamed: runSearchLoad(event, defaultQuery) });
 }
 
 /** Merge the chunk-level hits of a document into one result, keyed by doc id. */
