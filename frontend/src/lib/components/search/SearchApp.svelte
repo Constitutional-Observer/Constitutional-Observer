@@ -546,6 +546,7 @@
   $effect(() => {
     const source = data.streamed ?? data;
     searching = true;
+    resolved = EMPTY_SEARCH_DATA;
     let cancelled = false;
     Promise.resolve(source).then((value) => {
       if (!cancelled) resolved = value;
