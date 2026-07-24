@@ -3,7 +3,8 @@
   import SearchSidebar from "$lib/components/search/SearchSidebar.svelte";
   import DetailPanel from "$lib/components/search/DetailPanel.svelte";
   import { topicHighlight } from "$lib/components/search/topic-highlight.svelte.js";
-  import { goto } from "$app/navigation";
+  import { goto, replaceState } from "$app/navigation";
+  import { page } from "$app/state";
   import { browser } from "$app/environment";
   import { tick, untrack, onMount } from "svelte";
 
@@ -522,6 +523,36 @@
   const bookmarks = new Bookmarks();
 
   onMount(() => bookmarks.load());
+
+  onMount(() => {
+    const sp = page.url.searchParams;
+    const states = sp.get("states");
+    if (states) filter.selectedStates = new Set(states.split(","));
+    filter.yearMin = sp.get("yearMin") || "";
+    filter.yearMax = sp.get("yearMax") || "";
+    if (sp.has("hybrid")) search.hybrid = sp.get("hybrid") === "true";
+    if (sp.has("semanticRatio")) search.semanticRatio = parseFloat(sp.get("semanticRatio") ?? "");
+    if (sp.has("scoreThreshold")) search.scoreThreshold = parseFloat(sp.get("scoreThreshold") ?? "");
+    const indices = sp.get("indices");
+    if (indices) search.indexIds = new Set(indices.split(","));
+  });
+
+   $effect(() => {
+    const query = resolved.searchParams?.query;
+    if (!query) return;
+    const params = new URLSearchParams({
+      query,
+      hybrid: String(search.hybrid),
+      semanticRatio: String(search.semanticRatio),
+      scoreThreshold: String(search.scoreThreshold),
+    });
+    if (search.indexIds.size) params.set("indices", [...search.indexIds].join(","));
+    if (filter.selectedStates.size) params.set("states", [...filter.selectedStates].join(","));
+    if (filter.yearMin) params.set("yearMin", filter.yearMin);
+    if (filter.yearMax) params.set("yearMax", filter.yearMax);
+    const url = `${basePath}?${params}`;
+    if (browser && url !== `${page.url.pathname}${page.url.search}`) replaceState(url, {});
+  });
 
   // `data` comes from the route's SSR load; `basePath` is the route this app
   // lives on so searches navigate back to the same page ("/ask" or "/").

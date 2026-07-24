@@ -54,6 +54,20 @@
     next.has(uid) ? next.delete(uid) : next.add(uid);
     selectedIndexIds = next;
   }
+
+  // Filters section: closed by default on mobile, open by default on desktop
+  let filtersOpen = $state(false);
+  $effect(() => {
+    filtersOpen = window.matchMedia("(min-width: 768px)").matches;
+  });
+
+  // sharing is copying the current address.
+  let shared = $state(false);
+  function share() {
+    navigator.clipboard.writeText(window.location.href);
+    shared = true;
+    setTimeout(() => (shared = false), 1500);
+  }
 </script>
 
 <aside class="sidebar">
@@ -100,6 +114,10 @@
         <span class="btn-icon">★</span>
         <span class="btn-label">Bookmarks</span>
         <span class="bm-trigger-count">{bookmarkCount}</span>
+      </button>
+      <button class="bm-trigger" onclick={share} title="Share">
+        <span class="btn-icon">⇧</span>
+        <span class="btn-label">{shared ? "Copied!" : "Share"}</span>
       </button>
     </div>
 
