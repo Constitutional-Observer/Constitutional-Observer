@@ -654,6 +654,7 @@
     searching = true;
     goto(`${basePath}?${search.build(searchInput).toString()}`, {
       invalidateAll: true,
+      noScroll: true,
     });
   }
 
