@@ -26,8 +26,9 @@
 
   // Partitions hits into one group per source index, holds a TopicPipeline per
   // group, and models each in a sequential background queue (largest first).
-  // Past MAIN_CAP groups, the lowest-scored overflow into a single accordion
-  // column instead of growing the grid.
+  // Empty groups (0 docs) never get a grid cell — they always fall into the
+  // accordion overflow. Past MAIN_CAP non-empty groups, the lowest-scored of
+  // those overflow into the same accordion instead of growing the grid.
   class GeoGroups {
     static #MAIN_COLS = 5; // grid's 6 columns minus 1 reserved for the accordion
     static #MAIN_CAP = 12;
@@ -71,16 +72,21 @@
       groups.sort((a, b) => a.label.localeCompare(b.label));
       this.groups = groups;
 
-      if (groups.length > GeoGroups.#MAIN_CAP) {
+      const nonEmpty = groups.filter((g) => g.count > 0);
+      const empty = groups.filter((g) => g.count === 0);
+
+      let overflow;
+      if (nonEmpty.length > GeoGroups.#MAIN_CAP) {
         const keep = new Set(
-          [...groups].sort((a, b) => b.count - a.count).slice(0, GeoGroups.#MAIN_CAP).map((g) => g.key),
+          [...nonEmpty].sort((a, b) => b.count - a.count).slice(0, GeoGroups.#MAIN_CAP).map((g) => g.key),
         );
-        this.cellGroups = groups.filter((g) => keep.has(g.key));
-        this.accordionGroups = groups.filter((g) => !keep.has(g.key)).sort((a, b) => a.count - b.count);
+        this.cellGroups = nonEmpty.filter((g) => keep.has(g.key));
+        overflow = nonEmpty.filter((g) => !keep.has(g.key));
       } else {
-        this.cellGroups = groups;
-        this.accordionGroups = [];
+        this.cellGroups = nonEmpty;
+        overflow = [];
       }
+      this.accordionGroups = [...overflow, ...empty].sort((a, b) => a.count - b.count);
 
       for (const k of [...this.#pipelines.keys()]) if (!map.has(k)) this.#pipelines.delete(k);
       if (readyToModel) this.#enqueue();
@@ -339,6 +345,13 @@
     <span class="gm-cell-note">no results</span>
   {:else if g.count < MIN_GROUP_DOCS}
     <span class="gm-cell-note">too few to model</span>
+    <div class="gm-cell-docs">
+      {#each g.items as hit, i (hit.id || i)}
+        <button class="gm-cell-doc" onclick={() => onselect?.(hit)}>
+          {hitTitle(hit, i)}
+        </button>
+      {/each}
+    </div>
   {:else if !paginationDone}
     <span class="gm-cell-note"><span class="gm-spin"></span>counting…</span>
   {:else if pl.topicCount === 0}
@@ -389,7 +402,7 @@
     {/if}
   </div>
 
-<section class="geo-map">
+<section class="geo-map" class:geo-map-scatter={!!selectedCluster}>
   <div class="gm-body">
     {#if !selectedCluster}
       <div
@@ -401,7 +414,6 @@
           <div
             class="gm-cell"
             class:gm-cell-open={g.key === openKey}
-            class:gm-cell-empty={g.count === 0}
             class:gm-cell-selected={selectedGroup?.key === g.key}
             title={`${g.label} · ${g.count} docs${g.annotation ? `\n\n${g.annotation}` : ""}`}
             onmouseenter={() => (openKey = g.key)}
@@ -411,14 +423,14 @@
         {/each}
 
         {#if geo.overflowing}
-          <div class="gm-accordion-col" style={`grid-row: 1 / span ${geo.mainRows};`}>
+          <div class="gm-accordion-col">
             <span class="gm-accordion-head">{geo.accordionGroups.length} more sources</span>
             <div class="gm-accordion-list">
               {#each geo.accordionGroups as g (g.key)}
                 <details class="gm-accordion-item">
                   <summary class="gm-accordion-summary">
                     <span class="gm-accordion-label">{g.label}</span>
-                    <span class="gm-accordion-count">{g.count}</span>
+                    <span class="gm-accordion-count">{g.count === 0 ? "no results" : g.count}</span>
                   </summary>
                   <div class="gm-accordion-body">
                     {@render groupStatus(g)}
@@ -502,7 +514,6 @@
   .gm-zoom-btn { @apply text-[13px] px-2 py-0.5 bg-white/60 text-black/70 cursor-pointer leading-none hover:bg-primary/20; border: none; }
   .gm-zoom-btn + .gm-zoom-btn { border-left: 1px solid rgba(0,0,0,0.1); }
   .gm-clear { @apply text-[11px] px-2 py-0.5 rounded border border-primary/30 bg-white/60 text-black/70 cursor-pointer hover:bg-primary/20 shrink-0; }
-  .gm-zoom-btn::after, .gm-clear::after, .gm-cell-topic::after, .gm-label-card::after { content: ""; }
 
   .gm-body {
     @apply relative grid border border-primary/20 m-1 h-full;
@@ -510,17 +521,14 @@
     grid-template-rows: minmax(0, 1fr);
   }
 
-  .gm-grid-pane { @apply grid content-start gap-2 overflow-y-auto grid-cols-6 h-full min-h-0; }
-  /* 5 major columns + 1 reserved for the accordion, all equal width. */
-  .gm-grid-pane-overflow { grid-template-columns: repeat(6, minmax(1, 1fr)); grid-auto-flow: row; }
+  .gm-grid-pane { @apply grid content-start gap-2 overflow-y-auto grid-cols-2 md:grid-cols-6 h-full min-h-0; }
 
-  .gm-cell { @apply relative flex flex-col text-left p-1.5 transition-all overflow-hidden h-[200px] bg-white/50; border: 5px solid rgba(139, 115, 85, 0.8); }
+
+
+  .gm-cell { @apply relative flex flex-col text-left p-1.5 transition-all overflow-hidden h-[160px] md:h-[200px] bg-white/50; border: 5px solid rgba(139, 115, 85, 0.8); }
   .gm-cell:hover { @apply shadow-sm; border-color: rgba(139, 115, 85, 0.55); }
-  .gm-cell-open { border-color: rgba(139, 115, 85, 0.8); }
-  /* Pure transform, no grid reflow — scales in place above its neighbors. */
-  .gm-cell-open:not(.gm-cell-empty) { transform: scale(1.02); z-index: 5; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.22); }
+  .gm-cell-open { border-color: rgba(139, 115, 85, 0.8); transform: scale(1.02); z-index: 5; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.22); }
   .gm-cell-selected { border-color: #b8860b !important; box-shadow: 0 0 0 2px rgba(184, 134, 11, 0.4); }
-  .gm-cell-empty { border-style: solid; @apply opacity-20; }
 
   .gm-accordion-col {
     @apply flex flex-col gap-1.5 overflow-y-auto min-h-0 min-w-0 rounded-md border border-primary/20 bg-white/40 p-1.5;
@@ -537,7 +545,7 @@
   .gm-accordion-body { @apply px-1.5 pb-1.5; }
 
   .gm-cell-head { @apply flex items-start justify-between gap-1 shrink-0; }
-  .gm-cell-name { @apply text-[0.9em] font-bold text-black/80 leading-tight pb-2; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+  .gm-cell-name { @apply text-[0.9em] font-bold text-black/80 leading-tight pb-2 line-clamp-2; }
   .gm-cell-count { @apply text-[12px] font-mono font-bold text-black/60 leading-none shrink-0; }
   .gm-cell-note { @apply flex items-center gap-1 text-[12px] text-black/40 italic; }
 
@@ -548,6 +556,13 @@
     border: 1px solid transparent;
   }
   .gm-cell-topic-selected { @apply bg-white text-black/85 font-semibold; border-color: #b8860b; }
+
+  .gm-cell-docs { @apply flex flex-col flex-1 min-h-0 gap-0.5 overflow-y-auto -mr-1 pr-1; }
+  .gm-cell-doc {
+    @apply text-left text-[0.85em] leading-tight px-1 py-0.5 rounded cursor-pointer transition-colors shrink-0 truncate;
+    @apply bg-white/40 text-black/60 hover:bg-white/90 hover:text-black/85;
+    border: 1px solid transparent;
+  }
 
   .gm-right { @apply relative flex-1 rounded-md border border-primary/20 bg-white/70 h-full; }
   .gm-right-full { @apply w-full h-full; }
@@ -562,8 +577,7 @@
   .gm-label-card { @apply absolute z-10 bg-white/95 rounded-md shadow-sm cursor-pointer overflow-hidden text-[1em] text-left; border: 1px solid rgba(0,0,0,0.12); width: 200px; }
   .gm-label-card:hover { @apply bg-white shadow-lg z-30; border-color: rgba(0,0,0,0.22); }
   .gm-label-title { @apply px-2 pt-1.5 pb-1 text-[1em] font-semibold text-black/80 leading-tight truncate; border-bottom: 1px solid rgba(0,0,0,0.06); }
-  .gm-label-excerpt, .gm-tip-excerpt { display: -webkit-box; -webkit-box-orient: vertical; overflow: hidden; }
-  .gm-label-excerpt { @apply px-2 py-1.5 text-[0.78em] text-black/50 leading-snug; -webkit-line-clamp: 10; }
+  .gm-label-excerpt { @apply px-2 py-1.5 text-[0.78em] text-black/50 leading-snug line-clamp-[10]; }
   .gm-label-excerpt :global(strong), .gm-tip-excerpt :global(strong) {
     background: rgba(251, 191, 36, 0.45); border-radius: 2px; padding: 0 1px; font-weight: inherit;
   }
@@ -574,8 +588,8 @@
   }
   .gm-tip-title { @apply px-2.5 pt-2 pb-1 text-[1em] font-semibold text-black/80 leading-tight; }
   .gm-tip-excerpt {
-    @apply px-2.5 pb-2 text-[0.78em] text-black/55 leading-snug;
-    border-top: 1px solid rgba(0,0,0,0.06); padding-top: 5px; margin-top: 0; -webkit-line-clamp: 4;
+    @apply px-2.5 pb-2 text-[0.78em] text-black/55 leading-snug line-clamp-4;
+    border-top: 1px solid rgba(0,0,0,0.06); padding-top: 5px; margin-top: 0;
   }
 
   .gm-spin { @apply inline-block rounded-full shrink-0; width: 0.7rem; height: 0.7rem; border: 2px solid rgba(0,0,0,0.15); border-top-color: #c3b091; animation: gm-spin 0.7s linear infinite; }
@@ -585,7 +599,17 @@
   .gm-loading { @apply absolute inset-0 z-40 flex flex-col items-center justify-center gap-2 text-[12px] text-black/60 italic; background: rgba(240, 233, 218, 0.82); }
 
   @media (max-width: 768px) {
-    .gm-body { @apply flex-col h-auto; }
-    .gm-scatter { height: 360px; }
+    .geo-map:not(.geo-map-scatter) { height: auto; max-height: 70dvh; overflow-y: auto; }
+    .geo-map-scatter { @apply h-[60dvh]; }
+
+    .gm-header { @apply px-2 py-2 gap-2; }
+    .gm-zoom-btns { @apply ml-0; }
+    .gm-label-card { width: min(200px, 78vw); }
+    .gm-hover-tip { max-width: min(280px, 82vw); }
+    .gm-accordion-col {
+      grid-column: 1 / -1;
+      grid-row: auto;
+      max-height: 240px;
+    }
   }
 </style>

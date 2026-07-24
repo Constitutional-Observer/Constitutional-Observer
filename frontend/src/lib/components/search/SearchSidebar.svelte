@@ -1,6 +1,5 @@
 <script>
   import TimelineSlider from "$lib/components/search/TimelineSlider.svelte";
-  import TitleWithNav from "$lib/components/general/TitleWithNav.svelte";
 
   let {
     // Search bar
@@ -58,13 +57,16 @@
 </script>
 
 <aside class="sidebar">
-  <TitleWithNav title={searchInput} {subtitle}>
-    <form class="mt-2" onsubmit={(e) => { e.preventDefault(); onsearch?.(); }}>
+<section
+  class="relative py-2 md:py-7 px-2 md:px-5 backdrop-opacity-50 bg-primaryLight/90 drop-shadow-xl border-4 border-primary"
+>
+
+  <form class="mt-2" onsubmit={(e) => { e.preventDefault(); onsearch?.(); }}>
       <div class="flex items-center">
         <div class="search-input-wrap">
           <input
             type="text"
-            class="p-1 w-full text-xs text-gray-300"
+            class="p-1 !text-2xl w-full text-xs border border-primary caret-red"
             placeholder="Ask a question"
             bind:value={searchInput}
             disabled={searching}
@@ -77,8 +79,13 @@
           {searching ? "..." : "Go"}
         </button>
       </div>
-    </form>
-  </TitleWithNav>
+  </form>
+
+    {#if subtitle}
+    <p class="md:text-sm text-pretty text-justify text-black/60">
+      {subtitle}
+    </p>
+  {/if}
 
   {#if loadingMore}
     <div class="loading-bar">
@@ -87,18 +94,38 @@
     <p class="loading-text">{loadProgress}</p>
   {/if}
 
-  <button class="bm-trigger" onclick={() => (showBookmarks = true)}>
-    <span>★ Bookmarks</span>
-    <span class="bm-trigger-count">{bookmarkCount}</span>
-  </button>
+  <div class="controls-row">
+    <div class="action-row">
+      <button class="bm-trigger" onclick={() => (showBookmarks = true)} title="Bookmarks">
+        <span class="btn-icon">★</span>
+        <span class="btn-label">Bookmarks</span>
+        <span class="bm-trigger-count">{bookmarkCount}</span>
+      </button>
+    </div>
 
+    <details class="filters-accordion" bind:open={filtersOpen}>
+      <summary class="filters-accordion-summary">
+        <span>Filters</span>
+        <span class="accordion-arrow"></span>
+      </summary>
   <div class="filter-box">
-    <!-- Timeline — no accordion -->
-    <TimelineSlider hits={collectionDebates} bind:yearMin bind:yearMax />
+    <!-- Timeline — accordion, closed by default -->
+    <details class="filter-accordion">
+      <summary class="filter-accordion-summary">
+        <span class="summary-label">Timeline</span>
+        {#if yearMin || yearMax}
+          <span class="filter-badge">{yearMin || "…"}–{yearMax || "…"}</span>
+        {/if}
+        <span class="accordion-arrow"></span>
+      </summary>
+      <div class="accordion-body">
+        <TimelineSlider hits={collectionDebates} bind:yearMin bind:yearMax />
+      </div>
+    </details>
 
-    <!-- States — accordion, open by default -->
+    <!-- States — accordion, closed by default -->
     {#if isStateCollection && allStates.length > 0}
-      <details class="filter-accordion" open>
+      <details class="filter-accordion">
         <summary class="filter-accordion-summary">
           <span class="summary-label">States</span>
           {#if selectedStates.size > 0}
@@ -209,13 +236,17 @@
       </div>
     </details>
   </div>
+  </details>
+  </div>
+  </section>
+  
 </aside>
 
 <style lang="postcss">
   @reference "../../../app.css";
 
   .sidebar {
-    @apply shrink-0 sticky top-0 self-start max-h-full overflow-y-auto;
+    @apply shrink-0 sticky top-[6%] self-start max-h-full overflow-y-auto z-20;
     width: 280px;
   }
 
@@ -235,18 +266,59 @@
   }
 
   .filter-box {
-    @apply mt-3 bg-white/60 backdrop-blur-sm rounded-lg p-3 border border-primary/30 space-y-3;
+    @apply bg-white/60 backdrop-blur-sm rounded-lg p-3 border border-primary/30 space-y-3;
   }
 
-  /* Bookmarks trigger — sits below the title bar, above the filters */
+  /* Controls row — bookmarks/share + the Filters accordion trigger. Stacked on
+     desktop (action-row full width above Filters); on mobile they sit in one
+     line, with the trigger buttons collapsing to icons to save space. */
+  .controls-row {
+    @apply flex flex-col;
+  }
+
+  /* Filters — top-level accordion, closed on mobile / open on desktop by default */
+  .filters-accordion {
+    @apply mt-3 rounded-lg overflow-hidden;
+  }
+  .filters-accordion-summary {
+    @apply flex items-center justify-between px-3 py-2 cursor-pointer select-none list-none;
+    @apply bg-white/60 backdrop-blur-sm border border-primary/30 rounded-lg text-black/70 font-semibold text-xs;
+    @apply transition hover:bg-primary/20;
+  }
+  .filters-accordion-summary::-webkit-details-marker { display: none; }
+  .filters-accordion-summary::marker { display: none; }
+  .filters-accordion[open] > .filters-accordion-summary {
+    @apply rounded-b-none border-b-0;
+  }
+  .filters-accordion[open] .accordion-arrow {
+    transform: rotate(180deg);
+  }
+  .filters-accordion .filter-box {
+    @apply rounded-t-none border-t-0 mt-0;
+  }
+
+  /* Bookmarks/Share row — sits below the title bar, above the filters */
+  .action-row {
+    @apply mt-3 flex items-stretch gap-2;
+  }
   .bm-trigger {
-    @apply mt-3 w-full flex items-center justify-between gap-2 rounded-lg px-3 py-2 cursor-pointer;
+    @apply flex-1 flex items-center justify-center gap-2 rounded-lg px-3 py-2 cursor-pointer;
     @apply bg-white/60 backdrop-blur-sm border border-primary/30 text-black/70 font-semibold text-xs;
     @apply transition hover:bg-primary/20;
   }
-  .bm-trigger::after { content: ""; }
   .bm-trigger-count {
     @apply text-[10px] font-mono font-bold px-1.5 rounded bg-black/10 text-black/50;
+  }
+  .btn-icon { @apply hidden; }
+
+  @media (max-width: 768px) {
+    .controls-row { @apply flex-row items-center gap-2; }
+    .action-row { @apply mt-0 gap-1.5; }
+    .filters-accordion { @apply mt-0 flex-1; }
+    .bm-trigger { @apply relative flex-none px-2 py-2 gap-0; }
+    .btn-icon { @apply block text-sm leading-none; }
+    .btn-label { @apply hidden; }
+    .bm-trigger-count { @apply absolute -top-1 -right-1 text-[8px] px-1 leading-tight; }
   }
 
   /* Accordion */
