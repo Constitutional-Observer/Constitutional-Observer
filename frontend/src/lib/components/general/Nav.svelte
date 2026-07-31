@@ -19,7 +19,7 @@
 </script>
 
 <nav class="flex flex-row flex-wrap items-center justify-between gap-4">
-  <a href="/" class="font-bold text-black/90 no-underline">
+  <a href="/" class="!text-[1.2em] font-bold text-black/90 no-underline">
     Constitutional Observer
   </a>
 
