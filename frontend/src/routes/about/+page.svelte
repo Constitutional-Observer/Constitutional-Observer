@@ -22,7 +22,7 @@
 
   <div
     id="content"
-    class=" col-span-10 lg:col-span-7 px-2 text-sm overflow-y-scroll text-justify"
+    class=" col-span-10 lg:col-span-7 px-2 my-5 text-[1em] prose overflow-y-scroll text-justify"
   >
     {@html marked.parse(source)}
   </div>
@@ -51,14 +51,14 @@
     @apply border-2 border-primary w-fit rounded-md px-2;
   }
   #content :global(h2) {
-    @apply text-3xl pb-1 mt-12;
+    @apply text-2xl pb-1;
   }
 
   #content :global(h3) {
-    @apply text-2xl pt-5 pb-2;
+    @apply text-xl pb-1;
   }
 
   #content :global(h4) {
-    @apply text-xl pb-1;
+    @apply text-lg pb-1;
   }
 </style>
