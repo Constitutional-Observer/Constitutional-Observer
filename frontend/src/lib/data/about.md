@@ -34,7 +34,7 @@ State Legislatures are being archived from the legislatures websites. Progress c
 
 This work is possible due to the labour and support of Vivek Mathew, Sireesh Kodali, Abhiram Jois, Adhavan Sivaraj, Abhishek Hazra, Thejesh GN, FOSS United Foundation. 
 
-We wish to thank Reclaim Constitution for the support.
+We wish to thank Living Labs Network and Forum and Reclaim Constitution for the support.
 
 ### Data Notes
 

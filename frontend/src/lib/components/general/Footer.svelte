@@ -15,11 +15,11 @@
       </p>
     </div>
     <div class="text-justify">
-      This work is possible due to the labour and support of Vivek Mathew, Sireesh Kodali, Abhiram Jois, Adhavan Sivaraj, Abhishek Hazra, Thejesh GN, FOSS United Foundation. 
+      This work is possible due to the labour and support of Vivek Mathew, Sireesh Kodali, Abhiram Jois, Adhavan Sivaraj, Abhishek Hazra, Thejesh GN, FOSS United Foundation, Living Labs Network and Forum, and Reclaim Constitution.
 
       <br><br>
 
-      Thanks to Vinay and other members with Reclaim Constitution.
+     
     </div>
   </div>
 </footer>
