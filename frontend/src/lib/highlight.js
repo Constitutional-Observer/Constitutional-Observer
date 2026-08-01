@@ -7,6 +7,9 @@
 //     occurrences in <span class="topic-hl"> (rendered as a teal underline,
 //     styled globally in app.css since the markup is injected via {@html}).
 
+export const stripHighlight = (html) => String(html || "").replace(/<\/?strong>/g, "");
+export const chunkText = (chunk) => chunk?.text ?? stripHighlight(chunk?.textHL);
+
 // Escape HTML, then restore the Meilisearch <strong> query-highlight tags.
 export function escapeRestoreStrong(text) {
   return String(text || "")

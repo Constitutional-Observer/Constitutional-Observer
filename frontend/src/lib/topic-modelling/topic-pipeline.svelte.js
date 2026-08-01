@@ -16,6 +16,7 @@ import { browser } from "$app/environment";
 import { TOPIC_STOPWORDS } from "$lib/topic-modelling/topic-stopwords.js";
 import { TOPIC_PHRASES, SEED_GROUPS } from "$lib/topic-modelling/topic-phrases.js";
 import { applyPhrases } from "$lib/topic-modelling/phrase-matcher.js";
+import { chunkText } from "$lib/highlight.js";
 
 // Multi-topic membership floor. A document belongs to every topic it is more than
 // TOPIC_MIN composed of (θ > TOPIC_MIN) — no forced dominant topic — so it can sit
@@ -41,8 +42,7 @@ class Preprocessing {
   static get seedGroups() { return Preprocessing.#seedGroups; }
 
   static #hitText(hit) {
-    return (hit._matchedChunks || []).map(c => c.text).filter(Boolean).join(" ")
-      || hit.__discussions || "";
+    return (hit._matchedChunks || []).map(chunkText).filter(Boolean).join(" ");
   }
 
   static async #loadNLP() {

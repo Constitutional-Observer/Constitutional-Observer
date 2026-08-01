@@ -7,7 +7,23 @@
     "label": "Andhra Pradesh Assembly",
     "annotation": "Andhra Pradesh Legislative Assembly proceedings, chunked by discussion.",
     "searchField": "__discussions",
-    "titleField": "title_en"
+    "titleField": "title_en",
+    "metaFields": [
+      "id",
+      "chunk_id",
+      "file_name",
+      "archive_link",
+      "year",
+      "month",
+      "day",
+      "house",
+      "session",
+      "term_number",
+      "term_start",
+      "term_end",
+      "languages",
+      "state_code"
+    ]
   },
   {
     "uid": "state_legislature_debates_as",
@@ -17,7 +33,18 @@
     "label": "Assam Assembly",
     "annotation": "Assam Legislative Assembly proceedings, chunked by discussion.",
     "searchField": "__discussions",
-    "titleField": "title_en"
+    "titleField": "title_en",
+    "metaFields": [
+      "id",
+      "chunk_id",
+      "file_name",
+      "archive_link",
+      "year",
+      "month",
+      "day",
+      "languages",
+      "state_code"
+    ]
   },
   {
     "uid": "state_legislature_debates_ka",
@@ -27,7 +54,24 @@
     "label": "Karnataka Assembly",
     "annotation": "Karnataka Legislative Assembly proceedings, chunked by discussion. Carries Kannada-language fields alongside English.",
     "searchField": "__discussions",
-    "titleField": "title_en"
+    "titleField": "title_en",
+    "metaFields": [
+      "id",
+      "chunk_id",
+      "file_name",
+      "archive_link",
+      "year",
+      "month",
+      "day",
+      "house",
+      "session",
+      "term_number",
+      "term_start",
+      "term_end",
+      "section_type",
+      "languages",
+      "state_code"
+    ]
   },
   {
     "uid": "state_legislature_debates_ml",
@@ -37,7 +81,21 @@
     "label": "Meghalaya Assembly",
     "annotation": "Meghalaya Legislative Assembly proceedings, chunked by discussion.",
     "searchField": "__discussions",
-    "titleField": "title_en"
+    "titleField": "title_en",
+    "metaFields": [
+      "id",
+      "chunk_id",
+      "file_name",
+      "archive_link",
+      "year",
+      "month",
+      "day",
+      "house",
+      "session",
+      "term_number",
+      "languages",
+      "state_code"
+    ]
   },
   {
     "uid": "state_legislature_debates_py",
@@ -47,7 +105,21 @@
     "label": "Puducherry Assembly",
     "annotation": "Puducherry Legislative Assembly proceedings, chunked by discussion.",
     "searchField": "__discussions",
-    "titleField": "title_en"
+    "titleField": "title_en",
+    "metaFields": [
+      "id",
+      "chunk_id",
+      "file_name",
+      "archive_link",
+      "year",
+      "month",
+      "day",
+      "house",
+      "session",
+      "term_number",
+      "languages",
+      "state_code"
+    ]
   },
   {
     "uid": "state_legislature_debates_rj",
@@ -57,7 +129,21 @@
     "label": "Rajasthan Assembly",
     "annotation": "Rajasthan Legislative Assembly proceedings. Index exists but holds no documents yet.",
     "searchField": "__discussions",
-    "titleField": "title_en"
+    "titleField": "title_en",
+    "metaFields": [
+      "id",
+      "chunk_id",
+      "file_name",
+      "archive_link",
+      "year",
+      "month",
+      "day",
+      "house",
+      "session",
+      "term_number",
+      "languages",
+      "state_code"
+    ]
   },
   {
     "uid": "state_legislature_debates_tn",
@@ -67,7 +153,24 @@
     "label": "Tamil Nadu Assembly",
     "annotation": "Tamil Nadu Legislative Assembly proceedings, chunked by discussion.",
     "searchField": "__discussions",
-    "titleField": "title_en"
+    "titleField": "title_en",
+    "metaFields": [
+      "id",
+      "chunk_id",
+      "file_name",
+      "archive_link",
+      "year",
+      "month",
+      "day",
+      "house",
+      "session",
+      "term_number",
+      "term_start",
+      "term_end",
+      "section_type",
+      "languages",
+      "state_code"
+    ]
   },
   {
     "uid": "state_legislature_debates_up",
@@ -77,7 +180,23 @@
     "label": "Uttar Pradesh Assembly",
     "annotation": "Uttar Pradesh Legislative Assembly proceedings. Index exists but holds no documents yet.",
     "searchField": "__discussions",
-    "titleField": "title_en"
+    "titleField": "title_en",
+    "metaFields": [
+      "id",
+      "chunk_id",
+      "file_name",
+      "archive_link",
+      "year",
+      "month",
+      "day",
+      "house",
+      "session",
+      "term_number",
+      "term_start",
+      "term_end",
+      "languages",
+      "state_code"
+    ]
   },
   {
     "uid": "state_legislature_debates_wb",
@@ -87,9 +206,26 @@
     "label": "West Bengal Assembly",
     "annotation": "West Bengal Legislative Assembly proceedings. Index exists but holds no documents yet.",
     "searchField": "__discussions",
-    "titleField": "title_en"
+    "titleField": "title_en",
+    "metaFields": [
+      "id",
+      "chunk_id",
+      "file_name",
+      "archive_link",
+      "year",
+      "month",
+      "day",
+      "house",
+      "session",
+      "term_number",
+      "term_start",
+      "term_end",
+      "section_type",
+      "languages",
+      "state_code"
+    ]
   },
-    {
+  {
     "uid": "state_legislature_debates_kl",
     "collection": "State Legislatures",
     "stateCode": "KL",
@@ -97,7 +233,18 @@
     "label": "Keralam Assembly",
     "annotation": "Keralam Legislative Assembly proceedings. Index exists but holds no documents yet.",
     "searchField": "__discussions",
-    "titleField": "title_en"
+    "titleField": "title_en",
+    "metaFields": [
+      "id",
+      "chunk_id",
+      "file_name",
+      "archive_link",
+      "year",
+      "month",
+      "day",
+      "languages",
+      "state_code"
+    ]
   },
   {
     "uid": "state_legislature_debates_ls",
@@ -107,7 +254,24 @@
     "label": "Lok Sabha",
     "annotation": "Lower house of Parliament. Filed under a state_legislature_debates_* uid despite being national. Index exists but holds no documents yet.",
     "searchField": "__discussions",
-    "titleField": "title_en"
+    "titleField": "title_en",
+    "metaFields": [
+      "id",
+      "chunk_id",
+      "file_name",
+      "archive_link",
+      "year",
+      "month",
+      "day",
+      "house",
+      "session",
+      "term_number",
+      "term_start",
+      "term_end",
+      "section_type",
+      "languages",
+      "state_code"
+    ]
   },
   {
     "uid": "state_legislature_debates_rs",
@@ -116,10 +280,24 @@
     "state": null,
     "label": "Rajya Sabha",
     "annotation": "Upper house of Parliament. Filed under a state_legislature_debates_* uid despite being national.",
-    "searchField": "__discussions",
-    "titleField": "title_en"
+    "searchField": "__discussions_v2",
+    "titleField": "title_en",
+    "metaFields": [
+      "id",
+      "chunk_id",
+      "file_name",
+      "archive_link",
+      "year",
+      "month",
+      "day",
+      "house",
+      "session",
+      "term_number",
+      "languages",
+      "state_code"
+    ]
   },
-   {
+  {
     "uid": "parivesh_agenda_mom",
     "collection": "central_institution",
     "stateCode": "",
@@ -127,6 +305,23 @@
     "label": "Parivesh, Environmental Clearances",
     "annotation": "",
     "searchField": "content",
-    "titleField": "date"
+    "titleField": "date",
+    "metaFields": [
+      "id",
+      "chunk_id",
+      "file_name",
+      "archive_link",
+      "year",
+      "month",
+      "day",
+      "house",
+      "session",
+      "term_number",
+      "term_start",
+      "term_end",
+      "section_type",
+      "languages",
+      "state_code"
+    ]
   }
 ]

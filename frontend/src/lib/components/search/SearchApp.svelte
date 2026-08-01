@@ -3,6 +3,7 @@
   import SearchSidebar from "$lib/components/search/SearchSidebar.svelte";
   import DetailPanel from "$lib/components/search/DetailPanel.svelte";
   import { topicHighlight } from "$lib/components/search/topic-highlight.svelte.js";
+  import { chunkText } from "$lib/highlight.js";
   import { goto, replaceState } from "$app/navigation";
   import { page } from "$app/state";
   import { browser } from "$app/environment";
@@ -134,7 +135,7 @@
     }
 
     hitPreview(hit) {
-      const text = hit._matchedChunks?.[0]?.text || hit.__discussions || "";
+      const text = chunkText(hit._matchedChunks?.[0]);
       return text.length > 150 ? text.slice(0, 150) + "..." : text;
     }
 

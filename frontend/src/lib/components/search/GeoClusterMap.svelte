@@ -15,12 +15,7 @@
     return s.charAt(0).toUpperCase() + s.slice(1);
   };
   const hitTitle = (hit, i) => hit._title || `Document ${i + 1}`;
-  const hitExcerpt = (hit) =>
-    hit._matchedChunks?.[0]?.textHL ||
-    hit._matchedChunks?.[0]?.text ||
-    hit._formatted?.__discussions ||
-    hit.__discussions ||
-    "";
+  const hitExcerpt = (hit) => hit._matchedChunks?.[0]?.textHL || "";
   // Must agree with SearchApp's docKeyOf.
   const docKey = (hit) => hit._docId || String(hit?.id ?? "").replace(/_\d+$/, "");
 

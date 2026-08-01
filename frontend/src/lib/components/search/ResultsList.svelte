@@ -3,7 +3,7 @@
   // paged result cards (desktop) / accordions (mobile). Reactive state lives on
   // the `pager` (ResultPager) and `panel` (DocPanel) instances passed in.
   import GeoClusterMap from "$lib/components/search/GeoClusterMap.svelte";
-  import { renderHighlight } from "$lib/highlight.js";
+  import { renderHighlight, chunkText } from "$lib/highlight.js";
   import { topicHighlight } from "$lib/components/search/topic-highlight.svelte.js";
 
   let {
@@ -92,6 +92,8 @@
         </div>
       </summary>
       <div class="accordion-content">
+        <!-- groupHitsIntoDocs builds every doc from at least one hit, so a
+             result always carries _matchedChunks. -->
         {#if hit._matchedChunks?.length}
           <p class="matched-label">
             {hit._matchedChunks.length} matched section{hit._matchedChunks.length >
@@ -108,20 +110,16 @@
                 <button
                   class="copy-btn"
                   onclick={() =>
-                    panel.copyText(mc.text, `mc-${hit.id}-${mc.chunk_id}`)}
+                    panel.copyText(chunkText(mc), `mc-${hit.id}-${mc.chunk_id}`)}
                 >
                   {panel.copiedId === `mc-${hit.id}-${mc.chunk_id}`
                     ? "Copied"
                     : "Copy"}
                 </button>
               </div>
-              <p>{@html renderHighlight(mc.textHL || mc.text, hitTopics(hit))}</p>
+              <p>{@html renderHighlight(mc.textHL, hitTopics(hit))}</p>
             </div>
           {/each}
-        {:else}
-          <blockquote class="result-excerpt">
-            {@html renderHighlight(hit._formatted?.__discussions || hit.__discussions || "", hitTopics(hit))}
-          </blockquote>
         {/if}
         {#if !panel.fullDocs[panel.docKey(hit)]}
           <button class="load-doc-btn" onclick={() => panel.loadFullDocument(hit)}
@@ -303,9 +301,6 @@
   }
   .matched-chunk {
     @apply text-sm text-black/80 border-l-[3px] border-amber-400 bg-amber-50/50 pl-3 py-2 my-1 rounded-r whitespace-pre-wrap;
-  }
-  .result-excerpt {
-    @apply text-sm text-black/80 border-l-[3px] border-primary/50 pl-3 py-1 my-2 whitespace-pre-wrap;
   }
   .load-doc-btn {
     @apply text-xs text-blue-700 underline mt-2 hover:text-blue-900;

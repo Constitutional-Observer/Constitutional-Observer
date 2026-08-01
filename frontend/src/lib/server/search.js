@@ -18,8 +18,6 @@ export function sourceLabel(uid) {
   return reg ? reg.state || reg.label : "Unknown";
 }
 
-// The attributes an index holds its text and title in — indices differ, so
-// callers read these rather than assuming __discussions/title_en.
 const FIELD_FALLBACK = { searchField: "__discussions", titleField: "title_en" };
 export const fieldsOf = (uid) => ({ ...FIELD_FALLBACK, ...(INDEX_BY_UID[uid] || {}) });
 const searchFieldOf = (uid) => INDEX_BY_UID[uid]?.searchField || FIELD_FALLBACK.searchField;
@@ -125,6 +123,7 @@ export async function searchIndices(indexUids, query, params = DEFAULT_SEARCH_PA
   const queries = indexUids.map((uid) => {
     const meta = metaByUid[uid];
     const canHybrid = params.hybrid && meta?.semanticSearch && meta.embedders?.includes(params.embedder);
+    const { searchField, titleField, metaFields } = fieldsOf(uid);
     return {
       indexUid: uid,
       q: query,
@@ -132,10 +131,8 @@ export async function searchIndices(indexUids, query, params = DEFAULT_SEARCH_PA
       showRankingScore: true,
       limit: params.limit,
       offset: params.offset || 0,
-      // Only highlight the field we actually display. ["*"] makes Meilisearch
-      // render a highlighted copy of every attribute of every hit, which (×200
-      // hits × all indices) bloats the payload into megabytes.
-      attributesToHighlight: [fieldsOf(uid).searchField],
+      attributesToRetrieve: [...new Set([...metaFields, searchField, titleField])],
+      attributesToHighlight: [searchField],
       highlightPreTag: "<strong>",
       highlightPostTag: "</strong>",
       facets: [],
@@ -232,13 +229,14 @@ export function groupHitsIntoDocs(hits, scoreThreshold = 0.1) {
   for (const hit of filtered) {
     const searchField = searchFieldOf(hit._index);
     const key = baseDocId(hit.id);
-    // `text` is the raw chunk; `textHL` carries the <strong>-highlighted query
-    // terms. `_formatted` is dropped from the spread so the full highlight blob
-    // is not shipped to the client.
     const { _formatted, ...rest } = hit;
+    // The chunk text is carried once, on _matchedChunks, as the highlighted
+    // copy only: the raw field on the doc and a second plain copy per chunk
+    // were the same string shipped three times. Plain text is recovered
+    // client-side by dropping the tags — see chunkText in $lib/highlight.js.
+    delete rest[searchField];
     const chunk = {
       chunk_id: hit.chunk_id,
-      text: hit[searchField] || "",
       textHL: _formatted?.[searchField] || hit[searchField] || "",
       score: hit._rankingScore,
     };

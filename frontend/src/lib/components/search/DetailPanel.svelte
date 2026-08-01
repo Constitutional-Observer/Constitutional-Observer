@@ -4,7 +4,7 @@
   // clicking a result (or opening a bookmark) opens the detail modal. Reactive
   // state lives on the `panel` (DocPanel) and `bookmarks` (Bookmarks) class
   // instances passed in as props.
-  import { renderHighlight as renderHL } from "$lib/highlight.js";
+  import { renderHighlight as renderHL, chunkText } from "$lib/highlight.js";
   import { topicHighlight } from "$lib/components/search/topic-highlight.svelte.js";
 
   // ── RelatedSearch ────────────────────────────────────────────────────────────
@@ -44,11 +44,10 @@
       return { destroy: () => node.removeEventListener("click", handler) };
     };
 
-    // The searchable text held for a hit (matched chunks + discussions); full
-    // document bodies aren't loaded client-side, so this is best-effort.
+    // The searchable text held for a hit (its matched chunks); full document
+    // bodies aren't loaded client-side, so this is best-effort.
     static #hitText(hit) {
-      const chunks = (hit._matchedChunks || []).map((c) => c.text).filter(Boolean);
-      return [...chunks, hit.__discussions || ""].filter(Boolean).join("\n");
+      return (hit._matchedChunks || []).map(chunkText).filter(Boolean).join("\n");
     }
 
     // Hits whose held text contains the term, each with a match count and up to
@@ -315,6 +314,8 @@
             {@render topicMembership()}
           </div>
 
+          <!-- groupHitsIntoDocs builds every doc from at least one hit, so a
+               result always carries _matchedChunks. -->
           {#if selectedHit._matchedChunks?.length}
             <p class="matched-label">
               {selectedHit._matchedChunks.length} matched section{selectedHit
@@ -331,34 +332,16 @@
                   <button
                     class="copy-btn"
                     onclick={() =>
-                      panel.copyText(mc.text, `mc-${selectedHit.id}-${mc.chunk_id}`)}
+                      panel.copyText(chunkText(mc), `mc-${selectedHit.id}-${mc.chunk_id}`)}
                   >
                     {panel.copiedId === `mc-${selectedHit.id}-${mc.chunk_id}`
                       ? "Copied"
                       : "Copy"}
                   </button>
                 </div>
-                <p use:related.action>{@html renderHighlight(mc.textHL || mc.text)}</p>
+                <p class="result-excerpt" use:related.action>{@html renderHighlight(mc.textHL)}</p>
               </div>
             {/each}
-          {:else}
-            <blockquote class="result-excerpt" use:related.action>
-              {@html renderHighlight(
-                selectedHit._formatted?.__discussions ||
-                  selectedHit.__discussions ||
-                  "",
-              )}
-              <button
-                class="copy-btn"
-                onclick={() =>
-                  panel.copyText(
-                    selectedHit.__discussions || "",
-                    `ex-${selectedHit.id}`,
-                  )}
-              >
-                {panel.copiedId === `ex-${selectedHit.id}` ? "Copied" : "Copy"}
-              </button>
-            </blockquote>
           {/if}
 
           {#if !panel.fullDocs[panel.docKey(selectedHit)]}
@@ -674,7 +657,7 @@
     @apply text-sm text-black/80 border-l-[3px] border-amber-400 bg-amber-50/50 pl-3 py-2 my-1 rounded-r whitespace-pre-wrap;
   }
   .result-excerpt {
-    @apply text-sm text-black/80 border-l-[3px] border-primary/50 pl-3 py-1 my-2 whitespace-pre-wrap;
+    @apply !text-[1em] prose text-black/80 border-l-[3px] border-primary/50 pl-3 py-1 my-2 whitespace-pre-wrap;
   }
   .load-doc-btn {
     @apply text-xs text-blue-700 underline mt-2 hover:text-blue-900;
