@@ -12,6 +12,7 @@
     query = "",
     indices = [],
     paginationDone = true,
+    searching = false,
   } = $props();
 
   // The document's dominant-topic terms, for highlighting in its card.
@@ -55,7 +56,7 @@
   </nav>
 {/snippet}
 
-<main class="results-list-container">
+<main class="results-list-container" class:is-stale={searching}>
   <GeoClusterMap
     hits={pager.allRankedHits}
     {query}
@@ -202,6 +203,11 @@
 
   .results-list-container {
     @apply flex-1 min-w-[60vw] ;
+    transition: opacity 0.15s ease;
+  }
+  /* Results from the previous query, still shown while the new one loads. */
+  .is-stale {
+    @apply opacity-40 pointer-events-none;
   }
 
   .results-list{

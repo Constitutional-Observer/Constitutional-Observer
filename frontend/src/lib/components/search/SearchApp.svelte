@@ -266,18 +266,30 @@
     loading = $state(false);
     progress = $state("");
 
-    #activeQuery = "";
+    /** @type {AbortController | null} */
+    #controller = null;
 
-    seed(serverData) {
-      this.docs = Array.isArray(serverData.debates) ? serverData.debates : [];
-      this.hitCount = serverData.hitCount || 0;
-      this.estimated = serverData.totalEstimated || 0;
+    // Stop any in-flight/queued background batch immediately. Called
+    // whenever a new search starts so a stale query's lazy-load never
+    // overlaps the new one's own (much heavier) multi-search.
+    cancelBackgroundLoad() {
+      this.#controller?.abort();
+      this.#controller = null;
       this.loading = false;
       this.progress = "";
     }
 
+    seed(serverData) {
+      this.cancelBackgroundLoad();
+      this.docs = Array.isArray(serverData.debates) ? serverData.debates : [];
+      this.hitCount = serverData.hitCount || 0;
+      this.estimated = serverData.totalEstimated || 0;
+    }
+
     async fetchRemaining(query, extraParams = {}) {
-      this.#activeQuery = query;
+      this.cancelBackgroundLoad();
+      const controller = new AbortController();
+      this.#controller = controller;
       this.loading = true;
 
       let offset = LazyLoader.#BATCH_SIZE;
@@ -285,8 +297,6 @@
       let estimated = this.estimated;
 
       while (accumulated < LazyLoader.#MAX_HITS && accumulated < estimated) {
-        if (this.#activeQuery !== query) break;
-
         this.progress = `Loading more results... ${accumulated} of ~${estimated}`;
         try {
           const params = new URLSearchParams({
@@ -295,11 +305,10 @@
             offset: String(offset),
             ...extraParams,
           });
-          const resp = await fetch(`/api/search?${params}`);
+          const resp = await fetch(`/api/search?${params}`, { signal: controller.signal });
           if (!resp.ok) break;
           const batch = await resp.json();
           if (!batch.docs?.length) break;
-          if (this.#activeQuery !== query) break;
 
           const docMap = new Map(this.docs.map((d) => [docKeyOf(d), d]));
           for (const doc of batch.docs) {
@@ -333,14 +342,16 @@
           this.estimated = estimated;
           offset += LazyLoader.#BATCH_SIZE;
         } catch (err) {
+          if (err instanceof Error && err.name === "AbortError") return; // a newer call already owns state — don't touch it
           console.error("Lazy load failed:", err);
           break;
         }
       }
 
-      if (this.#activeQuery === query) {
+      if (this.#controller === controller) {
         this.loading = false;
         this.progress = "";
+        this.#controller = null;
       }
     }
   }
@@ -574,10 +585,13 @@
   let searching = $state(false);
   let showBookmarks = $state(false);
 
+  // Stale-while-revalidate: keep the previous results rendered while the new
+  // search resolves and swap them in one go. Blanking `resolved` here instead
+  // left the map, cards and subtitle empty for the whole multi-search (seconds),
+  // which read as a broken page — `searching` already drives the loading UI.
   $effect(() => {
     const source = data.streamed ?? data;
     searching = true;
-    resolved = EMPTY_SEARCH_DATA;
     let cancelled = false;
     Promise.resolve(source).then((value) => {
       if (!cancelled) resolved = value;
@@ -649,6 +663,7 @@
   // --- Actions ---
 
   function handleSubmit() {
+    loader.cancelBackgroundLoad();
     panel.reset();
     pager.reset();
     searching = true;
@@ -689,6 +704,7 @@
     <ResultsList
       {pager}
       {panel}
+      {searching}
       query={resolved.searchParams?.query || ""}
       {indices}
       paginationDone={!loader.loading}

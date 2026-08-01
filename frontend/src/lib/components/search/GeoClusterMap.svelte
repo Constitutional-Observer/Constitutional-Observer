@@ -48,6 +48,9 @@
     // pagination; topic modelling only starts once readyToModel is true, so
     // LDA isn't restarted mid-pagination.
     build(hits, query, indices = [], readyToModel = true) {
+      if (query !== this.#query) {
+        for (const p of this.#pipelines.values()) p.reset();
+      }
       this.#query = query;
       const meta = new Map(indices.map((i) => [i.uid, i]));
       const map = new Map();
