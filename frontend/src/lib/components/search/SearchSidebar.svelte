@@ -1,9 +1,9 @@
 <script>
   import TimelineSlider from "$lib/components/search/TimelineSlider.svelte";
+  import { searchBox, searchParams, ui } from "$lib/components/search/search-state.svelte.js";
 
   let {
     // Search bar
-    searchInput = $bindable(""),
     searching = false,
     subtitle = "",
     // Loading progress
@@ -19,14 +19,8 @@
     selectedStates = $bindable(new Set()),
     yearMin = $bindable(""),
     yearMax = $bindable(""),
-    selectedIndexIds = $bindable(new Set()),
-    // Search params (bindable)
-    paramHybrid = $bindable(false),
-    paramSemanticRatio = $bindable(0.5),
-    paramScoreThreshold = $bindable(0.1),
     // Bookmarks
     bookmarkCount = 0,
-    showBookmarks = $bindable(false),
     // Callback
     onsearch,
   } = $props();
@@ -50,9 +44,9 @@
   }
 
   function toggleIndex(uid) {
-    const next = new Set(selectedIndexIds);
+    const next = new Set(searchParams.indexIds);
     next.has(uid) ? next.delete(uid) : next.add(uid);
-    selectedIndexIds = next;
+    searchParams.indexIds = next;
   }
 
   // Filters section: closed by default on mobile, open by default on desktop
@@ -82,7 +76,7 @@
             type="text"
             class="p-1 !text-2xl w-full text-xs border border-primary caret-red"
             placeholder="Ask a question"
-            bind:value={searchInput}
+            bind:value={searchBox.query}
             disabled={searching}
           />
           {#if searching}
@@ -110,7 +104,7 @@
 
   <div class="controls-row">
     <div class="action-row">
-      <button class="bm-trigger" onclick={() => (showBookmarks = true)} title="Bookmarks">
+      <button class="bm-trigger" onclick={() => (ui.showBookmarks = true)} title="Bookmarks">
         <span class="btn-icon">★</span>
         <span class="btn-label">Bookmarks</span>
         <span class="bm-trigger-count">{bookmarkCount}</span>
@@ -174,21 +168,21 @@
     <details class="filter-accordion">
       <summary class="filter-accordion-summary">
         <span class="summary-label">Search params</span>
-        {#if paramHybrid}
-          <span class="filter-badge">hybrid {paramSemanticRatio}</span>
+        {#if searchParams.hybrid}
+          <span class="filter-badge">hybrid {searchParams.semanticRatio}</span>
         {/if}
         <span class="accordion-arrow"></span>
       </summary>
       <div class="accordion-body">
         <div class="param-grid">
           <label class="param-label">Hybrid (semantic)</label>
-          <input type="checkbox" bind:checked={paramHybrid} />
-          {#if paramHybrid}
-            <label class="param-label">Semantic ratio <span class="param-value">{paramSemanticRatio}</span></label>
-            <input type="range" step="0.01" min="0" max="1" bind:value={paramSemanticRatio} class="param-slider" />
+          <input type="checkbox" bind:checked={searchParams.hybrid} />
+          {#if searchParams.hybrid}
+            <label class="param-label">Semantic ratio <span class="param-value">{searchParams.semanticRatio}</span></label>
+            <input type="range" step="0.01" min="0" max="1" bind:value={searchParams.semanticRatio} class="param-slider" />
           {/if}
           <label class="param-label">Score threshold</label>
-          <input type="number" step="0.01" min="0" max="1" bind:value={paramScoreThreshold} class="param-input" />
+          <input type="number" step="0.01" min="0" max="1" bind:value={searchParams.scoreThreshold} class="param-input" />
         </div>
         <p class="param-hint">Changes apply on next search</p>
       </div>
@@ -197,7 +191,7 @@
     <!-- Indices — accordion, closed by default -->
     <details class="filter-accordion">
       <summary class="filter-accordion-summary">
-        <span class="summary-label">Indices ({indices.length}){selectedIndexIds.size > 0 ? ` · ${selectedIndexIds.size} selected` : ''}</span>
+        <span class="summary-label">Indices ({indices.length}){searchParams.indexIds.size > 0 ? ` · ${searchParams.indexIds.size} selected` : ''}</span>
         <span class="indices-pills">
           <span class="semantic-pill">{semanticCount} semantic</span>
           <span class="docs-pill">{totalDocs.toLocaleString()}</span>
@@ -206,9 +200,9 @@
       </summary>
       <div class="accordion-body">
         <div class="idx-controls">
-          <button class="idx-control-btn" onclick={() => selectedIndexIds = new Set(indices.map(i => i.uid))}>All</button>
-          <button class="idx-control-btn" onclick={() => selectedIndexIds = new Set()}>None</button>
-          {#if selectedIndexIds.size === 0}
+          <button class="idx-control-btn" onclick={() => searchParams.indexIds = new Set(indices.map(i => i.uid))}>All</button>
+          <button class="idx-control-btn" onclick={() => searchParams.indexIds = new Set()}>None</button>
+          {#if searchParams.indexIds.size === 0}
             <span class="idx-hint">None = search all</span>
           {/if}
         </div>
@@ -219,7 +213,7 @@
             {#each idxList as idx (idx.uid)}
               <button
                 class="idx-row"
-                class:idx-row-selected={selectedIndexIds.has(idx.uid)}
+                class:idx-row-selected={searchParams.indexIds.has(idx.uid)}
                 title={idx.annotation || idx.uid}
                 onclick={() => toggleIndex(idx.uid)}
               >

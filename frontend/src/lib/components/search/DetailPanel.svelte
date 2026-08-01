@@ -1,10 +1,11 @@
 <script>
   // Modal-based detail/bookmarks UI for the search page. The bookmarks modal is
-  // opened by a trigger in the sidebar (via the bindable `showBookmarks` prop);
+  // opened by a trigger in the sidebar (via the shared `ui.showBookmarks`);
   // clicking a result (or opening a bookmark) opens the detail modal. Reactive
   // state lives on the `panel` (DocPanel) and `bookmarks` (Bookmarks) class
   // instances passed in as props.
   import { renderHighlight as renderHL, chunkText } from "$lib/highlight.js";
+  import { ui } from "$lib/components/search/search-state.svelte.js";
   import { topicHighlight } from "$lib/components/search/topic-highlight.svelte.js";
 
   // ── RelatedSearch ────────────────────────────────────────────────────────────
@@ -87,7 +88,6 @@
     panel,
     bookmarks,
     selectedHit,
-    showBookmarks = $bindable(false),
     allHits = [],
     scopedHits = [],
     onOpenDoc,
@@ -126,7 +126,7 @@
 
   // Lock background scroll while either modal is open.
   $effect(() => {
-    if (detailOpen || showBookmarks) {
+    if (detailOpen || ui.showBookmarks) {
       document.body.style.overflow = "hidden";
       return () => (document.body.style.overflow = "");
     }
@@ -139,14 +139,14 @@
   }
 
   function openBookmark(bm) {
-    showBookmarks = false;
+    ui.showBookmarks = false;
     panel.openById(bm);
   }
 
   function onKeydown(e) {
     if (e.key !== "Escape") return;
     if (detailOpen) closeDetail();
-    else if (showBookmarks) showBookmarks = false;
+    else if (ui.showBookmarks) ui.showBookmarks = false;
   }
 </script>
 
@@ -173,11 +173,11 @@
 {/snippet}
 
 <!-- Bookmarks modal -->
-{#if showBookmarks}
+{#if ui.showBookmarks}
   <div
     class="modal-overlay"
     role="presentation"
-    onclick={() => (showBookmarks = false)}
+    onclick={() => (ui.showBookmarks = false)}
   >
     <div
       class="modal bookmarks-modal"
@@ -189,7 +189,7 @@
     >
       <header class="modal-header">
         <span class="modal-title">★ Bookmarks <span class="bm-count">{bookmarks.items.length}</span></span>
-        <button class="modal-close" title="Close" onclick={() => (showBookmarks = false)}>✕</button>
+        <button class="modal-close" title="Close" onclick={() => (ui.showBookmarks = false)}>✕</button>
       </header>
       <div class="modal-body">
         {#if bookmarks.items.length === 0}

@@ -4,6 +4,7 @@
   import SearchApp from "$lib/components/search/SearchApp.svelte";
   import { goto } from "$app/navigation";
   import {thematicQuestions} from "$lib/data/text.js";
+  import { searchBox } from "$lib/components/search/search-state.svelte.js";
 
   let { data } = $props();
 
@@ -28,14 +29,16 @@
   }
 
   function searchQuery(query) {
-    const el = document.getElementById("ask-section");
-    if (el) slowScrollTo(el, 1800);
-
-    goto(`/?query=${encodeURIComponent(query)}`, {
+    searchBox.query = query;
+        goto(`/?query=${encodeURIComponent(query)}`, {
       invalidateAll: true,
       noScroll: true,
       keepFocus: true,
     });
+    const el = document.getElementById("ask-section");
+    if (el) slowScrollTo(el, 1800);
+
+
   }
 
   function searchTheme(theme) {

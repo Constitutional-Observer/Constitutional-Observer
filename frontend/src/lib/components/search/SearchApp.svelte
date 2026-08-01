@@ -3,6 +3,7 @@
   import SearchSidebar from "$lib/components/search/SearchSidebar.svelte";
   import DetailPanel from "$lib/components/search/DetailPanel.svelte";
   import { topicHighlight } from "$lib/components/search/topic-highlight.svelte.js";
+  import { searchBox, searchParams, ui } from "$lib/components/search/search-state.svelte.js";
   import { chunkText } from "$lib/highlight.js";
   import { goto, replaceState } from "$app/navigation";
   import { page } from "$app/state";
@@ -358,30 +359,6 @@
   }
 
   // ---------------------------------------------------------------------------
-  // SearchParams — adjustable search configuration + URL-params builder
-  // ---------------------------------------------------------------------------
-  class SearchParams {
-    hybrid = $state(false);
-    semanticRatio = $state(0.5);
-    limit = $state(200);
-    scoreThreshold = $state(0.1);
-    indexIds = $state(new Set());
-
-    build(query) {
-      const params = new URLSearchParams({
-        query,
-        hybrid: this.hybrid,
-        semanticRatio: this.semanticRatio,
-        limit: this.limit,
-        scoreThreshold: this.scoreThreshold,
-      });
-      if (this.indexIds.size > 0)
-        params.set("indices", [...this.indexIds].join(","));
-      return params;
-    }
-  }
-
-  // ---------------------------------------------------------------------------
   // ResultFilter — filter state + all views derived from it
   // Getters are reactive: Svelte tracks $state reads on both this and #loader.
   // ---------------------------------------------------------------------------
@@ -528,7 +505,6 @@
   // ---------------------------------------------------------------------------
 
   const loader = new LazyLoader();
-  const search = new SearchParams();
   const filter = new ResultFilter(loader);
   const pager = new ResultPager(filter);
   const panel = new DocPanel(pager);
@@ -542,11 +518,11 @@
     if (states) filter.selectedStates = new Set(states.split(","));
     filter.yearMin = sp.get("yearMin") || "";
     filter.yearMax = sp.get("yearMax") || "";
-    if (sp.has("hybrid")) search.hybrid = sp.get("hybrid") === "true";
-    if (sp.has("semanticRatio")) search.semanticRatio = parseFloat(sp.get("semanticRatio") ?? "");
-    if (sp.has("scoreThreshold")) search.scoreThreshold = parseFloat(sp.get("scoreThreshold") ?? "");
+    if (sp.has("hybrid")) searchParams.hybrid = sp.get("hybrid") === "true";
+    if (sp.has("semanticRatio")) searchParams.semanticRatio = parseFloat(sp.get("semanticRatio") ?? "");
+    if (sp.has("scoreThreshold")) searchParams.scoreThreshold = parseFloat(sp.get("scoreThreshold") ?? "");
     const indices = sp.get("indices");
-    if (indices) search.indexIds = new Set(indices.split(","));
+    if (indices) searchParams.indexIds = new Set(indices.split(","));
   });
 
    $effect(() => {
@@ -554,11 +530,11 @@
     if (!query) return;
     const params = new URLSearchParams({
       query,
-      hybrid: String(search.hybrid),
-      semanticRatio: String(search.semanticRatio),
-      scoreThreshold: String(search.scoreThreshold),
+      hybrid: String(searchParams.hybrid),
+      semanticRatio: String(searchParams.semanticRatio),
+      scoreThreshold: String(searchParams.scoreThreshold),
     });
-    if (search.indexIds.size) params.set("indices", [...search.indexIds].join(","));
+    if (searchParams.indexIds.size) params.set("indices", [...searchParams.indexIds].join(","));
     if (filter.selectedStates.size) params.set("states", [...filter.selectedStates].join(","));
     if (filter.yearMin) params.set("yearMin", filter.yearMin);
     if (filter.yearMax) params.set("yearMax", filter.yearMax);
@@ -582,9 +558,7 @@
   let resolved = $state(EMPTY_SEARCH_DATA);
 
   // UI state — search bar + loading flag
-  let searchInput = $state("");
   let searching = $state(false);
-  let showBookmarks = $state(false);
 
   // Stale-while-revalidate: keep the previous results rendered while the new
   // search resolves and swap them in one go. Blanking `resolved` here instead
@@ -603,7 +577,7 @@
   });
 
   $effect(() => {
-    searchInput = resolved.searchParams?.query || "";
+    searchBox.query = resolved.searchParams?.query || "";
   });
 
   // Seed loader + reset everything when the resolved data changes
@@ -668,7 +642,7 @@
     panel.reset();
     pager.reset();
     searching = true;
-    goto(`${basePath}?${search.build(searchInput).toString()}`, {
+    goto(`${basePath}?${searchParams.build(searchBox.query).toString()}`, {
       invalidateAll: true,
       noScroll: true,
     });
@@ -679,7 +653,6 @@
 <div id="container">
   <div class="page-layout">
     <SearchSidebar
-      bind:searchInput
       {searching}
       {subtitle}
       loadingMore={loader.loading}
@@ -692,12 +665,7 @@
       bind:selectedStates={filter.selectedStates}
       bind:yearMin={filter.yearMin}
       bind:yearMax={filter.yearMax}
-      bind:selectedIndexIds={search.indexIds}
-      bind:paramHybrid={search.hybrid}
-      bind:paramSemanticRatio={search.semanticRatio}
-      bind:paramScoreThreshold={search.scoreThreshold}
       bookmarkCount={bookmarks.items.length}
-      bind:showBookmarks
       onsearch={handleSubmit}
     />
 
@@ -716,7 +684,6 @@
       {panel}
       {bookmarks}
       {selectedHit}
-      bind:showBookmarks
       allHits={loader.docs}
       scopedHits={pager.rankedHits}
       onOpenDoc={(hit) => panel.openHit(hit)}
