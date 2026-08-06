@@ -14,7 +14,8 @@
     const s = term.replace(/_/g, " ");
     return s.charAt(0).toUpperCase() + s.slice(1);
   };
-  const hitTitle = (hit, i) => hit._title || `Document ${i + 1}`;
+  
+  const hitTitle = (hit, i) => "On " + new Date (hit.year, hit.month, hit.day).toLocaleDateString("en-UK", { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }) + " · " + String(hit._title).toLowerCase() || `Document ${i + 1}`;
   const hitExcerpt = (hit) => hit._matchedChunks?.[0]?.textHL || "";
   // Must agree with SearchApp's docKeyOf.
   const docKey = (hit) => hit._docId || String(hit?.id ?? "").replace(/_\d+$/, "");
@@ -574,7 +575,7 @@
 
   .gm-label-card { @apply absolute z-10 bg-white/95 rounded-md shadow-sm cursor-pointer overflow-hidden text-[1em] text-left; border: 1px solid rgba(0,0,0,0.12); width: 200px; }
   .gm-label-card:hover { @apply bg-white shadow-lg z-30; border-color: rgba(0,0,0,0.22); }
-  .gm-label-title { @apply px-2 pt-1.5 pb-1 text-[1em] font-semibold text-black/80 leading-tight truncate; border-bottom: 1px solid rgba(0,0,0,0.06); }
+  .gm-label-title { @apply px-2 pt-1.5 pb-1 text-[1em] whitespace-pre-wrap font-semibold capitalize text-black/80 leading-tight truncate; border-bottom: 1px solid rgba(0,0,0,0.06); }
   .gm-label-excerpt { @apply px-2 py-1.5 text-[0.78em] text-black/50 leading-snug line-clamp-[10]; }
   .gm-label-excerpt :global(strong), .gm-tip-excerpt :global(strong) {
     background: rgba(251, 191, 36, 0.45); border-radius: 2px; padding: 0 1px; font-weight: inherit;
