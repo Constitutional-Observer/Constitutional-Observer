@@ -4,8 +4,8 @@
   // clicking a result (or opening a bookmark) opens the detail modal. Reactive
   // state lives on the `panel` (DocPanel) and `bookmarks` (Bookmarks) class
   // instances passed in as props.
-  import { renderHighlight as renderHL, chunkText } from "$lib/highlight.js";
-  import { ui } from "$lib/components/search/search-state.svelte.js";
+  import { renderHighlight as renderHL, chunkText, markQuery } from "$lib/highlight.js";
+  import { ui, searchBox } from "$lib/components/search/search-state.svelte.js";
   import { topicHighlight } from "$lib/components/search/topic-highlight.svelte.js";
 
   // ── RelatedSearch ────────────────────────────────────────────────────────────
@@ -117,6 +117,9 @@
   // Query-term + topic-term highlight for the open document. Clickable — the
   // detail panel is the one place a highlight is interactive.
   const renderHighlight = (text) => renderHL(text, highlightTerms, true);
+
+  const renderDocChunk = (text) =>
+    renderHL(markQuery(text, searchBox.query), highlightTerms, true);
 
   // Detail modal is open whenever there's a document to read (a result hit or an
   // opened bookmark) OR an active related-term search (which can be started from
@@ -271,7 +274,7 @@
                   class:doc-chunk-highlight={chunk.isHighlighted}
                 >
                   <span class="chunk-id">#{chunk.chunk_id}</span>
-                  <p use:related.action>{@html renderHighlight(chunk.text)}</p>
+                  <p use:related.action>{@html renderDocChunk(chunk.text)}</p>
                 </div>
               {/each}
             </div>
@@ -365,7 +368,7 @@
                   class:doc-chunk-highlight={chunk.isHighlighted}
                 >
                   <span class="chunk-id">#{chunk.chunk_id}</span>
-                  <p use:related.action>{@html renderHighlight(chunk.text)}</p>
+                  <p use:related.action>{@html renderDocChunk(chunk.text)}</p>
                 </div>
               {/each}
             </div>

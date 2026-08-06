@@ -2,7 +2,7 @@
   import { navigating } from "$app/state";
   import { untrack, tick } from "svelte";
   import { TopicPipeline } from "$lib/topic-modelling/topic-pipeline.svelte.js";
-  import { renderHighlight } from "$lib/highlight.js";
+  import { renderHighlight, chunkSnippet } from "$lib/highlight.js";
   import { topicHighlight } from "$lib/components/search/topic-highlight.svelte.js";
 
   import { select as d3select } from "d3-selection";
@@ -14,9 +14,9 @@
     const s = term.replace(/_/g, " ");
     return s.charAt(0).toUpperCase() + s.slice(1);
   };
-  
+
   const hitTitle = (hit, i) => "On " + new Date (hit.year, hit.month, hit.day).toLocaleDateString("en-UK", { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }) + " · " + String(hit._title).toLowerCase() || `Document ${i + 1}`;
-  const hitExcerpt = (hit) => hit._matchedChunks?.[0]?.textHL || "";
+  const hitExcerpt = (hit) => chunkSnippet(hit._matchedChunks?.[0]);
   // Must agree with SearchApp's docKeyOf.
   const docKey = (hit) => hit._docId || String(hit?.id ?? "").replace(/_\d+$/, "");
 

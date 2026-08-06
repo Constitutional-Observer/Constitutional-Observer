@@ -131,7 +131,7 @@ export async function searchIndices(indexUids, query, params = DEFAULT_SEARCH_PA
       showRankingScore: true,
       limit: params.limit,
       offset: params.offset || 0,
-      attributesToRetrieve: [...new Set([...metaFields, searchField, titleField])],
+      attributesToRetrieve: [...new Set([...metaFields, titleField])],
       attributesToHighlight: [searchField],
       highlightPreTag: "<strong>",
       highlightPostTag: "</strong>",
@@ -230,10 +230,6 @@ export function groupHitsIntoDocs(hits, scoreThreshold = 0.1) {
     const searchField = searchFieldOf(hit._index);
     const key = baseDocId(hit.id);
     const { _formatted, ...rest } = hit;
-    // The chunk text is carried once, on _matchedChunks, as the highlighted
-    // copy only: the raw field on the doc and a second plain copy per chunk
-    // were the same string shipped three times. Plain text is recovered
-    // client-side by dropping the tags — see chunkText in $lib/highlight.js.
     delete rest[searchField];
     const chunk = {
       chunk_id: hit.chunk_id,

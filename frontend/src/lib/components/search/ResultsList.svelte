@@ -3,7 +3,7 @@
   // paged result cards (desktop) / accordions (mobile). Reactive state lives on
   // the `pager` (ResultPager) and `panel` (DocPanel) instances passed in.
   import GeoClusterMap from "$lib/components/search/GeoClusterMap.svelte";
-  import { renderHighlight, chunkText } from "$lib/highlight.js";
+  import { renderHighlight, chunkText, chunkSnippet } from "$lib/highlight.js";
   import { topicHighlight } from "$lib/components/search/topic-highlight.svelte.js";
 
   let {
@@ -117,7 +117,7 @@
                     : "Copy"}
                 </button>
               </div>
-              <p>{@html renderHighlight(mc.textHL, hitTopics(hit))}</p>
+              <p>{@html renderHighlight(chunkSnippet(mc), hitTopics(hit))}</p>
             </div>
           {/each}
         {/if}

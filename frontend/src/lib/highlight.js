@@ -10,6 +10,88 @@
 export const stripHighlight = (html) => String(html || "").replace(/<\/?strong>/g, "");
 export const chunkText = (chunk) => chunk?.text ?? stripHighlight(chunk?.textHL);
 
+export const SNIPPET_WORDS = 20;
+
+export function cropHighlight(html, words = SNIPPET_WORDS) {
+  const src = String(html || "");
+  if (!src) return "";
+
+  const toks = [];
+  let ws = false;
+  for (const part of src.split(/(<\/?strong>)/)) {
+    if (part === "<strong>" || part === "</strong>") {
+      toks.push({ tag: part, ws });
+      ws = false;
+      continue;
+    }
+    for (const piece of part.split(/(\s+)/)) {
+      if (!piece) continue;
+      if (/^\s+$/.test(piece)) ws = true;
+      else {
+        toks.push({ word: piece, ws });
+        ws = false;
+      }
+    }
+  }
+
+  const total = toks.reduce((n, t) => n + (t.word ? 1 : 0), 0);
+  if (total <= words) return src;
+
+  let before = 0;
+  for (const t of toks) {
+    if (t.tag === "<strong>") break;
+    if (t.word) before++;
+  }
+  const start = Math.max(0, Math.min(before - Math.floor(words / 3), total - words));
+  const end = start + words;
+
+  let out = "";
+  let seen = 0;
+  let openBefore = false;
+  let open = false;
+  for (const t of toks) {
+    const inWindow = seen >= start && seen < end;
+    if (t.tag) {
+      if (inWindow) {
+        if (t.ws && out) out += " ";
+        out += t.tag;
+        open = t.tag === "<strong>";
+      } else if (seen < start) {
+        openBefore = t.tag === "<strong>";
+      }
+      continue;
+    }
+    if (inWindow) {
+      if (t.ws && out) out += " ";
+      out += t.word;
+    }
+    seen++;
+    if (seen >= end) break;
+  }
+
+  if (openBefore) out = "<strong>" + out;
+  if (open) out += "</strong>";
+  return (start > 0 ? "…" : "") + out + (end < total ? "…" : "");
+}
+
+export const chunkSnippet = (chunk, words = SNIPPET_WORDS) =>
+  cropHighlight(chunk?.textHL ?? chunk?.text, words);
+
+export function markQuery(text, query) {
+  const src = String(text || "");
+  const terms = [
+    ...new Set(
+      String(query || "")
+        .toLowerCase()
+        .split(/[^\p{L}\p{N}]+/u)
+        .filter((t) => t.length >= 3),
+    ),
+  ].sort((a, b) => b.length - a.length);
+  if (!src || !terms.length) return src;
+  const re = new RegExp(`\\b(${terms.map(escapeRegex).join("|")})`, "gi");
+  return src.replace(re, "<strong>$1</strong>");
+}
+
 // Escape HTML, then restore the Meilisearch <strong> query-highlight tags.
 export function escapeRestoreStrong(text) {
   return String(text || "")
