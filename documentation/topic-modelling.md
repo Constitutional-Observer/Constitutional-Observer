@@ -2,7 +2,8 @@
 
 This document describes the end-to-end topic modelling pipeline implemented in
 `frontend/src/lib/topic-modelling/topic-pipeline.svelte.js` (orchestration) and
-`frontend/src/lib/topic-modelling/lda.js` (Gibbs sampler).
+`frontend/src/lib/topic-modelling/lda.js` (Gibbs sampler), plus the plot it feeds
+(`frontend/src/lib/components/search/radviz.svelte.js`).
 
 ---
 
@@ -27,13 +28,13 @@ Search hits (raw parliamentary text)
 [5] Full seeded LDA at bestK           (Gibbs sampler, 300 iterations)
     │
     ▼
-[6] t-SNE projection                   (theta matrix → 2-D layout)
-    │
+[6] Document–topic membership          (θ > TOPIC_MIN → multi-topic buckets,
+    │                                   each tagged with its second topic)
     ▼
-[7] Document–topic membership          (θ > TOPIC_MIN → multi-topic buckets)
-    │
+[7] RadViz projection                  (per opened topic: the other topics become
+    │                                   named anchors; θ places the documents)
     ▼
-Topic map
+Topic plot
 ```
 
 ---
@@ -228,45 +229,28 @@ the 1%-floor fix, both numbers should rise substantially.
 
 ---
 
-## Stage 6 — t-SNE projection
-
-The M×K document-topic matrix θ is projected to 2-D using t-SNE:
-
-```
-perplexity = clamp(floor(M / 4), 5, 30)
-iterations = 250
-epsilon    = 10  (learning rate)
-```
-
-t-SNE runs once over the full θ; each cluster's scatter then reuses those
-coordinates for the documents in it. A document that belongs to several topics
-(see Stage 7) appears in each of their scatters, its opacity reflecting that
-topic's θ weight.
-
-Topics are ordered in the legend by **per-topic distinctiveness**: the
-prevalence-weighted average JSD from every other topic. More distinctive topics
-appear first.
-
----
-
-## Stage 7 — Document–topic membership (multi-topic)
+## Stage 6 — Document–topic membership (multi-topic)
 
 LDA is a **mixed-membership** model: every document has a full distribution θ
 over all K topics, not a single label. A document belongs to every topic it is
 more than `TOPIC_MIN` composed of:
 
 ```
-θ[doc][k] > TOPIC_MIN            (currently 0.1)
+θ[doc][k] > TOPIC_MIN            (currently 0.2)
 ```
 
 Membership is purely θ-driven — **no forced dominant (`argmax`) topic**. So a
 document can belong to several topics, or (rarely, if nothing clears the floor)
 to none — with `K ≈ 7` the strongest topic is almost always well above it.
 
-This one rule drives everything downstream: cluster buckets, the map (a document
+This one rule drives everything downstream: cluster buckets, the plot (a document
 appears in each cluster it belongs to), the detail-panel chips, and highlighting.
 Because a document can sit in several clusters, **per-topic member counts overlap
 and no longer sum to the document total**.
+
+Topics are ordered for display by **per-topic distinctiveness**: the
+prevalence-weighted average JSD from every other topic. More distinctive topics
+appear first.
 
 ### Choosing the threshold
 
@@ -275,7 +259,21 @@ is high, so θ rows spread across topics:
 
 - **Too high** (e.g. `0.4`) → docs collapse back toward a single topic.
 - **Too low** (e.g. `0.01`) → docs pick up topics they barely touch; noise.
-- At `0.1` a document is listed under any topic it is >10% composed of.
+- At `0.2` a document is listed under any topic it is >20% composed of.
+
+### The second topic — why documents sit together
+
+Each bucket entry also carries `second`, the document's strongest topic *other*
+than the one whose bucket it is in, and `secondProb`, that topic's weight.
+`second` is `null` when no other topic clears `TOPIC_MIN`.
+
+`second` is deliberately **relative to the bucket**: the same document has a
+different `second` in each topic it belongs to, because "what else is this about"
+is only meaningful from wherever you are currently reading.
+
+The plot uses it for the one-line summary under a hovered document — *68% this
+topic · also concerns tenancy · tenure · holding* — which names in words the pull
+that the document's position already shows.
 
 ### Consumers
 
@@ -287,6 +285,126 @@ with each topic's λ-ranked terms. `GeoClusterMap` publishes this to the shared
   chips in the detail panel.
 - `termsByDoc[docKey]` → the **union** of all member topics' terms → text
   highlighting covers every topic the document belongs to, not just one.
+
+---
+
+## Stage 7 — RadViz projection
+
+`TopicPipeline.radviz(topicId)` lays out one topic's documents in 2-D. It runs per
+opened topic, not per model run, and is a weighted sum rather than an optimisation
+— no iterations, no timing entry in the stats bar.
+
+### The construction
+
+Every topic **other** than the opened one becomes an anchor, evenly spaced around
+a circle. A document is the θ-weighted sum of those anchor unit vectors:
+
+```
+ux = Σ  θ[j][a] · cos(angle_a)          for every anchor a ≠ opened topic
+uy = Σ  θ[j][a] · sin(angle_a)
+```
+
+The opened topic has no anchor, so it contributes nothing and pulls toward the
+origin. Because θ rows sum to 1 there is no renormalisation step and the bound
+falls straight out: `|r| ≤ 1 − θ[j][k]`. That is the whole reading of the plot —
+
+> **distance from the centre is the share of a document that is about something
+> other than the topic you opened, and the direction says which topic that is.**
+
+A document that clears no other topic sits exactly at the centre. And since a
+document is only in this bucket if `θ[j][k] > TOPIC_MIN`, `r` can never exceed
+`1 − 0.2 = 0.8` — usually far less. The plot stretches to compensate; see
+**Rendering** below.
+
+### Anchor order
+
+Anchors are placed in a **ring order** computed once per model run in
+`TopicLDAViz.ringOrder`, from the full K×K Jensen–Shannon matrix that the
+distinctiveness pass already produces: start at the most distinctive topic, then
+repeatedly append the nearest topic not yet placed.
+
+This defuses RadViz's known ambiguity. A document splitting its weight across two
+anchors lands between them — and if those anchors were diametrically opposed it
+would land back on the origin and read as "about nothing else". Ordering by
+similarity means the two anchors a document is *likely* to split across are
+neighbours, so the in-between position is a true reading rather than a collision
+with the centre.
+
+Computing the ring once, rather than per selection, keeps the picture's shape
+stable as the reader moves between topics: opening a topic vacates its slot and
+the survivors are respaced evenly, but their cyclic order never changes.
+
+### Return value
+
+```
+radviz(topicId) → {
+  anchors: [{ topic, angle, ux, uy }],                     // unit vectors, ring order
+  points:  [{ j, hit, idx, prob, second, ux, uy, r }],     // unit-disc coordinates
+  rMax,                                                    // largest r in points
+}
+```
+
+Coordinates are unit-disc, not pixels. `null` before the model finishes and at
+K = 1, where there is no other topic to anchor against; the caller falls back to a
+plain document list.
+
+`radviz` reads `#theta`, `#ring` and `rawClusters`, but deliberately **not**
+`lambda`. λ re-ranks the words an anchor is *labelled* with; it never moves
+anything. Anchor terms are resolved from `clusters` at render time, so dragging
+the slider re-words the plot without re-running the layout.
+
+### Rendering
+
+`RadvizPlot` (`frontend/src/lib/components/search/radviz.svelte.js`) turns those
+coordinates into pane pixels; `GeoClusterMap` draws them. Every constant below is
+configurable through the component's `radvizConfig` prop — the defaults are
+documented inline in `RadvizPlot.#DEFAULTS`.
+
+**Scale.** `k = R / max(rMax, 0.05)` maps the *furthest actual document* to the
+ring radius rather than mapping 1.0 to it, because `rMax` is at most 0.8 and
+usually much less — without the stretch every plot would be a knot at the origin.
+The stretch varies per topic, which is exactly why the grid has to label what its
+lines stand for.
+
+**Grid.** An open cartesian grid ruled to the pane edges, stepped in θ-share
+(0.1) rather than pixels, so a labelled line means the same thing at any zoom.
+Only lines within the measurable range are ticked and labelled: past `rMax`, and
+hard-capped at 100%, there is no share to state, so those lines are rule rather
+than scale.
+
+**Markers.** Radius encodes θ in the opened topic; position encodes what the
+document is *also* about. Plain circles in one ink — no colour or shape per topic,
+since K reaches the mid-teens and identity is already carried by position relative
+to a named anchor. A document that clears no other topic is drawn hollow.
+
+**Relaxation.** Identical topic profiles map to the same pixel, and every
+centre-only document lands exactly on the origin. Overlapping markers are pushed
+apart over a fixed number of passes, each clamped to 12px of its true position so
+the nudge never outgrows the signal. There is no randomness anywhere in the
+layout: a random seed would reintroduce the reload-to-reload drift that t-SNE was
+dropped for.
+
+**Zoom and pan.** Drag to pan, ⌘/ctrl + wheel to zoom at the cursor, buttons in
+the header. Both fold into the same transform — markers, grid and anchors scale
+and translate together, so the projection is never distorted and the grid stays
+true. Anchors are pinned inside the pane so the legend survives a deep zoom.
+
+**Document cards.** The strongest documents get a card pinned beside their marker
+on a short leader, placed in the first of eight surrounding slots that clears the
+pane edge, other cards, anchor labels and every marker. Nothing is displaced to
+make room, so a marker with no free slot simply gets no card and is read by
+hovering instead — which keeps a placed card unambiguously next to the document it
+names.
+
+### Why this and not t-SNE
+
+An earlier version projected θ with t-SNE. Two problems: once the view is filtered
+to a single topic every plotted document already shares it, so nothing visible
+explained the remaining spread; and with ~20–30 documents per topic the perplexity
+floor of 5 meant it was fitting noise that changed on every reload.
+
+RadViz names its axes on screen and is deterministic — the same search gives the
+same picture on every load, which is the property t-SNE could never offer here.
 
 ---
 
@@ -306,7 +424,6 @@ with each topic's λ-ranked terms. `GeoClusterMap` publishes this to the shared
 | `NLP Xms` | time for winkNLP lemmatization |
 | `phrases Xms` | time for phrase detection |
 | `LDA Xms` | time for K-sweep + full LDA run |
-| `t-SNE Xms` | time for dimensionality reduction |
 
 ---
 
@@ -316,4 +433,4 @@ with each topic's λ-ranked terms. `GeoClusterMap` publishes this to the shared
 - **Gibbs sampling for LDA**: Griffiths, T., Steyvers, M. (2004). *PNAS 101*(suppl 1).
 - **Seeded LDA**: Lu, B., Ott, M., Cardie, C., Tsou, B. (2011). *EMNLP*. Pseudo-count formulation as used in Watanabe, K., Baturo, A. (2024). *Political Analysis 32(1)*.
 - **Regularized Topic Divergence**: Deveaud, R., SanJuan, E., Bellot, P. (2014). *JDIQ 6(1)*.
-- **t-SNE**: van der Maaten, L., Hinton, G. (2008). *JMLR 9*.
+- **RadViz (dimensional anchors)**: Hoffman, P., Grinstein, G., Marx, K., Grosse, I., Stanley, E. (1997). *DNA visual and analytic data mining*. IEEE Visualization.

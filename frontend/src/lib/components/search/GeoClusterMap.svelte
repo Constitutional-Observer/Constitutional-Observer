@@ -1,12 +1,10 @@
 <script>
   import { navigating } from "$app/state";
-  import { untrack, tick } from "svelte";
+  import { untrack } from "svelte";
   import { TopicPipeline } from "$lib/topic-modelling/topic-pipeline.svelte.js";
   import { renderHighlight, chunkSnippet } from "$lib/highlight.js";
   import { topicHighlight } from "$lib/components/search/topic-highlight.svelte.js";
-
-  import { select as d3select } from "d3-selection";
-  import { zoom as d3zoom, zoomIdentity } from "d3-zoom";
+  import { RadvizPlot } from "$lib/components/search/radviz.svelte.js";
 
   const MIN_GROUP_DOCS = 4;
 
@@ -108,147 +106,16 @@
     }
   }
 
-  // Zoomable t-SNE canvas for one selected topic.
-  class ClusterScatter {
-    static #PAD = 32;
-    static #SCALE_MIN = 0.2;
-    static #SCALE_MAX = 4;
-
-    hoveredCircle = $state(null);
-    canvas        = $state(null);
-    rect          = $state(null);
-    transform     = $state({ x: 0, y: 0, k: 1 });
-    items         = $state([]);
-    #zoom = null;
-    #dragMoved = false;
-
-    attachZoom() {
-      if (!this.canvas) return;
-      this.#zoom = d3zoom()
-        .scaleExtent([ClusterScatter.#SCALE_MIN, ClusterScatter.#SCALE_MAX])
-        .filter((ev) => ev.type !== "wheel" || ev.ctrlKey)
-        .on("start", () => { this.#dragMoved = false; })
-        .on("zoom", (ev) => {
-          if (ev.sourceEvent?.type !== "wheel") this.#dragMoved = true;
-          this.transform = { x: ev.transform.x, y: ev.transform.y, k: ev.transform.k };
-        });
-      d3select(this.canvas).call(this.#zoom);
-    }
-    zoomBy(factor) {
-      if (this.#zoom && this.canvas) d3select(this.canvas).call(this.#zoom.scaleBy, factor);
-    }
-    resetView() {
-      if (this.#zoom && this.canvas) d3select(this.canvas).call(this.#zoom.transform, zoomIdentity);
-      this.transform = { x: 0, y: 0, k: 1 };
-    }
-
-    #toPx(it, w, h) {
-      const pad = ClusterScatter.#PAD;
-      return {
-        cx: (pad + it.nx * (w - pad * 2)) * this.transform.k + this.transform.x,
-        cy: (pad + (1 - it.ny) * (h - pad * 2)) * this.transform.k + this.transform.y,
-      };
-    }
-    pick(clientX, clientY) {
-      if (!this.canvas) return null;
-      const rect = this.canvas.getBoundingClientRect();
-      const mx = clientX - rect.left, my = clientY - rect.top;
-      let best = null, bestD = 400;
-      for (const it of this.items) {
-        const { cx, cy } = this.#toPx(it, rect.width, rect.height);
-        const d = (cx - mx) ** 2 + (cy - my) ** 2;
-        if (d < bestD) { bestD = d; best = { ...it, cx, cy }; }
-      }
-      return best;
-    }
-    onMove(e) {
-      const p = this.pick(e.clientX, e.clientY);
-      if (!p && this.hoveredCircle) { this.hoveredCircle = null; return; }
-      if (p && (this.hoveredCircle?.j !== p.j || this.hoveredCircle?.cx !== p.cx || this.hoveredCircle?.cy !== p.cy))
-        this.hoveredCircle = p;
-    }
-    onLeave() { this.hoveredCircle = null; }
-    onClick(e, onselect) {
-      if (this.#dragMoved) { this.#dragMoved = false; return; }
-      const p = this.pick(e.clientX, e.clientY);
-      if (p) onselect?.(p.hit);
-    }
-
-    draw() {
-      if (!this.canvas) return;
-      const dpr = window.devicePixelRatio || 1;
-      const rect = this.canvas.getBoundingClientRect();
-      const w = rect.width, h = rect.height;
-      const W = Math.max(1, Math.floor(w * dpr)), H = Math.max(1, Math.floor(h * dpr));
-      if (this.canvas.width !== W) this.canvas.width = W;
-      if (this.canvas.height !== H) this.canvas.height = H;
-
-      const ctx = this.canvas.getContext("2d");
-      ctx.setTransform(1, 0, 0, 1, 0, 0);
-      ctx.scale(dpr, dpr);
-      ctx.clearRect(0, 0, w, h);
-
-      for (const it of this.items) {
-        const { cx, cy } = this.#toPx(it, w, h);
-        const radius = 3 + Math.min(6, it.prob * 8);
-        const hover = this.hoveredCircle?.j === it.j;
-        ctx.beginPath();
-        ctx.arc(cx, cy, hover ? radius + 2 : radius, 0, Math.PI * 2);
-        ctx.fillStyle = hover ? "rgba(184,134,11,1)" : "rgba(0,0,0,0.62)";
-        ctx.fill();
-        ctx.lineWidth = hover ? 2 : 0.8;
-        ctx.strokeStyle = hover ? "#6b5335" : "rgba(0,0,0,0.25)";
-        ctx.stroke();
-      }
-      if (!this.rect || this.rect.width !== w || this.rect.height !== h) {
-        this.rect = { width: w, height: h };
-      }
-    }
-
-    // Greedy label placement for the highest-probability documents.
-    computeLabels() {
-      if (!this.rect || !this.items.length) return [];
-      const { width: w, height: h } = this.rect;
-      const tr = this.transform, pad = ClusterScatter.#PAD;
-      const N = 80, LW = 200, LH = 78, GAP = 6;
-      const placed = [], result = [];
-      for (let rank = 0; rank < Math.min(N, this.items.length); rank++) {
-        const it = this.items[rank];
-        const cx = (pad + it.nx * (w - pad * 2)) * tr.k + tr.x;
-        const cy = (pad + (1 - it.ny) * (h - pad * 2)) * tr.k + tr.y;
-        if (cx < -LW || cx > w + LW || cy < -LH || cy > h + LH) continue;
-        const dotR = 3 + Math.min(6, it.prob * 8) + GAP;
-        const candidates = [
-          { ox: dotR, oy: -LH / 2 }, { ox: -LW - dotR, oy: -LH / 2 },
-          { ox: -LW / 2, oy: -LH - dotR }, { ox: -LW / 2, oy: dotR },
-          { ox: dotR, oy: dotR }, { ox: -LW - dotR, oy: dotR },
-        ];
-        let pos = null;
-        for (const { ox, oy } of candidates) {
-          const lx = cx + ox, ly = cy + oy;
-          if (lx < 2 || lx + LW > w - 2 || ly < 2 || ly + LH > h - 2) continue;
-          if (placed.every((p) => lx + LW < p.x || lx > p.x + p.w || ly + LH < p.y || ly > p.y + p.h)) {
-            pos = { lx, ly }; break;
-          }
-        }
-        if (!pos) continue;
-        placed.push({ x: pos.lx, y: pos.ly, w: LW, h: LH });
-        result.push({ j: it.j, idx: it.idx, hit: it.hit, rank, cx, cy, lx: pos.lx, ly: pos.ly });
-      }
-      return result;
-    }
-  }
-
   let {
     hits = [],
     query = "",
     indices = [],
     onselect,
     paginationDone = true,
+    radvizConfig = {},
   } = $props();
 
   const geo = new GeoGroups();
-  const scatter = new ClusterScatter();
 
   // Hovering a square opens (and grows) it; it closes on mouseleave of the grid.
   let openKey = $state(null);
@@ -297,35 +164,50 @@
       : null;
   });
 
-  $effect(() => {
-    const p = selectedPipeline;
-    if (p) untrack(() => p.project());
-  });
+  // ── RadViz ───────────────────────────────────────────────────────────────
+  // `rv` holds pane size, hover, and the draw config. Its output is in pane
+  // pixels, shared by the SVG geometry and the HTML overlays.
+  // Constructed bare so radvizConfig is tracked by the effect, not captured once.
+  const rv = new RadvizPlot();
+  $effect(() => rv.configure(radvizConfig));
 
-  $effect(() => {
-    const c = selectedCluster;
-    const projected = selectedPipeline?.projected;
-    scatter.items = c && projected ? c.items : [];
-  });
+  let radviz = $derived(
+    selectedCluster && selectedPipeline
+      ? selectedPipeline.radviz(selectedCluster.topic)
+      : null,
+  );
+  let plot = $derived(rv.layoutFor(radviz));
+  let labelCards = $derived(rv.cardsFor(plot));
+  let floatingDoc = $derived(rv.floatingIn(plot, labelCards));
 
-  $effect(() => { if (scatter.canvas) untrack(() => scatter.attachZoom()); });
-  $effect(() => {
-    scatter.items; scatter.transform; scatter.hoveredCircle;
-    if (!scatter.canvas) return;
-    tick().then(() => scatter.draw());
-  });
 
-  let scatterLabels = $derived.by(() => {
-    scatter.items; scatter.transform; scatter.rect;
-    return scatter.computeLabels();
-  });
+  // Resolved here, not in RadvizPlot: λ re-ranks anchor wording but must not
+  // re-run the layout.
+  let topicTerms = $derived(
+    new Map(
+      (selectedPipeline?.clusters || []).map((c) => [
+        c.topic,
+        c.terms.slice(0, 3).map((t) => humanTerm(t.term)).join(" · "),
+      ]),
+    ),
+  );
+  const anchorLabel = (topic) => topicTerms.get(topic) || `Topic ${topic + 1}`;
+
+  // "68% this topic · also concerns Irrigation".
+  function dotSubtitle(d) {
+    const pct = `${Math.round(d.prob * 100)}% this topic`;
+    return d.second === null || d.second === undefined
+      ? `${pct} · nothing else`
+      : `${pct} · also concerns ${anchorLabel(d.second)}`;
+  }
 
   function selectTopic(groupKey, idx) {
+    rv.hovered = null;
+    rv.resetView();
     selectedTopic =
       selectedTopic?.groupKey === groupKey && selectedTopic?.idx === idx
         ? null
         : { groupKey, idx };
-    scatter.resetView();
   }
   const isSelected = (groupKey, idx) =>
     selectedTopic?.groupKey === groupKey && selectedTopic?.idx === idx;
@@ -333,7 +215,7 @@
 
 <svelte:window
   onkeydown={(e) => {
-    if (e.key === "Escape") { selectedTopic = null; openKey = null; }
+    if (e.key === "Escape") { selectedTopic = null; openKey = null; rv.hovered = null; }
   }}
 />
 
@@ -356,18 +238,29 @@
   {:else if pl.topicCount === 0}
     <span class="gm-cell-note"><span class="gm-spin"></span>modelling…</span>
   {:else}
+    <!-- count === 0 means no document clears TOPIC_MIN for this topic. It still
+         anchors the plot, but there is nothing to open. -->
     <div class="gm-cell-topics">
       {#each pl.clusters as c, ci (c.topic)}
-        <button
-          class="gm-cell-topic"
-          class:gm-cell-topic-selected={isSelected(g.key, ci)}
-          title={`${c.count} docs`}
-          onclick={() => selectTopic(g.key, ci)}
-        >
-          {c.terms.slice(0, 3).map((t) => humanTerm(t.term)).join(" · ")}
-        </button>
+        {#if c.count > 0}
+          <button
+            class="gm-cell-topic"
+            class:gm-cell-topic-selected={isSelected(g.key, ci)}
+            title={`${c.count} docs`}
+            onclick={() => selectTopic(g.key, ci)}
+          >
+            {c.terms.slice(0, 3).map((t) => humanTerm(t.term)).join(" · ")}
+          </button>
+        {/if}
       {/each}
     </div>
+  {/if}
+{/snippet}
+
+{#snippet docCard(d)}
+  <div class="gm-card-title" title={dotSubtitle(d)}>{hitTitle(d.hit, d.idx)}</div>
+  {#if hitExcerpt(d.hit)}
+    <p class="gm-card-excerpt">{@html renderHighlight(hitExcerpt(d.hit), selectedClusterTerms)}</p>
   {/if}
 {/snippet}
 
@@ -389,19 +282,19 @@
       </h3>
       <span class="gm-open-meta">{selectedGroup?.label} · {selectedCluster.count} docs</span>
       <div class="gm-zoom-btns">
-        <button class="gm-zoom-btn" onclick={() => scatter.zoomBy(1.4)}>+</button>
-        <button class="gm-zoom-btn" onclick={() => scatter.zoomBy(1 / 1.4)}>−</button>
-        <button class="gm-zoom-btn" onclick={() => scatter.resetView()}>⟲</button>
+        <button class="gm-zoom-btn" disabled={!rv.canZoomIn} title="Zoom in" onclick={() => rv.zoomIn()}>+</button>
+        <button class="gm-zoom-btn" disabled={!rv.canZoomOut} title="Zoom out" onclick={() => rv.zoomOut()}>−</button>
+        <button class="gm-zoom-btn" disabled={!rv.moved} title="Reset view" onclick={() => rv.resetView()}>⟲</button>
       </div>
       <button class="gm-clear" onclick={() => (selectedTopic = null)}>Clear ✕</button>
     {:else}
       <span class="gm-hint">
-        Click a topic inside a cell to project its documents.
+        Click a topic inside a cell to place its documents against the other topics.
       </span>
     {/if}
   </div>
 
-<section class="geo-map" class:geo-map-scatter={!!selectedCluster}>
+<section class="geo-map" class:geo-map-radviz={!!selectedCluster}>
   <div class="gm-body">
     {#if !selectedCluster}
       <div
@@ -442,53 +335,139 @@
       </div>
 
     {:else}
-      <!-- Accordion expanded: the t-SNE projection takes the full width. -->
-      <div class="gm-right gm-right-full">
-        <div class="gm-scatter">
-          {#if selectedPipeline?.projecting || !selectedPipeline?.projected}
-            <div class="gm-scatter-loading">
-              <span class="gm-spin gm-spin-lg"></span><span>Projecting cluster…</span>
-            </div>
-          {/if}
-          <canvas
-            bind:this={scatter.canvas}
-            class="gm-scatter-canvas"
-            onmousemove={(e) => scatter.onMove(e)}
-            onmouseleave={() => scatter.onLeave()}
-            onclick={(e) => scatter.onClick(e, onselect)}
-          ></canvas>
+      <!-- Topic opened. Other topics become named anchors; the opened topic is the
+           origin, so distance from centre is the share about something else. -->
+      <div class="gm-radviz-wrap">
+        <!-- Drag to pan, ctrl/⌘+wheel to zoom; a bare wheel still scrolls the page. -->
+        <div
+          class="gm-radviz"
+          class:gm-radviz-dragging={rv.dragging}
+          role="presentation"
+          bind:clientWidth={rv.paneW} bind:clientHeight={rv.paneH}
+          onwheel={(e) => rv.wheel(e)}
+          onpointerdown={(e) => rv.pointerDown(e)}
+          onpointermove={(e) => rv.pointerMove(e)}
+          onpointerup={() => rv.pointerUp()}
+          onpointercancel={() => rv.pointerUp()}
+        >
+          {#if plot}
+            <svg class="gm-rv-svg" aria-hidden="true">
+              <!-- Grid bleeds to the pane edges; one line per θ-share step. -->
+              {#each plot.grid.cols as g (g.off)}
+                <line class="gm-rv-grid" class:gm-rv-grid-marked={g.marked}
+                      x1={plot.cx0 - g.off} y1={plot.grid.y0} x2={plot.cx0 - g.off} y2={plot.grid.y1} />
+                <line class="gm-rv-grid" class:gm-rv-grid-marked={g.marked}
+                      x1={plot.cx0 + g.off} y1={plot.grid.y0} x2={plot.cx0 + g.off} y2={plot.grid.y1} />
+              {/each}
+              {#each plot.grid.rows as g (g.off)}
+                <line class="gm-rv-grid" class:gm-rv-grid-marked={g.marked}
+                      x1={plot.grid.x0} y1={plot.cy0 - g.off} x2={plot.grid.x1} y2={plot.cy0 - g.off} />
+                <line class="gm-rv-grid" class:gm-rv-grid-marked={g.marked}
+                      x1={plot.grid.x0} y1={plot.cy0 + g.off} x2={plot.grid.x1} y2={plot.cy0 + g.off} />
+              {/each}
 
-          <svg class="gm-scatter-leaders" aria-hidden="true">
-            {#each scatterLabels as r (r.j)}
-              <line x1={r.cx} y1={r.cy} x2={r.lx < r.cx ? r.lx + 200 : r.lx} y2={r.ly + 10} class="gm-scatter-leader" />
+              <line class="gm-rv-axis" x1={plot.grid.x0} y1={plot.cy0} x2={plot.grid.x1} y2={plot.cy0} />
+              <line class="gm-rv-axis" x1={plot.cx0} y1={plot.grid.y0} x2={plot.cx0} y2={plot.grid.y1} />
+
+              {#each plot.grid.cols as g (g.off)}
+                {#if g.marked}
+                  <line class="gm-rv-tick" x1={plot.cx0 + g.off} y1={plot.cy0 - plot.grid.tick}
+                                           x2={plot.cx0 + g.off} y2={plot.cy0 + plot.grid.tick} />
+                  <text class="gm-rv-tick-label" x={plot.cx0 + g.off} y={plot.cy0 + plot.grid.tick + 10}>
+                    {g.pct}%
+                  </text>
+                  <line class="gm-rv-tick" x1={plot.cx0 - g.off} y1={plot.cy0 - plot.grid.tick}
+                                           x2={plot.cx0 - g.off} y2={plot.cy0 + plot.grid.tick} />
+                  <text class="gm-rv-tick-label" x={plot.cx0 - g.off} y={plot.cy0 + plot.grid.tick + 10}>
+                    {g.pct}%
+                  </text>
+                {/if}
+              {/each}
+
+              {#each plot.anchors as a (a.topic)}
+                <line class="gm-rv-spoke" x1={plot.cx0} y1={plot.cy0} x2={a.sx} y2={a.sy} />
+              {/each}
+
+              {#each labelCards as c (c.j)}
+                <line class="gm-rv-leader" x1={c.px} y1={c.py} x2={c.ex} y2={c.ey} />
+              {/each}
+
+              {#each plot.dots as d (d.j)}
+                <circle
+                  class="gm-rv-dot"
+                  class:gm-rv-dot-on={rv.hovered === d.j}
+                  class:gm-rv-dot-solo={d.solo}
+                  cx={d.px} cy={d.py} r={rv.markerRadius(d)}
+                />
+              {/each}
+
+              {#each plot.dots as d (d.j)}
+                <circle
+                  class="gm-rv-hit"
+                  cx={d.px} cy={d.py} r={d.rad + rv.cfg.marker.hitPad}
+                  role="button" tabindex="-1"
+                  aria-label={hitTitle(d.hit, d.idx)}
+                  onmouseenter={() => rv.enter(d.j)}
+                  onmouseleave={() => rv.leave(d.j)}
+                  onclick={() => { if (rv.clickAllowed()) onselect?.(d.hit); }}
+                  onkeydown={(e) => { if (e.key === "Enter") onselect?.(d.hit); }}
+                />
+              {/each}
+            </svg>
+
+            {#each plot.anchors as a (a.topic)}
+              <span
+                class="gm-rv-anchor"
+                style="left: {a.ax}px; top: {a.ay}px; transform: translate({a.tx}, {a.ty});"
+              >
+                {anchorLabel(a.topic)}
+              </span>
             {/each}
-          </svg>
 
-          {#each scatterLabels as r (r.j)}
-            <div
-              class="gm-label-card"
-              style="left: {r.lx}px; top: {r.ly}px"
-              role="button" tabindex="0"
-              onclick={(e) => { e.stopPropagation(); onselect?.(r.hit); }}
-              onkeydown={(e) => { if (e.key === "Enter") onselect?.(r.hit); }}
-            >
-              <div class="gm-label-title">{hitTitle(r.hit, r.idx)}</div>
-              {#if hitExcerpt(r.hit)}
-                <p class="gm-label-excerpt">{@html renderHighlight(hitExcerpt(r.hit), selectedClusterTerms)}</p>
-              {/if}
-            </div>
-          {/each}
+            {#each labelCards as c (c.j)}
+              <div
+                class="gm-card gm-card-placed"
+                class:gm-card-on={rv.hovered === c.j}
+                style="left: {c.lx}px; top: {c.ly}px; width: {c.w}px; height: {c.h}px;"
+                role="button" tabindex="0"
+                onmouseenter={() => rv.enter(c.j)}
+                onmouseleave={() => rv.leave(c.j)}
+                onclick={() => { if (rv.clickAllowed()) onselect?.(c.hit); }}
+                onkeydown={(e) => { if (e.key === "Enter") onselect?.(c.hit); }}
+              >
+                {@render docCard(c)}
+              </div>
+            {/each}
 
-          {#if scatter.hoveredCircle}
-            {@const hov = scatter.hoveredCircle}
-            <div class="gm-hover-tip" style="left: {hov.cx}px; top: {hov.cy}px">
-              <div class="gm-tip-title">{hitTitle(hov.hit, hov.idx)}</div>
-              {#if hitExcerpt(hov.hit)}
-                <p class="gm-tip-excerpt">{@html renderHighlight(hitExcerpt(hov.hit), selectedClusterTerms)}</p>
-              {/if}
+            {#if floatingDoc}
+              <div
+                class="gm-card gm-card-float"
+                style="left: {floatingDoc.px}px; top: {floatingDoc.py}px; --card-w: {rv.cfg.cards.width}px;"
+              >
+                {@render docCard(floatingDoc)}
+              </div>
+            {/if}
+
+          {:else if rv.paneW > 0}
+            <!-- K = 1 (no anchors) or pane too small for minRadius. -->
+            <div class="gm-rv-fallback">
+              {#each selectedCluster.items as it (it.j)}
+                <button class="gm-cell-doc" onclick={() => onselect?.(it.hit)}>
+                  {hitTitle(it.hit, it.idx)}
+                </button>
+              {/each}
             </div>
           {/if}
         </div>
+
+        <p class="gm-radviz-caption">
+          Each label around the edge is another topic in this source. A document's
+          <strong>distance from the centre</strong> is how much of it is about something
+          other than the topic you opened — the grid marks read that share off — and the
+          <strong>direction</strong> says which topic that is. A <strong>hollow marker</strong>
+          at the centre is a document about nothing else. <strong>Marker size</strong> is
+          how much of the document is this topic. Drag to pan, ⌘/ctrl + scroll to zoom.
+        </p>
       </div>
     {/if}
 
@@ -511,11 +490,12 @@
   .gm-open-meta { @apply text-[10px] text-black/50 font-mono; }
   .gm-zoom-btns { @apply flex items-center rounded border border-primary/30 overflow-hidden ml-auto; }
   .gm-zoom-btn { @apply text-[13px] px-2 py-0.5 bg-white/60 text-black/70 cursor-pointer leading-none hover:bg-primary/20; border: none; }
-  .gm-zoom-btn + .gm-zoom-btn { border-left: 1px solid rgba(0,0,0,0.1); }
+  .gm-zoom-btn + .gm-zoom-btn { border-left: 1px solid rgba(0, 0, 0, 0.1); }
+  .gm-zoom-btn:disabled { @apply text-black/25 cursor-default; background: rgba(255, 255, 255, 0.3); }
   .gm-clear { @apply text-[11px] px-2 py-0.5 rounded border border-primary/30 bg-white/60 text-black/70 cursor-pointer hover:bg-primary/20 shrink-0; }
 
   .gm-body {
-    @apply relative grid border border-primary/20 m-1 h-full;
+    @apply relative grid border border-primary/20 p-1 h-full;
     grid-template-columns: minmax(0, 1fr);
     grid-template-rows: minmax(0, 1fr);
   }
@@ -563,32 +543,61 @@
     border: 1px solid transparent;
   }
 
-  .gm-right { @apply relative flex-1 rounded-md border border-primary/20 bg-white/70 h-full; }
-  .gm-right-full { @apply w-full h-full; }
+  .gm-radviz-wrap { @apply flex flex-col h-full min-h-0 gap-1; }
+  .gm-radviz {
+    @apply relative flex-1 min-h-0 rounded-md border border-primary/20 bg-white/70 overflow-hidden;
+    cursor: grab; touch-action: none;
+  }
+  .gm-radviz-dragging { cursor: grabbing; }
+  .gm-radviz-caption { @apply shrink-0 px-2 pb-0.5 text-[11px] leading-snug text-black/45; }
+  .gm-radviz-caption strong { @apply font-semibold text-black/65; }
+  .gm-rv-fallback { @apply flex flex-col gap-0.5 h-full overflow-y-auto p-2; }
 
-  .gm-scatter { @apply absolute inset-0 overflow-hidden; }
-  .gm-scatter-canvas { @apply absolute inset-0 w-full h-full; cursor: grab; touch-action: none; }
-  .gm-scatter-canvas:active { cursor: grabbing; }
-  .gm-scatter-loading { @apply absolute inset-0 z-30 flex flex-col items-center justify-center gap-2 text-[12px] text-black/55 italic; background: rgba(255,255,255,0.7); }
-  .gm-scatter-leaders { @apply absolute inset-0 w-full h-full pointer-events-none; z-index: 5; }
-  .gm-scatter-leader { stroke: rgba(0,0,0,0.2); stroke-width: 1; stroke-dasharray: 3 3; fill: none; }
+  /* Above the cards so markers stay visible; only .gm-rv-hit takes the pointer. */
+  .gm-rv-svg { @apply absolute inset-0 w-full h-full z-20 pointer-events-none; }
+  .gm-rv-grid { stroke: rgba(139, 115, 85, 0.13); stroke-width: 1; }
+  .gm-rv-grid-marked { stroke: rgba(139, 115, 85, 0.26); }
+  .gm-rv-axis { stroke: rgba(139, 115, 85, 0.45); stroke-width: 1; }
+  .gm-rv-tick { stroke: rgba(139, 115, 85, 0.6); stroke-width: 1.5; }
+  .gm-rv-tick-label {
+    @apply font-mono; font-size: 9px; fill: rgba(0, 0, 0, 0.35); text-anchor: middle;
+    paint-order: stroke; stroke: rgba(255, 255, 255, 0.9); stroke-width: 3px;
+  }
+  .gm-rv-spoke { stroke: rgba(139, 115, 85, 0.16); stroke-width: 1; stroke-dasharray: 3 4; }
+  .gm-rv-leader { stroke: rgba(0, 0, 0, 0.18); stroke-width: 1; stroke-dasharray: 3 3; }
 
-  .gm-label-card { @apply absolute z-10 bg-white/95 rounded-md shadow-sm cursor-pointer overflow-hidden text-[1em] text-left; border: 1px solid rgba(0,0,0,0.12); width: 200px; }
-  .gm-label-card:hover { @apply bg-white shadow-lg z-30; border-color: rgba(0,0,0,0.22); }
-  .gm-label-title { @apply px-2 pt-1.5 pb-1 text-[1em] whitespace-pre-wrap font-semibold capitalize text-black/80 leading-tight truncate; border-bottom: 1px solid rgba(0,0,0,0.06); }
-  .gm-label-excerpt { @apply px-2 py-1.5 text-[0.78em] text-black/50 leading-snug line-clamp-[10]; }
-  .gm-label-excerpt :global(strong), .gm-tip-excerpt :global(strong) {
+  .gm-rv-dot { fill: #6b5335; stroke: rgba(255, 255, 255, 0.85); stroke-width: 1; }
+  .gm-rv-dot-solo { fill: rgba(255, 255, 255, 0.9); stroke: #6b5335; stroke-width: 1.5; }
+  .gm-rv-dot-on { fill: #b8860b; stroke: #6b5335; stroke-width: 2; }
+  .gm-rv-hit { fill: transparent; cursor: pointer; pointer-events: all; }
+
+  .gm-rv-anchor {
+    @apply absolute z-30 max-w-[130px] text-center text-[10px] font-bold uppercase tracking-wide leading-tight;
+    @apply px-1 pointer-events-none;
+    color: #6b5335;
+    text-shadow: 0 0 3px rgba(255, 255, 255, 0.95), 0 0 6px rgba(255, 255, 255, 0.9);
+  }
+
+  /* One card, two placements: fixed beside its marker, or floated at the cursor
+     for a document with no placed card. */
+  .gm-card {
+    @apply absolute flex flex-col bg-white/95 rounded-md shadow-sm overflow-hidden text-left;
+    border: 1px solid rgba(0, 0, 0, 0.12);
+  }
+  .gm-card-placed { @apply z-10 cursor-pointer ; }
+  .gm-card-placed:hover, .gm-card-on { @apply bg-white shadow-lg z-30; border-color: #b8860b; }
+  .gm-card-float {
+    @apply z-40 pointer-events-none shadow-lg;
+    width: var(--card-w, 196px); transform: translate(-50%, calc(-100% - 14px)); border-color: #b8860b;
+  }
+
+  .gm-card-title {
+    @apply px-2 pt-1.5 pb-1 text-[1em] font-semibold capitalize text-black/80 leading-tight line-clamp-2 h-full;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+  }
+  .gm-card-excerpt { @apply px-2 py-1 text-[0.82em] text-black/50 leading-snug line-clamp-5 h-full; }
+  .gm-card-excerpt :global(strong) {
     background: rgba(251, 191, 36, 0.45); border-radius: 2px; padding: 0 1px; font-weight: inherit;
-  }
-
-  .gm-hover-tip {
-    @apply absolute rounded bg-white/95 border border-primary/30 shadow-sm pointer-events-none z-20;
-    max-width: 280px; transform: translate(-50%, calc(-100% - 10px));
-  }
-  .gm-tip-title { @apply px-2.5 pt-2 pb-1 text-[1em] font-semibold text-black/80 leading-tight; }
-  .gm-tip-excerpt {
-    @apply px-2.5 pb-2 text-[0.78em] text-black/55 leading-snug line-clamp-4;
-    border-top: 1px solid rgba(0,0,0,0.06); padding-top: 5px; margin-top: 0;
   }
 
   .gm-spin { @apply inline-block rounded-full shrink-0; width: 0.7rem; height: 0.7rem; border: 2px solid rgba(0,0,0,0.15); border-top-color: #c3b091; animation: gm-spin 0.7s linear infinite; }
@@ -598,13 +607,12 @@
   .gm-loading { @apply absolute inset-0 z-40 flex flex-col items-center justify-center gap-2 text-[12px] text-black/60 italic; background: rgba(240, 233, 218, 0.82); }
 
   @media (max-width: 768px) {
-    .geo-map:not(.geo-map-scatter) { height: auto; max-height: 70dvh; overflow-y: auto; }
-    .geo-map-scatter { @apply h-[60dvh]; }
+    .geo-map:not(.geo-map-radviz) { height: auto; max-height: 70dvh; overflow-y: auto; }
+    .geo-map-radviz { @apply h-[80dvh]; }
 
     .gm-header { @apply px-2 py-2 gap-2; }
     .gm-zoom-btns { @apply ml-0; }
-    .gm-label-card { width: min(200px, 78vw); }
-    .gm-hover-tip { max-width: min(280px, 82vw); }
+    .gm-card-float { width: min(var(--card-w, 196px), 84vw); }
     .gm-accordion-col {
       grid-column: 1 / -1;
       grid-row: auto;

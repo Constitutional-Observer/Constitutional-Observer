@@ -1,13 +1,15 @@
-// TopicPipeline — NLP → phrase-merge → seeded-sequential LDA → (lazy) t-SNE.
+// TopicPipeline — NLP → phrase-merge → seeded-sequential LDA → display clusters.
 //
-// Split into two phases so the geo view can show cluster term-grids without
-// paying for the 2-D projection up front:
-//   • model(hits, query, tag) — tokenize, detect phrases, run LDA, bucket
-//     documents by multi-topic membership and build `rawClusters` (terms +
-//     counts + member hits) WITHOUT any t-SNE coordinates.
-//   • project() — runs t-SNE on the stored θ and back-fills per-cluster /
-//     global normalized coordinates onto the already-built cluster items. Runs
-//     at most once per model; called only when a cluster's scatter is opened.
+// model(hits, query, tag) tokenizes, detects phrases, runs LDA, buckets documents
+// by multi-topic membership and builds `rawClusters` (terms + counts + member
+// hits).
+//
+// radviz(topicId) then lays one topic's documents out in 2-D against the OTHER
+// topics as named anchors on a circle: the opened topic is the origin, so how far
+// a document sits from the centre is the share of it that is about something else,
+// and which way it leans says what. It is a weighted sum, not an optimisation —
+// deterministic, O(M·K), and bounded by the unit disc. A topic holds ~20-30
+// documents, far too few for t-SNE to say anything the data supports.
 //
 //   • Preprocessing     — hits → cleaned token docs (NLP, tokenize, phrases).
 //   • TopicSequentialLDA — token docs → chosen-K sequential-LDA fit.
@@ -266,21 +268,51 @@ class TopicLDAViz {
     return s * 0.5;
   }
 
-  // LDA fit + corpus → rawClusters:
+  // Walks the K×K divergence matrix greedily — most distinctive topic first, then
+  // always the nearest topic not yet placed — to order topics around the RadViz
+  // ring. Similar topics end up adjacent, which is what defuses RadViz's central
+  // ambiguity: a document splitting its weight across two anchors lands between
+  // them, and the two anchors it is likely to split across are now neighbours
+  // rather than opposite sides of the circle (where it would land back at the
+  // origin and read as "about nothing else").
+  static ringOrder(jsd, seed, K) {
+    const ring = [seed];
+    const placed = new Set(ring);
+    while (ring.length < K) {
+      const last = ring[ring.length - 1];
+      let next = -1, bestD = Infinity;
+      for (let k = 0; k < K; k++) {
+        if (placed.has(k) || jsd[last][k] >= bestD) continue;
+        next = k; bestD = jsd[last][k];
+      }
+      if (next < 0) { for (let k = 0; k < K; k++) if (!placed.has(k)) { next = k; break; } }
+      ring.push(next); placed.add(next);
+    }
+    return ring;
+  }
+
+  // LDA fit + corpus → { clusters, ring }. Clusters are
   //   {topic, allTerms:[{term,probability,pw}], coherence, count, items}[]
-  // ordered strongest-distinctiveness first (no t-SNE coordinates yet).
+  // ordered strongest-distinctiveness first; `ring` is the topic order RadViz
+  // places around its circle, computed once here so it stays stable as the reader
+  // moves between topics.
   static buildClusters({ ldaTopics, theta, phi, K }, phrased, meta) {
-    // P(Z=k) and per-topic distinctiveness for display ordering.
+    // P(Z=k) and per-topic distinctiveness for display ordering. The full pairwise
+    // matrix is kept for the ring; the aggregate is the per-topic coherence.
     const pK = new Array(K).fill(0);
     for (const t of theta) for (let k = 0; k < K; k++) pK[k] += t[k];
     const pKSum = pK.reduce((a, b) => a + b, 0);
     for (let k = 0; k < K; k++) pK[k] /= (pKSum || 1);
+    const jsd = Array.from({ length: K }, () => new Array(K).fill(0));
+    for (let i = 0; i < K; i++)
+      for (let j = i + 1; j < K; j++)
+        jsd[i][j] = jsd[j][i] = TopicLDAViz.jsdPair(phi[i], phi[j]);
     const topicJSD = new Array(K).fill(0);
     for (let i = 0; i < K; i++) {
       let wSum = 0;
       for (let j = 0; j < K; j++) {
         if (i === j) continue;
-        topicJSD[i] += TopicLDAViz.jsdPair(phi[i], phi[j]) * pK[j];
+        topicJSD[i] += jsd[i][j] * pK[j];
         wSum += pK[j];
       }
       if (wSum > 0) topicJSD[i] /= wSum;
@@ -296,20 +328,34 @@ class TopicLDAViz {
     }
 
     // Multi-topic bucketing (see TOPIC_MIN): a doc lands in every topic it clears
-    // (θ > TOPIC_MIN), carrying that topic's own weight as `prob`. Lazy t-SNE — no
-    // coordinates yet.
+    // (θ > TOPIC_MIN), carrying that topic's own weight as `prob`.
+    //
+    // `second` is the doc's strongest OTHER topic, or null when this is the only
+    // topic it clears. It is relative to the bucket — the same doc has a different
+    // `second` in each topic it belongs to, because "what else is this about" is
+    // asked from wherever you are currently reading. The geo view sections a
+    // topic's documents by it, which is what gives adjacency a name.
     const counts  = new Array(K).fill(0);
     const buckets = Array.from({ length: K }, () => []);
     for (let j = 0; j < theta.length; j++) {
       const t = theta[j];
       for (let k = 0; k < K; k++) {
         if (t[k] <= TOPIC_MIN) continue;
+        let best = -1, bestP = 0;
+        for (let k2 = 0; k2 < K; k2++) {
+          if (k2 === k || t[k2] <= bestP) continue;
+          best = k2; bestP = t[k2];
+        }
+        const second = bestP > TOPIC_MIN ? best : null;
         counts[k]++;
-        buckets[k].push({ j, prob: t[k], hit: meta[j].hit, idx: meta[j].idx });
+        buckets[k].push({
+          j, prob: t[k], hit: meta[j].hit, idx: meta[j].idx,
+          second, secondProb: second === null ? 0 : bestP,
+        });
       }
     }
 
-    return order.map((k) => {
+    const clusters = order.map((k) => {
       const items = buckets[k].slice().sort((a, b) => b.prob - a.prob);
       const allTerms = (ldaTopics[k] || []).map(t => ({
         term: t.term, probability: t.probability,
@@ -317,20 +363,20 @@ class TopicLDAViz {
       }));
       return { topic: k, allTerms, coherence: topicJSD[k], count: counts[k], items };
     });
+    return { clusters, ring: TopicLDAViz.ringOrder(jsd, order[0], K) };
   }
 }
 
 export class TopicPipeline {
   lambda      = $state(0.6);
   processing  = $state(false);
-  projecting  = $state(false);
-  projected   = $state(false);
   progress    = $state("");
   stats       = $state(null);
   rawClusters = $state([]); // {topic, allTerms:[{term,probability,pw}], coherence, count, items}[]
 
   #lastSig = "";
-  #theta   = null;          // retained for lazy t-SNE projection
+  #theta   = null;          // retained for docTopics and radviz
+  #ring    = null;          // topic ids in RadViz ring order
 
   get clusters() {
     const lam = this.lambda;
@@ -383,9 +429,51 @@ export class TopicPipeline {
   // to read a length (hot path: card sizing + grid layout).
   get topicCount() { return this.rawClusters.length; }
 
+  // RadViz layout for one topic's documents, in unit-disc coordinates.
+  //
+  // Every OTHER topic becomes a labelled anchor evenly spaced around the circle,
+  // in `#ring` order. A document is the θ-weighted sum of those anchors; the
+  // opened topic contributes nothing, so it pulls toward the origin. θ rows sum to
+  // 1, so no renormalisation is needed and |r| ≤ 1 − θ[j][topicId] falls out:
+  // **distance from centre is literally the share of the document that is about
+  // something other than the topic you opened, and the direction says what.**
+  //
+  // Returns null before the model finishes, or when there is no other topic to
+  // anchor against (K = 1) — the caller falls back to a plain list.
+  //
+  // Deliberately independent of `lambda`: λ only re-ranks the words an anchor is
+  // *labelled* with, never where anything sits, so the caller resolves anchor
+  // terms from `clusters` and dragging the slider doesn't re-run the layout.
+  radviz(topicId) {
+    const clusters = this.rawClusters;
+    const theta = this.#theta, ring = this.#ring;
+    if (!theta || !ring || !clusters.length) return null;
+
+    const cluster = clusters.find((c) => c.topic === topicId);
+    const ids = ring.filter((k) => k !== topicId);
+    if (!cluster || !ids.length) return null;
+
+    const anchors = ids.map((k, i) => {
+      const angle = -Math.PI / 2 + (2 * Math.PI * i) / ids.length;
+      return { topic: k, angle, ux: Math.cos(angle), uy: Math.sin(angle) };
+    });
+
+    let rMax = 0;
+    const points = cluster.items.map((it) => {
+      const row = theta[it.j];
+      let ux = 0, uy = 0;
+      for (const a of anchors) { ux += row[a.topic] * a.ux; uy += row[a.topic] * a.uy; }
+      const r = Math.hypot(ux, uy);
+      if (r > rMax) rMax = r;
+      return { j: it.j, hit: it.hit, idx: it.idx, prob: it.prob, second: it.second, ux, uy, r };
+    });
+
+    return { anchors, points, rMax };
+  }
+
   reset() {
     this.rawClusters = []; this.stats = null; this.processing = false;
-    this.projecting = false; this.projected = false; this.#theta = null;
+    this.#theta = null; this.#ring = null;
   }
   remodel(hits, query = "", tag = "") { this.#lastSig = ""; return this.model(hits, query, tag); }
 
@@ -402,7 +490,7 @@ export class TopicPipeline {
     }
 
     this.processing = true;
-    this.projected = false; this.#theta = null;
+    this.#theta = null; this.#ring = null;
     const t0 = performance.now();
     this.progress = "Loading NLP model...";
 
@@ -438,7 +526,9 @@ export class TopicPipeline {
       }
       const tLda = performance.now();
 
-      this.rawClusters = TopicLDAViz.buildClusters({ ldaTopics, theta, phi, K }, phrased, meta);
+      const built = TopicLDAViz.buildClusters({ ldaTopics, theta, phi, K }, phrased, meta);
+      this.rawClusters = built.clusters;
+      this.#ring = built.ring;
       this.#theta = theta;
       this.stats = {
         hits: cappedCount, modeledDocs: tokenized.length, vocab: vocab.length,
@@ -457,58 +547,6 @@ export class TopicPipeline {
       this.progress = "Error: " + (err.message || err);
     } finally {
       this.processing = false;
-    }
-  }
-
-  // Lazy 2-D projection: t-SNE over the retained θ, back-filling per-cluster and
-  // global normalized coordinates onto each cluster's member items. Idempotent.
-  async project() {
-    if (!browser || this.projected || this.projecting || !this.#theta) return;
-    this.projecting = true;
-    try {
-      const { TSNE } = await import("$lib/topic-modelling/tsne.js");
-      const theta = this.#theta;
-      const t0 = performance.now();
-      const perplexity = Math.min(30, Math.max(5, Math.floor(theta.length / 4)));
-      const tsne = new TSNE({ dim: 2, perplexity, epsilon: 10 });
-      tsne.initDataRaw(theta);
-      for (let it = 0; it < 250; it++) tsne.step();
-      const globalRaw = tsne.getSolution();
-
-      let gMinX = Infinity, gMaxX = -Infinity, gMinY = Infinity, gMaxY = -Infinity;
-      for (const p of globalRaw) {
-        if (p[0] < gMinX) gMinX = p[0]; if (p[0] > gMaxX) gMaxX = p[0];
-        if (p[1] < gMinY) gMinY = p[1]; if (p[1] > gMaxY) gMaxY = p[1];
-      }
-      const gRx = (gMaxX - gMinX) || 1, gRy = (gMaxY - gMinY) || 1;
-      const SPREAD = 0.7;
-
-      this.rawClusters = this.rawClusters.map((c) => {
-        let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
-        for (const it of c.items) {
-          const gx = globalRaw[it.j][0], gy = globalRaw[it.j][1];
-          if (gx < minX) minX = gx; if (gx > maxX) maxX = gx;
-          if (gy < minY) minY = gy; if (gy > maxY) maxY = gy;
-        }
-        const rx = (maxX - minX) || 1, ry = (maxY - minY) || 1;
-        const items = c.items.map((it) => {
-          const gx = globalRaw[it.j][0], gy = globalRaw[it.j][1];
-          return {
-            ...it,
-            nx: c.items.length === 1 ? 0.5 : 0.5 + ((gx - minX) / rx - 0.5) * SPREAD,
-            ny: c.items.length === 1 ? 0.5 : 0.5 + ((gy - minY) / ry - 0.5) * SPREAD,
-            ngx: (gx - gMinX) / gRx,
-            ngy: (gy - gMinY) / gRy,
-          };
-        });
-        return { ...c, items };
-      });
-      if (this.stats) this.stats = { ...this.stats, tsneMs: Math.round(performance.now() - t0) };
-      this.projected = true;
-    } catch (err) {
-      console.error("TopicPipeline.project failed:", err);
-    } finally {
-      this.projecting = false;
     }
   }
 }
