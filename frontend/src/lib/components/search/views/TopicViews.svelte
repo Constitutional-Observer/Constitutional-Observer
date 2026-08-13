@@ -238,7 +238,7 @@
   {:else if pl.topicCount === 0}
     <span class="gm-cell-note"><span class="gm-spin"></span>modelling…</span>
   {:else}
-    <!-- count === 0 means no document clears TOPIC_MIN for this topic. It still
+    <!-- count === 0 means no document clears the membership floor here. It still
          anchors the plot, but there is nothing to open. -->
     <div class="gm-cell-topics">
       {#each pl.clusters as c, ci (c.topic)}

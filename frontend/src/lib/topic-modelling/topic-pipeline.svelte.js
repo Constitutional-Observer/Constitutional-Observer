@@ -21,9 +21,25 @@ import { applyPhrases } from "$lib/topic-modelling/phrase-matcher.js";
 import { chunkText } from "$lib/highlight.js";
 
 // Multi-topic membership floor. A document belongs to every topic it is more than
-// TOPIC_MIN composed of (θ > TOPIC_MIN) — no forced dominant topic — so it can sit
-// in several clusters 
-const TOPIC_MIN = 0.2;
+// this composed of (θ > floor) — no forced dominant topic — so it can sit in
+// several clusters.
+//
+// The floor has to fall with K. θ is smoothed by α = 50/K spread over all topics
+// (see TopicSequentialLDA.#ldaOpts), so it sits close to uniform 1/K; a fixed 0.2
+// therefore demands an ever-larger multiple of a topic's fair share as K grows,
+// and past K ≈ 8 documents start clearing no topic at all and vanish from every
+// bucket. Measured on synthetic corpora with 8 known themes, 120 docs, 3 seeds:
+//
+//   K       fixed 0.2                  min(0.2, 1.5/K)
+//   8       0-1 orphan docs            0 orphans
+//   12      6-8 orphan docs            0 orphans
+//   14      15-20 orphans, 0-2 empty   0 orphans, 0-0.3 empty
+//   16      20-34 orphans, 1-3 empty   0 orphans, 0 empty
+//
+// 1.5/K only bites at K ≥ 8, so the common small-K case is unchanged. Lower
+// constants (1.0, 1.25) also clear the orphans but push memberships to 4-5 topics
+// per document, well past the 1-3 the corpora actually contain.
+const topicMin = (K) => Math.min(0.2, 1.5 / K);
 
 // ── Preprocessing ──────────────────────────────────────────────────────────
 // Pure "hits → cleaned token documents" work: winkNLP load, tokenization, and
@@ -234,10 +250,10 @@ class TopicSequentialLDA {
 
     await onProgress(`K=${bestK} · Running full model (${phrased.length} docs)...`);
     const K = bestK;
-    const { topics: ldaTopics, theta, vocab, prunedByMax, phi, seedMatched, seedTotal } =
+    const { topics: ldaTopics, theta, modeled, vocab, prunedByMax, phi, seedMatched, seedTotal } =
       lda(phrased, K, 100, TopicSequentialLDA.#ldaOpts(K, false, cfg));
 
-    return { K, ldaTopics, theta, vocab, prunedByMax, phi, seedMatched, seedTotal, bestRD };
+    return { K, ldaTopics, theta, modeled, vocab, prunedByMax, phi, seedMatched, seedTotal, bestRD };
   }
 }
 
@@ -296,7 +312,7 @@ class TopicLDAViz {
   // ordered strongest-distinctiveness first; `ring` is the topic order RadViz
   // places around its circle, computed once here so it stays stable as the reader
   // moves between topics.
-  static buildClusters({ ldaTopics, theta, phi, K }, phrased, meta) {
+  static buildClusters({ ldaTopics, theta, modeled, phi, K }, phrased, meta) {
     // P(Z=k) and per-topic distinctiveness for display ordering. The full pairwise
     // matrix is kept for the ring; the aggregate is the per-topic coherence.
     const pK = new Array(K).fill(0);
@@ -327,26 +343,28 @@ class TopicLDAViz {
       for (const w of doc) tokenFreq.set(w, (tokenFreq.get(w) || 0) + 1);
     }
 
-    // Multi-topic bucketing (see TOPIC_MIN): a doc lands in every topic it clears
-    // (θ > TOPIC_MIN), carrying that topic's own weight as `prob`.
+    // Multi-topic bucketing (see topicMin): a doc lands in every topic it clears
+    // (θ > floor), carrying that topic's own weight as `prob`. Documents with no
+    // vocabulary left after pruning are skipped — their θ row is a uniform
+    // placeholder, not a measurement.
     //
-    // `second` is the doc's strongest OTHER topic, or null when this is the only
-    // topic it clears. It is relative to the bucket — the same doc has a different
-    // `second` in each topic it belongs to, because "what else is this about" is
-    // asked from wherever you are currently reading. The geo view sections a
-    // topic's documents by it, which is what gives adjacency a name.
+    // `second` is the doc's strongest OTHER topic, null when this is the only one
+    // it clears. Relative to the bucket: the same doc carries a different `second`
+    // in each topic it belongs to. Names the pull in the plot's hover card.
+    const floor   = topicMin(K);
     const counts  = new Array(K).fill(0);
     const buckets = Array.from({ length: K }, () => []);
     for (let j = 0; j < theta.length; j++) {
+      if (modeled && !modeled[j]) continue;
       const t = theta[j];
       for (let k = 0; k < K; k++) {
-        if (t[k] <= TOPIC_MIN) continue;
+        if (t[k] <= floor) continue;
         let best = -1, bestP = 0;
         for (let k2 = 0; k2 < K; k2++) {
           if (k2 === k || t[k2] <= bestP) continue;
           best = k2; bestP = t[k2];
         }
-        const second = bestP > TOPIC_MIN ? best : null;
+        const second = bestP > floor ? best : null;
         counts[k]++;
         buckets[k].push({
           j, prob: t[k], hit: meta[j].hit, idx: meta[j].idx,
@@ -386,7 +404,7 @@ export class TopicPipeline {
   }
 
   // Per-document topic membership: for each modeled doc, every topic it clears
-  // (θ > TOPIC_MIN), strongest-first, with that topic's λ-ranked terms. Returns
+  // (θ > topicMin), strongest-first, with that topic's λ-ranked terms. Returns
   // [{ hit, topics: [{ topic, prob, terms }] }] keyed by hit (callers form the
   // docKey). Feeds the detail panel's topic list and union highlighting.
   get docTopics() {
@@ -397,6 +415,8 @@ export class TopicPipeline {
     const theta = this.#theta;
     if (!theta || !clusters.length) return [];
     const lam = this.lambda;
+    // One cluster per topic, so clusters.length is K.
+    const floor = topicMin(clusters.length);
     const termsByTopic = new Map();
     for (const c of clusters) {
       termsByTopic.set(
@@ -415,7 +435,7 @@ export class TopicPipeline {
         const topics = [];
         for (const c2 of clusters) {
           const k = c2.topic;
-          if (row[k] > TOPIC_MIN)
+          if (row[k] > floor)
             topics.push({ topic: k, prob: row[k], terms: termsByTopic.get(k) || [] });
         }
         topics.sort((a, b) => b.prob - a.prob);
@@ -431,19 +451,15 @@ export class TopicPipeline {
 
   // RadViz layout for one topic's documents, in unit-disc coordinates.
   //
-  // Every OTHER topic becomes a labelled anchor evenly spaced around the circle,
-  // in `#ring` order. A document is the θ-weighted sum of those anchors; the
-  // opened topic contributes nothing, so it pulls toward the origin. θ rows sum to
-  // 1, so no renormalisation is needed and |r| ≤ 1 − θ[j][topicId] falls out:
-  // **distance from centre is literally the share of the document that is about
-  // something other than the topic you opened, and the direction says what.**
+  // Every other topic is an anchor, evenly spaced around the circle in `#ring`
+  // order. A document is the θ-weighted sum of those anchors; topicId has no
+  // anchor, so it pulls toward the origin. θ rows sum to 1, so there is no
+  // renormalisation and |r| ≤ 1 − θ[j][topicId] falls out — r is the share of the
+  // document that is about something else, and the direction is which topic.
   //
-  // Returns null before the model finishes, or when there is no other topic to
-  // anchor against (K = 1) — the caller falls back to a plain list.
-  //
-  // Deliberately independent of `lambda`: λ only re-ranks the words an anchor is
-  // *labelled* with, never where anything sits, so the caller resolves anchor
-  // terms from `clusters` and dragging the slider doesn't re-run the layout.
+  // Null before the model finishes, or at K = 1 (no anchors); caller falls back
+  // to a list. Independent of `lambda` — λ re-ranks anchor wording only, so the
+  // caller resolves terms from `clusters` and the slider never re-runs the layout.
   radviz(topicId) {
     const clusters = this.rawClusters;
     const theta = this.#theta, ring = this.#ring;
@@ -516,7 +532,7 @@ export class TopicPipeline {
         await Preprocessing.detectPhrases(tokenized, onProgress);
       const tBigram = performance.now();
 
-      const { K, ldaTopics, theta, vocab, prunedByMax, phi, seedMatched, seedTotal, bestRD } =
+      const { K, ldaTopics, theta, modeled, vocab, prunedByMax, phi, seedMatched, seedTotal, bestRD } =
         await TopicSequentialLDA.run(phrased, Preprocessing.seedGroups, onProgress);
 
       if (theta.length < 4 || vocab.length === 0) {
@@ -526,7 +542,7 @@ export class TopicPipeline {
       }
       const tLda = performance.now();
 
-      const built = TopicLDAViz.buildClusters({ ldaTopics, theta, phi, K }, phrased, meta);
+      const built = TopicLDAViz.buildClusters({ ldaTopics, theta, modeled, phi, K }, phrased, meta);
       this.rawClusters = built.clusters;
       this.#ring = built.ring;
       this.#theta = theta;

@@ -17,11 +17,13 @@
 //     — Watanabe & Baturo (2024) "Sequence-aware Topic Models" Eq. 7
 //   * Performance: reusable Float64Array buffers hoisted out of hot inner loops
 
-// Returns { topics, theta, vocab, phi } where:
-//   topics: array of K topics, each an array of {term, probability}
-//   theta:  M × K matrix — document-topic distributions  (θ, Blei et al. 2003)
-//   vocab:  vocabulary array (indices match phi columns)
-//   phi:    K × V matrix — topic-word distributions      (φ, Blei et al. 2003)
+// Returns { topics, theta, modeled, vocab, phi } where:
+//   topics:  array of K topics, each an array of {term, probability}
+//   theta:   M × K matrix — document-topic distributions  (θ, Blei et al. 2003)
+//   modeled: M booleans — false where the doc had no vocabulary left after
+//            pruning and its theta row is a uniform placeholder, not a fit
+//   vocab:   vocabulary array (indices match phi columns)
+//   phi:     K × V matrix — topic-word distributions      (φ, Blei et al. 2003)
 //
 // `sentences` may be raw strings or arrays of pre-tokenized words.
 //
@@ -163,14 +165,22 @@ const ldaProcess = function (sentences, numberOfTopics, numberOfTermsPerTopic, o
   const phi          = lda.getPhi();
   const thetaCompact = lda.getTheta();
 
-  // Re-expand theta to align with the original input order; empty docs get a uniform prior.
+  // Re-expand theta to align with the original input order. A document left with
+  // no vocabulary after pruning gets a uniform prior, which is not a measurement —
+  // `modeled` flags the rows that are, so callers can skip the rest. Without it a
+  // contentless document reads as 1/K on every topic, and at K ≤ 4 that clears a
+  // 0.2 membership threshold and lands it in every single bucket.
   const M = sentences.length;
   const theta = new Array(M);
+  const modeled = new Array(M).fill(false);
   for (let i = 0; i < M; i++) {
     theta[i] = new Array(K);
     for (let k = 0; k < K; k++) theta[i][k] = 1 / K;
   }
-  for (let j = 0; j < docMap.length; j++) theta[docMap[j]] = thetaCompact[j];
+  for (let j = 0; j < docMap.length; j++) {
+    theta[docMap[j]] = thetaCompact[j];
+    modeled[docMap[j]] = true;
+  }
 
   // Extract top terms per topic from phi.
   const topics = [];
@@ -187,7 +197,7 @@ const ldaProcess = function (sentences, numberOfTopics, numberOfTermsPerTopic, o
     topics.push(row);
   }
 
-  return { topics, theta, vocab, prunedByMax, phi, seedMatched, seedTotal, seedMatchedPhrases };
+  return { topics, theta, modeled, vocab, prunedByMax, phi, seedMatched, seedTotal, seedMatchedPhrases };
 };
 
 function makeArray(x) {
