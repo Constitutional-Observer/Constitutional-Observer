@@ -4,9 +4,6 @@ import SEARCH_INDICES from "$lib/data/indices.json";
 
 const client = new Meilisearch({ host: MEILI_HOST, apiKey: MEILI_KEY });
 
-// The registry is the source of truth for which indices exist, what they hold,
-// and how their hits are labelled — Meilisearch uids do not encode any of this.
-// Unlisted indices are ignored; listed ones are searched even at zero documents.
 export { SEARCH_INDICES };
 export const INDEX_BY_UID = Object.fromEntries(SEARCH_INDICES.map((i) => [i.uid, i]));
 export const SEARCH_INDEX_UIDS = SEARCH_INDICES.map((i) => i.uid);
@@ -30,7 +27,7 @@ export const DEFAULT_SEARCH_PARAMS = {
   hybrid: false,
   semanticRatio: 0.5,
   embedder: "LLAMA_PROVIDER",
-  limit: 200,
+  limit: 100,
   scoreThreshold: 0.1,
 };
 
@@ -115,10 +112,13 @@ async function loadIndexDetails() {
 }
 
 // Run one multi-search across the given indices and return flattened, annotated
-// hits. Per-index details are fetched here to decide hybrid eligibility.
+// hits. Per-index details decide hybrid eligibility, so they are fetched only
+// for a hybrid search — on a cold cache that is 2 requests per index, and a
+// keyword search would otherwise wait for all of them before querying.
 export async function searchIndices(indexUids, query, params = DEFAULT_SEARCH_PARAMS) {
-  const details = await fetchIndicesWithDetails();
-  const metaByUid = Object.fromEntries(details.map((d) => [d.uid, d]));
+  const metaByUid = params.hybrid
+    ? Object.fromEntries((await fetchIndicesWithDetails()).map((d) => [d.uid, d]))
+    : {};
 
   const queries = indexUids.map((uid) => {
     const meta = metaByUid[uid];
@@ -171,9 +171,9 @@ export async function searchIndices(indexUids, query, params = DEFAULT_SEARCH_PA
 async function runSearchLoad({ url }, defaultQuery) {
   const query = url.searchParams.get("query") || defaultQuery;
 
-  const startTime = Date.now();
-  const indicesWithDetails = await fetchIndicesWithDetails();
-  console.log(`Loaded ${indicesWithDetails.length} indices in ${Date.now() - startTime}ms`);
+  // Not awaited here: the index list feeds the filter UI, not the query, so it
+  // resolves alongside the search rather than gating it.
+  const indicesPromise = fetchIndicesWithDetails();
 
   if (!query) {
     return {
@@ -181,7 +181,7 @@ async function runSearchLoad({ url }, defaultQuery) {
       hitCount: 0,
       totalEstimated: 0,
       collections: COLLECTIONS,
-      indices: indicesWithDetails,
+      indices: await indicesPromise,
       searchParams: DEFAULT_SEARCH_PARAMS,
     };
   }
@@ -193,14 +193,17 @@ async function runSearchLoad({ url }, defaultQuery) {
 
   console.log(`Search: query="${query}" indices=[${searchUids.join(",")}] hybrid=${activeParams.hybrid} limit=${activeParams.limit}`);
   const searchStart = Date.now();
-  const { hits, totalEstimated } = await searchIndices(searchUids, query, activeParams);
+  const [indicesWithDetails, { hits, totalEstimated }] = await Promise.all([
+    indicesPromise,
+    searchIndices(searchUids, query, activeParams),
+  ]);
   console.log(`Search completed in ${Date.now() - searchStart}ms`);
 
   const { docs, hitCount } = groupHitsIntoDocs(hits, activeParams.scoreThreshold);
   console.log(`Hits: ${totalEstimated} estimated, ${hits.length} returned, ${hitCount} above threshold (${activeParams.scoreThreshold})`);
 
   return {
-    debates: structuredClone(docs),
+    debates: docs,
     hitCount,
     totalEstimated,
     collections: COLLECTIONS,
