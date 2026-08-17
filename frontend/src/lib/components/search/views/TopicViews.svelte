@@ -1,6 +1,7 @@
 <script>
   import { navigating } from "$app/state";
   import { untrack } from "svelte";
+  import TimelineBand from "$lib/components/search/views/TimelineBand.svelte";
   import SourceGrid from "$lib/components/search/views/SourceGrid.svelte";
   import TopicPlot from "$lib/components/search/views/TopicPlot.svelte";
   import { GeoGroups } from "$lib/components/search/views/geo-groups.svelte.js";
@@ -159,7 +160,14 @@
 <section class="geo-map">
   <div class="gm-body">
     {#if !selectedCluster}
-      <SourceGrid {geo} {paginationDone} {onselect} onopentopic={openTopic} />
+      <!-- Every result on one axis, coloured by state, above the sources that
+           hold them. The strip and the grid are the same set read two ways. -->
+      <div class="gm-sources">
+        <SourceGrid {geo} {paginationDone} {onselect} onopentopic={openTopic} />
+        <!-- Every result on one axis, under the sources that hold them. The band
+             and the grid are the same set read two ways. -->
+        <TimelineBand {hits} rise={280} fade={64} {onselect} />
+      </div>
     {:else}
       <TopicPlot
         plot={rv}
@@ -198,9 +206,28 @@
     grid-template-rows: minmax(0, 1fr);
   }
 
+  /* Split horizontally: the sources above, every result on one time axis below.
+     The band takes 30% — it is one axis and reads at a glance, so the rest belongs
+     to the grid, which scrolls inside its share. No gap between them — the band's
+     fade is what separates the two, and it needs the grid's clipped edge to land
+     where it is already solid.
+
+     The children carry min-h-0 and are stretched by the grid; they must NOT set
+     height:100%, which resolves against the track and reintroduces the same
+     content-driven growth min-h-0 exists to prevent. */
+  .gm-sources {
+    @apply grid min-h-0;
+    grid-template-rows: minmax(0, 7fr) minmax(0, 3fr);
+  }
+
   .gm-loading { @apply absolute inset-0 z-40 flex flex-col items-center justify-center gap-2 text-[12px] text-black/60 italic; background: rgba(240, 233, 218, 0.82); }
 
   @media (max-width: 768px) {
+    /* Height stays definite. This used to fall back to `height: auto` at the
+       sources level, which was safe when the grid was the only child and sized
+       itself — but the sources view is now a split of shares, and percentage tracks
+       inside an auto-height parent collapse to content, leaving the timeline band
+       nothing to measure. */
     .geo-map { height: 72dvh; }
   }
 </style>

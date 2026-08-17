@@ -4,6 +4,8 @@
   // anchor, so it pulls to the origin. Distance from centre is therefore the
   // share of a document that is about something else, and direction says which.
   import DocCard from "$lib/components/search/views/DocCard.svelte";
+  import TimelineBand from "$lib/components/search/views/TimelineBand.svelte";
+  import { docFormat } from "$lib/components/search/search-state.svelte.js";
   import DocList from "$lib/components/search/views/DocList.svelte";
 
   let {
@@ -16,6 +18,21 @@
     onselect,
     onclose,
   } = $props();
+
+  // The same band that sits under the source grid, scoped to this topic's own
+  // documents: where the projection says what a document is about, the band says
+  // when it was said.
+  let bandHits = $derived((cluster?.items || []).map((it) => it.hit));
+
+  // The band knows documents; the projection knows θ-row indices. docKey is the one
+  // identity both agree on, so it is what bridges them.
+  let rowByDoc = $derived(
+    new Map((cluster?.items || []).map((it) => [docFormat.docKey(it.hit), it.j])),
+  );
+  /** @param {any} hit */
+  function focusFromBand(hit) {
+    plot.hovered = hit ? rowByDoc.get(docFormat.docKey(hit)) ?? null : null;
+  }
 
   let source = $derived(pipeline && cluster ? pipeline.radviz(cluster.topic) : null);
   let layout = $derived(plot.layoutFor(source));
@@ -145,6 +162,13 @@
     <button class="gm-clear" onclick={() => onclose?.()}>Clear ✕</button>
   </div>
 
+  {#if bandHits.length}
+    <div class="gm-radviz-band">
+      <TimelineBand hits={bandHits} {terms} rise={280}
+                    {onselect} onhoverdoc={focusFromBand} />
+    </div>
+  {/if}
+
   <p class="gm-radviz-caption">
     Each label around the edge is another topic in this source. A document's
     <strong>distance from the centre</strong> is how much of it is about something
@@ -175,6 +199,13 @@
     cursor: grab; touch-action: none;
   }
   .gm-radviz-dragging { cursor: grabbing; }
+  /* A grid rather than a plain box, so the band stretches to the row instead of
+     needing a percentage height of its own. */
+  .gm-radviz-band {
+    @apply grid shrink-0;
+    height: 132px;
+    grid-template-rows: minmax(0, 1fr);
+  }
   .gm-radviz-caption { @apply shrink-0 px-2 pb-0.5 text-[11px] leading-snug text-black/45; }
   .gm-radviz-caption strong { @apply font-semibold text-black/65; }
   .gm-rv-fallback { @apply flex flex-col gap-0.5 flex-1 min-h-0 overflow-y-auto p-2; }
