@@ -41,6 +41,13 @@ import { chunkText } from "$lib/highlight.js";
 // per document, well past the 1-3 the corpora actually contain.
 const topicMin = (K) => Math.min(0.2, 1.5 / K);
 
+const PHRASE_MAX_WORDS = 7;
+/** A term is a phrase once bigram-merging has joined 2–7 words with `_`. */
+export const isPhrase = (term) => {
+  const n = String(term).split("_").length;
+  return n >= 2 && n <= PHRASE_MAX_WORDS;
+};
+
 // ── Preprocessing ──────────────────────────────────────────────────────────
 // Pure "hits → cleaned token documents" work: winkNLP load, tokenization, and
 // the repeated bigram-merge passes. Holds no reactive state; progress is
@@ -257,21 +264,24 @@ class TopicSequentialLDA {
   }
 }
 
+const RANK_EPS = 1e-12;
+
+// LDAvis relevance ranking: blends raw topic probability with lift over the
+// corpus-wide P(w), so common words don't dominate every topic's term list.
+export function rankTerms(allTerms, lambda) {
+  return allTerms.map(t => ({
+    term: t.term, probability: t.probability,
+    relevance: lambda * Math.log(t.probability + RANK_EPS)
+             + (1 - lambda) * Math.log((t.probability + RANK_EPS) / (t.pw + RANK_EPS)),
+  })).sort((a, b) => b.relevance - a.relevance);
+}
+
 // ── TopicLDAViz ────────────────────────────────────────────────────────────
 // Visualization-facing math over a fitted LDA model: LDAvis relevance ranking,
 // Jensen–Shannon divergence, and building the display clusters (distinctiveness
 // ordering + P(w) lift denominator + multi-topic doc bucketing).
 class TopicLDAViz {
   static #EPS = 1e-12;
-
-  static rankTerms(allTerms, lambda) {
-    const EPS = TopicLDAViz.#EPS;
-    return allTerms.map(t => ({
-      term: t.term, probability: t.probability,
-      relevance: lambda * Math.log(t.probability + EPS)
-               + (1 - lambda) * Math.log((t.probability + EPS) / (t.pw + EPS)),
-    })).sort((a, b) => b.relevance - a.relevance);
-  }
 
   static jsdPair(pi, pj) {
     const EPS = TopicLDAViz.#EPS;
@@ -399,7 +409,7 @@ export class TopicPipeline {
   get clusters() {
     const lam = this.lambda;
     return this.rawClusters.map(c => ({
-      ...c, terms: TopicLDAViz.rankTerms(c.allTerms, lam).slice(0, 10),
+      ...c, terms: rankTerms(c.allTerms, lam).slice(0, 10),
     }));
   }
 
@@ -421,7 +431,7 @@ export class TopicPipeline {
     for (const c of clusters) {
       termsByTopic.set(
         c.topic,
-        TopicLDAViz.rankTerms(c.allTerms, lam).slice(0, 10).map(t => t.term),
+        rankTerms(c.allTerms, lam).slice(0, 10).map(t => t.term),
       );
     }
     // A doc can sit in several buckets; emit each once (by θ-row index).

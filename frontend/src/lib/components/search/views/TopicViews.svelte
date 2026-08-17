@@ -6,7 +6,19 @@
   import TopicPlot from "$lib/components/search/views/TopicPlot.svelte";
   import { GeoGroups } from "$lib/components/search/views/geo-groups.svelte.js";
   import { RadvizPlot } from "$lib/components/search/views/radviz.svelte.js";
-  import { docFormat, topicHighlight, viewNav } from "$lib/components/search/search-state.svelte.js";
+  import { docFormat, topicHighlight, topicTerms as termPool, viewNav } from "$lib/components/search/search-state.svelte.js";
+  import { isPhrase, rankTerms } from "$lib/topic-modelling/topic-pipeline.svelte.js";
+
+  const PHRASES_PER_TOPIC = 8;
+  // Per-cluster equivalent of pipeline.clusters, but ranking only multi-word
+  // (bigram-merged) terms — the pool of readable phrases term suggestions draw from.
+  const phraseClusters = (pipeline) => {
+    const lam = pipeline.lambda;
+    return pipeline.rawClusters.map((c) => ({
+      ...c,
+      terms: rankTerms(c.allTerms.filter((t) => isPhrase(t.term)), lam).slice(0, PHRASES_PER_TOPIC),
+    }));
+  };
 
   let {
     hits = [],
@@ -64,6 +76,46 @@
     topicHighlight.docKeys = selectedCluster
       ? new Set(selectedCluster.items.map((it) => docFormat.docKey(it.hit)))
       : null;
+  });
+
+  $effect(() => {
+    const byTerm = new Map();
+    const sources = new Set();
+    let topics = 0;
+    for (const g of geo.groups) {
+      for (const c of phraseClusters(g.pipeline)) {
+        if (!c.count) continue;
+        topics++;
+        sources.add(g.key);
+        const keys = c.items.map((it) => docFormat.docKey(it.hit));
+        for (const t of c.terms) {
+          let e = byTerm.get(t.term);
+          if (!e) {
+            e = { term: t.term, docs: new Set(), topics: 0, sources: new Set() };
+            byTerm.set(t.term, e);
+          }
+          for (const k of keys) e.docs.add(k);
+          e.topics++;
+          e.sources.add(g.label);
+        }
+      }
+    }
+    termPool.ranked = [...byTerm.values()]
+      .map((e) => ({
+        term: e.term,
+        label: docFormat.humanTerm(e.term),
+        docs: e.docs.size,
+        topics: e.topics,
+        sources: [...e.sources],
+      }))
+      .sort(
+        (a, b) =>
+          b.docs - a.docs ||
+          b.sources.length - a.sources.length ||
+          a.label.localeCompare(b.label),
+      );
+    termPool.topics = topics;
+    termPool.sources = sources.size;
   });
 
   // ── Views ────────────────────────────────────────────────────────────────

@@ -1,6 +1,7 @@
 <script>
   import ResultsList from "$lib/components/search/ResultsList.svelte";
   import SearchSidebar from "$lib/components/search/SearchSidebar.svelte";
+  import TermSuggestions from "$lib/components/search/TermSuggestions.svelte";
   import DetailPanel from "$lib/components/search/DetailPanel.svelte";
   
   import { searchBox, searchParams, ui, docFormat, topicHighlight } from "$lib/components/search/search-state.svelte.js";
@@ -663,6 +664,13 @@
       query={resolved.searchParams?.query || ""}
       {indices}
       paginationDone={!loader.loading}
+    />
+
+    <!-- Right rail: the topic model's vocabulary, as further searches -->
+    <TermSuggestions
+      {searching}
+      query={resolved.searchParams?.query || ""}
+      onsearch={handleSubmit}
     />
 
     <!-- modal: bookmarks + collapsible detail accordion -->
