@@ -449,7 +449,7 @@
     backdrop-filter: blur(2px);
   }
   .modal {
-    @apply flex flex-col rounded-xl bg-primaryLight border border-primary/30 shadow-2xl overflow-hidden;
+    @apply flex flex-col bg-primaryLight border border-4 border-primaryDark/90 shadow-2xl overflow-hidden;
     width: 100%;
     max-height: 85vh;
   }

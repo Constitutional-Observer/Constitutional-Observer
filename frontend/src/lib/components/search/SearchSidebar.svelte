@@ -1,6 +1,7 @@
 <script>
   import TimelineSlider from "$lib/components/search/TimelineSlider.svelte";
-  import { searchBox, searchParams, ui } from "$lib/components/search/search-state.svelte.js";
+  import Breadcrumbs from "$lib/components/search/views/Breadcrumbs.svelte";
+  import { searchBox, searchParams, ui, viewNav } from "$lib/components/search/search-state.svelte.js";
 
   let {
     // Search bar
@@ -68,12 +69,18 @@
 <section
   class="relative py-2 md:py-7 px-2 md:px-5 backdrop-opacity-50 bg-primaryLight/90 drop-shadow-xl border-4 border-primary"
 >
+  <!-- Where you are in the results. Published by the map, drawn here, so the trail
+       reads as part of the query rather than as a caption on one panel. -->
+  {#if viewNav.trail.length}
+    <nav class="sidebar-trail">
+      <Breadcrumbs trail={viewNav.trail} onnavigate={(k) => viewNav.to(k)} />
+    </nav>
+  {/if}
 
   <form class="mt-2" onsubmit={(e) => { e.preventDefault(); onsearch?.(); }}>
       <div class="flex items-center">
         <div class="search-input-wrap">
-          <input
-            type="text"
+          <textarea
             class="p-1 !text-2xl w-full text-xs border border-primary caret-red"
             placeholder="Ask a question"
             bind:value={searchBox.query}
@@ -94,6 +101,7 @@
       {subtitle}
     </p>
   {/if}
+
 
   {#if loadingMore}
     <div class="loading-bar">
@@ -250,8 +258,7 @@
   </div>
   </details>
   </div>
-  </section>
-  
+</section>
 </aside>
 
 <style lang="postcss">

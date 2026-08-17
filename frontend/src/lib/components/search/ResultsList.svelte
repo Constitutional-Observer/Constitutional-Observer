@@ -1,10 +1,8 @@
 <script>
-  // Center column of the search page: the topic-map canvas, pagination, and the
-  // paged result cards (desktop) / accordions (mobile). Reactive state lives on
-  // the `pager` (ResultPager) and `panel` (DocPanel) instances passed in.
-  import GeoClusterMap from "$lib/components/search/GeoClusterMap.svelte";
+  import TopicViews from "$lib/components/search/views/TopicViews.svelte";
+  import { topicHighlight } from "$lib/components/search/search-state.svelte.js";
   import { renderHighlight, chunkText, chunkSnippet } from "$lib/highlight.js";
-  import { topicHighlight } from "$lib/components/search/topic-highlight.svelte.js";
+  
 
   let {
     pager,
@@ -57,7 +55,7 @@
 {/snippet}
 
 <main class="results-list-container" class:is-stale={searching}>
-  <GeoClusterMap
+  <TopicViews
     hits={pager.allRankedHits}
     {query}
     {indices}
@@ -76,18 +74,19 @@
     <details class="accordion mobile-only" open={i < 3}>
       <summary>
         <div class="result-summary">
-          <span class="score-badge">{(hit._bestScore || 0).toFixed(3)}</span>
+          <!-- <span class="score-badge">{(hit._bestScore || 0).toFixed(3)}</span> -->
           <div class="result-info">
             <div class="result-head">
-              <span class="state-badge">{hit.state || "Unknown"}</span>
-              {#if panel.hitDate(hit)}<span class="date-badge"
+            {#if panel.hitDate(hit)}<span class="date-badge"
                   >{panel.hitDate(hit)}</span
                 >{/if}
+              <span class="state-badge">In {hit.state || "Unknown"}, on </span>
+              
               <h4 class="result-title">
                 {hit._title || "Untitled"}
               </h4>
             </div>
-            <p class="result-preview">{@html renderHighlight(panel.hitPreview(hit), hitTopics(hit))}</p>
+            <p class="result-preview">{@html renderHighlight(hit._matchedChunks[0].textHL, hitTopics(hit))}</p>
           </div>
         </div>
       </summary>
@@ -156,13 +155,14 @@
       onclick={() => panel.toggleSelect(i)}
     >
       <div class="result-summary">
-        <span class="score-badge">{(hit._bestScore || 0).toFixed(3)}</span>
+        <!-- <span class="score-badge">{(hit._bestScore || 0).toFixed(3)}</span> -->
         <div class="result-info">
           <div class="result-head">
-            <span class="state-badge">{hit.state || "Unknown"}</span>
-            {#if panel.hitDate(hit)}<span class="date-badge"
+                 {#if panel.hitDate(hit)}<span class="date-badge"
                 >{panel.hitDate(hit)}</span
               >{/if}
+            <span class="state-badge">In {hit.state || "Unknown"}, </span>
+     
             <h4 class="result-title">
               {hit._title || "Untitled"}
             </h4>
@@ -200,7 +200,7 @@
   @reference "../../../app.css";
 
   .results-list-container {
-    @apply flex-1 min-w-[60vw] ;
+    @apply flex-1 ;
     transition: opacity 0.15s ease;
   }
   /* Results from the previous query, still shown while the new one loads. */
@@ -208,8 +208,8 @@
     @apply opacity-40 pointer-events-none;
   }
 
-  .results-list{
-    @apply h-[60vh] overflow-y-auto ;
+  .results-list {
+    @apply h-auto overflow-y-auto p-2 bg-primary/10 border border-primary/30;
   }
   .mobile-only {
     display: none;
@@ -248,44 +248,57 @@
   }
 
   .result-card {
-    @apply w-full text-left bg-primaryLight rounded-lg p-3 mb-2 transition cursor-pointer border-2 border-transparent;
+    @apply w-full text-left bg-white/50 p-3 mb-3 transition-all cursor-pointer;
+    border: 5px solid rgba(139, 115, 85, 0.8);
   }
   .result-card:hover {
-    @apply bg-primary/30;
+    @apply bg-white/70 shadow-sm;
+    border-color: rgba(139, 115, 85, 0.55);
   }
   .result-card-active {
-    @apply bg-primary/40 border-primary/60;
+    @apply bg-primary/30;
+    border-color: #b8860b;
+    box-shadow: 0 0 0 2px rgba(184, 134, 11, 0.4);
   }
 
   .result-summary {
-    @apply flex items-start gap-3 w-full;
+    @apply flex items-start gap-3 w-full min-w-0;
   }
   .score-badge {
     @apply shrink-0 text-sm font-mono font-bold px-2 py-1 rounded-md bg-emerald-100 text-emerald-900 border border-emerald-300;
   }
   .result-info {
-    @apply flex-1 flex-col min-w-0;
+    @apply grid flex-1 min-w-0 gap-x-3 gap-y-1;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      "meta tags"
+      "preview tags";
   }
   .state-badge {
-    @apply text-[11px] font-semibold px-2 py-0.5 rounded bg-blue-100 text-blue-800 border border-blue-200;
+    @apply text-[1em] font-semibold px-2 py-0.5;
   }
   .result-head {
-    @apply flex items-center gap-2 flex-wrap;
+    @apply flex flex-wrap items-baseline min-w-0;
+    grid-area: meta;
   }
   .date-badge {
-    @apply text-[11px] font-mono font-bold px-2 py-0.5 rounded bg-amber-100 text-amber-900 border border-amber-300;
+    @apply text-[1em] font-mono font-bold px-2 py-0.5;
   }
   .result-title {
-    @apply text-[1em] font-semibold text-black/90;
+    @apply text-[1em] capitalize font-semibold text-black/90;
   }
   .result-preview {
-    @apply text-[0.9em] text-black/50 mt-1 line-clamp-2 leading-relaxed;
+    @apply text-[0.9em] text-black/50 line-clamp-4 leading-relaxed;
+    grid-area: preview;
   }
+
   .meta-tags {
-    @apply flex flex-wrap gap-1.5 mt-1;
+    @apply flex flex-wrap content-start justify-end gap-1 max-w-[11rem];
+    grid-area: tags;
   }
   .meta-tag {
-    @apply text-[10px] bg-primary/20 text-black/70 px-1.5 py-0.5 rounded;
+    @apply text-[10px] bg-primary/20 text-black/70 px-1.5 py-0.5 rounded h-fit;
+    border: 1px solid rgba(139, 115, 85, 0.35);
   }
   .chunks-tag {
     @apply bg-amber-100 text-amber-800 font-semibold;
@@ -337,13 +350,16 @@
   }
 
   .accordion {
-    @apply bg-primaryLight rounded-lg p-3 mb-3 transition;
+    @apply bg-white/50 p-3 mb-3 transition-all;
+    border: 5px solid rgba(139, 115, 85, 0.8);
   }
   .accordion:hover {
-    @apply bg-primary/40;
+    @apply bg-white/70;
+    border-color: rgba(139, 115, 85, 0.55);
   }
   .accordion[open] {
-    @apply bg-primary/40;
+    @apply bg-primary/30;
+    border-color: #b8860b;
   }
   .accordion summary {
     @apply cursor-pointer list-none;

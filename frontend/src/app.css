@@ -44,6 +44,28 @@ body {
   font-weight: 700;
 }
 
+/* Inline spinner. Global because Svelte scopes styles per component and this is
+   needed by the view shell's loading overlay and by the source grid's per-cell
+   "modelling…" note, which now live in different files. */
+.gm-spin {
+  display: inline-block;
+  flex-shrink: 0;
+  width: 0.7rem;
+  height: 0.7rem;
+  border: 2px solid rgba(0, 0, 0, 0.15);
+  border-top-color: #c3b091;
+  border-radius: 9999px;
+  animation: gm-spin 0.7s linear infinite;
+}
+.gm-spin-lg {
+  width: 1.6rem;
+  height: 1.6rem;
+  border-width: 3px;
+}
+@keyframes gm-spin {
+  to { transform: rotate(360deg); }
+}
+
 .im-fell-dw-pica-regular {
   font-family: "IM Fell DW Pica", serif;
   font-weight: 400;

@@ -47,7 +47,7 @@ export class RadvizPlot {
       edge: 4,            // card → pane edge
       dotClearance: 3,    // reject a card with a marker this close inside it
       minPaneMargin: 120, // no cards below paneW < width + this
-      // Must track `.gm-rv-anchor`'s max-width in GeoClusterMap.
+      // Must track `.gm-rv-anchor`'s max-width in TopicPlot.
       anchorBox: { width: 132, height: 32 },
     },
   };
@@ -156,7 +156,7 @@ export class RadvizPlot {
   }
   static #clamp(v, lo, hi) { return v < lo ? lo : v > hi ? hi : v; }
 
-  // Separates markers that share a pixel (identical θ profiles; all solo docs sit
+  // Separates markers that share a pixel (identical θ profiles; every document about
   // on the origin). Displacement is capped at relax.maxShift. No randomness — the
   // layout must be identical across reloads.
   #relax(dots) {
@@ -237,7 +237,6 @@ export class RadvizPlot {
     const dots = this.#relax(
       source.points.map((p) => ({
         ...p,
-        solo: p.second === null || p.second === undefined,
         tx: cx0 + p.ux * k,
         ty: cy0 + p.uy * k,
         rad: marker.baseRadius + Math.min(marker.probCap, p.prob * marker.probScale),

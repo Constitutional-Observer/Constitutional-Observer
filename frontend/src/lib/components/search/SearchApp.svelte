@@ -2,20 +2,16 @@
   import ResultsList from "$lib/components/search/ResultsList.svelte";
   import SearchSidebar from "$lib/components/search/SearchSidebar.svelte";
   import DetailPanel from "$lib/components/search/DetailPanel.svelte";
-  import { topicHighlight } from "$lib/components/search/topic-highlight.svelte.js";
-  import { searchBox, searchParams, ui } from "$lib/components/search/search-state.svelte.js";
-  import { chunkText } from "$lib/highlight.js";
+  
+  import { searchBox, searchParams, ui, docFormat, topicHighlight } from "$lib/components/search/search-state.svelte.js";
   import { goto, replaceState } from "$app/navigation";
   import { page } from "$app/state";
   import { browser } from "$app/environment";
   import { tick, untrack, onMount } from "svelte";
 
-  // Document id: the chunk id (`<STATE_CODE>_<file>_<chunk_id>`) with its
-  // trailing _<chunk_id> removed. Keys every per-document map here and is the
-  // doc_id /api/document fetches by. The server stamps it as `_docId`; fall back
-  // to computing it for hits that lack one.
-  const baseDocId = (idLike) => String(idLike ?? "").replace(/_\d+$/, "");
-  const docKeyOf = (h) => h._docId || baseDocId(h?.id);
+  // Per-document key and date come from docFormat, so the result cards, the map
+  // views and a saved bookmark can never disagree about which document is which.
+  const docKeyOf = docFormat.docKey;
 
   // ---------------------------------------------------------------------------
   // DocPanel — result selection, copy feedback, full-document cache
@@ -104,7 +100,7 @@
       this.selectedHitIndex = null;
       this.openedBookmark = { loading: true, meta: { ...bm }, chunks: [] };
       try {
-        const did = bm.docId || baseDocId(bm.id);
+        const did = bm.docId || docKeyOf(bm);
         const params = new URLSearchParams({ index: bm.index });
         if (did) params.set("doc_id", did);
         else params.set("file_name", bm.file_name);
@@ -125,19 +121,15 @@
 
     // Per-document id, matching docKey. Bookmarks carry it as `docId`.
     docId(hit) {
-      return hit?._docId || baseDocId(hit?.id ?? hit?.docId);
+      return docKeyOf(hit);
     }
 
     hitDate(hit) {
-      if (!hit.year) return null;
-      const m = String(hit.month || 1).padStart(2, "0");
-      const d = String(hit.day || 1).padStart(2, "0");
-      return `${hit.year}-${m}-${d}`;
+      return docFormat.hitDate(hit);
     }
 
     hitPreview(hit) {
-      const text = chunkText(hit._matchedChunks?.[0]);
-      return text.length > 150 ? text.slice(0, 150) + "..." : text;
+      return docFormat.hitPreview(hit);
     }
 
     metaTags(hit) {
@@ -203,12 +195,6 @@
     static #key(hit) {
       return docKeyOf(hit);
     }
-    static #dateOf(hit) {
-      if (!hit.year) return null;
-      const m = String(hit.month || 1).padStart(2, "0");
-      const d = String(hit.day || 1).padStart(2, "0");
-      return `${hit.year}-${m}-${d}`;
-    }
 
     load() {
       if (!browser) return;
@@ -242,7 +228,7 @@
             file_name: hit.file_name,
             title: hit._title || "Untitled",
             state: hit.state || "Unknown",
-            date: Bookmarks.#dateOf(hit),
+            date: docFormat.hitDate(hit),
             score: hit._bestScore || 0,
           },
         ];
@@ -434,7 +420,7 @@
   // ResultPager — pagination state + sorted/paged views of filtered results
   // ---------------------------------------------------------------------------
   class ResultPager {
-    static #PER_PAGE = 20;
+    static #PER_PAGE = 10;
 
     currentPage = $state(0);
 
@@ -679,7 +665,7 @@
       paginationDone={!loader.loading}
     />
 
-    <!-- Right column: bookmarks + collapsible detail accordion -->
+    <!-- modal: bookmarks + collapsible detail accordion -->
     <DetailPanel
       {panel}
       {bookmarks}
@@ -695,20 +681,25 @@
   @reference "../../../app.css";
 
   #container {
-    @apply !w-screen;
+    @apply mx-auto w-screen md:w-[80vw];
     display: flex;
     flex-direction: column;
   }
 
   .page-layout {
-    @apply flex gap-4 px-4 mx-2 h-auto items-start;
+    @apply grid gap-4 px-4 mx-2 h-auto items-start;
+    --rail: 280px;
+    grid-template-columns: var(--rail) minmax(0, 1fr) var(--rail);
     padding-top: 1.5rem;
     padding-bottom: 1.5rem;
   }
 
   @media (max-width: 768px) {
     /* On small screens let the page scroll naturally as a column */
-    .page-layout { @apply flex-col; padding-bottom: 2rem; }
+    .page-layout {
+      grid-template-columns: minmax(0, 1fr);
+      padding-bottom: 2rem;
+    }
   }
 
   :global(input[type="text"]) {
