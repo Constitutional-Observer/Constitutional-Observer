@@ -167,7 +167,7 @@
               {hit._title || "Untitled"}
             </h4>
           </div>
-          <p class="result-preview">{panel.hitPreview(hit)}</p>
+          <p class="result-preview">{@html renderHighlight(panel.hitExcerpt(hit), hitTopics(hit))}</p>
           <div class="meta-tags">
             {#if hit._matchedChunks?.length > 1}
               <span class="meta-tag chunks-tag"

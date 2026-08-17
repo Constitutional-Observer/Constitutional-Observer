@@ -133,6 +133,10 @@
       return docFormat.hitPreview(hit);
     }
 
+    hitExcerpt(hit) {
+      return docFormat.hitExcerpt(hit);
+    }
+
     metaTags(hit) {
       const tags = [];
       for (const key of DocPanel.#METADATA_KEYS) {
