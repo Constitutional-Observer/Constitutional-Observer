@@ -62,7 +62,7 @@
   }
 
   // Surface a random handful so the viewport doesn't get crowded.
-  const SHOW = 10;
+  const SHOW =5;
   const sample = [...thematicQuestions]
     .sort(() => Math.random() - 0.5)
     .slice(0, SHOW);
@@ -124,15 +124,17 @@
 
 <style lang="postcss">
   @reference "../app.css";
-
-
-
   .scatter-box {
     @apply relative w-full overflow-hidden;
+    background-image: url("/stage1-1.jpeg");
+    background-repeat: no-repeat;
+    background-size: cover;
+    background-position-y: bottom;
+    filter: sepia(5%) blur(0.5px) saturate(20%) ;
   }
 
   .scatter-question {
-    @apply absolute cursor-pointer border-0 bg-transparent p-1 text-left;
+    @apply absolute cursor-pointer border-0 bg-primaryLight opacity-100 px-1 text-left drop-shadow-lg;
     @apply text-base md:text-lg font-medium text-balance;
     max-width: 26vw;
     transition: color 0.2s, transform 0.2s;
@@ -140,6 +142,7 @@
   .scatter-question:hover {
     color: #c3b091;
     transform: scale(1.05);
+    filter: blur(0px)
   }
 
   .theme-grid {

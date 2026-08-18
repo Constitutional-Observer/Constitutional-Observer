@@ -16,8 +16,8 @@
     </h2>
   </div>
   <code class="preformatter pt-10 pl-5 pr-10 md:px-0 w-full md:w-1/2"
-    >If this error persists, please contact at adhavan [dot] sivaraj16 [at]
-    gmail [dot] com with "Constitutional-Observer-Error" as the subject line. <br
+    >If this error persists, please contact at hello [at]
+    constitutional [dot] observer with "Constitutional-Observer-Error" as the subject line. <br
     />{page.status}
     {page.error?.message ?? 'Unknown error'}</code
   >
