@@ -19,7 +19,7 @@ class SearchParams {
   hybrid = $state(false);
   semanticRatio = $state(0.5);
   limit = $state(200);
-  scoreThreshold = $state(0.1);
+  scoreThreshold = $state(0.7);
   indexIds = $state(new Set());
 
   build(query) {
