@@ -10,7 +10,7 @@
   // `columns` is the wide-screen column count. It is a prop rather than a media
   // query because the grid now shares its row with the overview timeline — how
   // many cells fit depends on the half it was given, not on the viewport.
-  let { geo, paginationDone = true, columns = 6, onselect, onopentopic } = $props();
+  let { geo, paginationDone = true, columns = 4, onselect, onopentopic } = $props();
 
   let openKey = $state(null);
 
@@ -104,10 +104,10 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
   @media (min-width: 768px) {
-    .gm-grid-pane { grid-template-columns: repeat(var(--gm-cols, 6), minmax(0, 1fr)); }
+    .gm-grid-pane { grid-template-columns: repeat(var(--gm-cols, 4), minmax(0, 1fr)); }
   }
 
-  .gm-cell { @apply relative flex flex-col text-left p-1.5 transition-all overflow-hidden h-[160px] md:h-[200px] bg-white/50; border: 5px solid rgba(139, 115, 85, 0.8); }
+  .gm-cell { @apply relative flex flex-col text-left p-1.5 transition-all overflow-hidden h-[160px] md:h-[200px] bg-white/50; border: 5px solid var(--borderDark); }
   .gm-cell:hover { @apply shadow-sm; border-color: rgba(139, 115, 85, 0.55); }
   .gm-cell-open { border-color: rgba(139, 115, 85, 0.8); transform: scale(1.02); z-index: 5; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.22); }
   .gm-cell-selected { border-color: #b8860b !important; box-shadow: 0 0 0 2px rgba(184, 134, 11, 0.4); }
@@ -127,13 +127,13 @@
   .gm-accordion-body { @apply px-1.5 pb-1.5; }
 
   .gm-cell-head { @apply flex items-start justify-between gap-1 shrink-0; }
-  .gm-cell-name { @apply text-[0.9em] font-bold text-black/80 leading-tight pb-2 line-clamp-2; }
+  .gm-cell-name { @apply text-[0.75em] text-black/80 leading-tight pb-2 line-clamp-2; }
   .gm-cell-count { @apply text-[12px] font-mono font-bold text-black/60 leading-none shrink-0; }
   .gm-cell-note { @apply flex items-center gap-1 text-[12px] text-black/40 italic; }
 
   .gm-cell-topics { @apply flex flex-col flex-1 min-h-0 gap-0.5 overflow-y-auto -mr-1 pr-1 ; }
   .gm-cell-topic {
-    @apply text-left text-[0.9em] leading-tight px-1 py-0.5 rounded cursor-pointer transition-colors shrink-0 ;
+    @apply text-left text-[1em] px-1 py-0.5 rounded cursor-pointer transition-colors shrink-0 ;
     @apply bg-white/50 text-black/65 hover:bg-white/90 hover:text-black/85;
     border: 1px solid transparent;
   }

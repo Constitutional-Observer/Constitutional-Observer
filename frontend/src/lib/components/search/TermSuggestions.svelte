@@ -95,7 +95,6 @@
 
   .term-rail {
     @apply sticky top-[6%] self-start max-h-[88vh] overflow-y-auto z-20;
-    width: 280px;
   }
   .term-box {
     @apply relative py-3 md:py-5 px-2 md:px-4 bg-primaryLight/90 backdrop-opacity-50 drop-shadow-xl border-4 border-primary;

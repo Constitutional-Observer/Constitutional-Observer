@@ -53,7 +53,7 @@
   // Filters section: closed by default on mobile, open by default on desktop
   let filtersOpen = $state(false);
   $effect(() => {
-    filtersOpen = window.matchMedia("(min-width: 768px)").matches;
+    filtersOpen = window.matchMedia("(min-width: 1000px)").matches;
   });
 
   // sharing is copying the current address.
@@ -67,7 +67,7 @@
 
 <aside class="sidebar">
 <section
-  class="relative py-2 md:py-7 px-2 md:px-5 backdrop-opacity-50 bg-primaryLight/90 drop-shadow-xl border-4 border-primary"
+  class="relative p-2 backdrop-opacity-50 bg-primaryLight/90 drop-shadow-xl border-4 border-primary"
 >
   <!-- Where you are in the results. Published by the map, drawn here, so the trail
        reads as part of the query rather than as a caption on one panel. -->
@@ -129,8 +129,8 @@
         <span class="accordion-arrow"></span>
       </summary>
   <div class="filter-box">
-    <!-- Timeline — accordion, closed by default -->
-    <details class="filter-accordion">
+    <!-- Timeline — accordion, open by default -->
+    <details class="filter-accordion" open>
       <summary class="filter-accordion-summary">
         <span class="summary-label">Timeline</span>
         {#if yearMin || yearMax}
@@ -266,10 +266,10 @@
 
   .sidebar {
     @apply shrink-0 sticky top-[6%] self-start max-h-full overflow-y-auto z-20;
-    width: 280px;
+    container-type: inline-size;
   }
 
-  @media (max-width: 768px) {
+  @media (max-width: 1000px) {
     .sidebar { width: 100%; overflow-y: visible; }
   }
 
@@ -285,22 +285,22 @@
   }
 
   .filter-box {
-    @apply bg-white/60 backdrop-blur-sm rounded-lg p-3 border border-primary/30 space-y-3;
+    @apply bg-white/60 backdrop-blur-sm rounded-lg p-1 border border-primary/30 space-y-3;
   }
 
-  /* Controls row — bookmarks/share + the Filters accordion trigger. Stacked on
-     desktop (action-row full width above Filters); on mobile they sit in one
-     line, with the trigger buttons collapsing to icons to save space. */
+  /* Controls row — bookmarks/share above the Filters accordion trigger, always
+     stacked; when the sidebar itself is narrow the trigger buttons collapse
+     to icons to save space instead of reflowing into a row. */
   .controls-row {
     @apply flex flex-col;
   }
 
   /* Filters — top-level accordion, closed on mobile / open on desktop by default */
   .filters-accordion {
-    @apply mt-3 rounded-lg overflow-hidden;
+    @apply mt-3 overflow-hidden;
   }
   .filters-accordion-summary {
-    @apply flex items-center justify-between px-3 py-2 cursor-pointer select-none list-none;
+    @apply flex flex-wrap items-center justify-between gap-1 px-3 py-1 cursor-pointer select-none list-none;
     @apply bg-white/60 backdrop-blur-sm border border-primary/30 rounded-lg text-black/70 font-semibold text-xs;
     @apply transition hover:bg-primary/20;
   }
@@ -330,10 +330,12 @@
   }
   .btn-icon { @apply hidden; }
 
-  @media (max-width: 768px) {
-    .controls-row { @apply flex-row items-center gap-2; }
-    .action-row { @apply mt-0 gap-1.5; }
-    .filters-accordion { @apply mt-0 flex-1; }
+  /* Below this, the sidebar itself is too narrow for full-label buttons —
+     keyed on the sidebar's own rendered width (a container query), not the
+     viewport: on desktop the sidebar is a ~15vw grid rail that can be this
+     narrow even when the viewport is wide. */
+  @container (max-width: 260px) {
+    .action-row { @apply gap-1.5; }
     .bm-trigger { @apply relative flex-none px-2 py-2 gap-0; }
     .btn-icon { @apply block text-sm leading-none; }
     .btn-label { @apply hidden; }
@@ -346,7 +348,7 @@
   }
 
   .filter-accordion-summary {
-    @apply flex items-center gap-1.5 px-2 py-1.5 cursor-pointer select-none list-none;
+    @apply flex flex-wrap items-center gap-1.5 px-2 py-1.5 cursor-pointer select-none list-none;
     @apply bg-white/40 hover:bg-primary/10 transition-colors;
   }
 
@@ -405,10 +407,10 @@
   .param-hint { @apply text-[8px] text-black/30 italic; }
 
   /* Indices */
-  .indices-pills { @apply flex gap-1 shrink-0; }
+  .indices-pills { @apply flex flex-wrap gap-1; }
   .semantic-pill { @apply text-[8px] bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded-full font-medium; }
   .docs-pill { @apply text-[8px] bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded-full font-mono; }
-  .idx-controls { @apply flex items-center gap-2; }
+  .idx-controls { @apply flex flex-wrap items-center gap-2; }
   .idx-control-btn {
     @apply text-[9px] px-1.5 py-0.5 rounded border border-primary/20 bg-white/60 text-black/60 transition-all;
     @apply hover:bg-primary/20;

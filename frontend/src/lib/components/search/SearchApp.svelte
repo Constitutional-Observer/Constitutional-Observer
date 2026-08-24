@@ -693,21 +693,26 @@
   @reference "../../../app.css";
 
   #container {
-    @apply mx-auto w-screen md:w-[80vw];
+    @apply mx-auto w-screen md:w-[90vw];
     display: flex;
     flex-direction: column;
   }
 
   .page-layout {
     @apply grid gap-4 px-4 mx-2 h-auto items-start;
-    --rail: 280px;
-    grid-template-columns: var(--rail) minmax(0, 1fr) var(--rail);
+    /* Bounded so the rails never shrink to an unusably narrow column before
+       the layout switches to a single stacked column below. */
+    --rail-primary: clamp(240px, 20vw, 340px);
+    --rail: clamp(210px, 15vw, 320px);
+
+    grid-template-columns: var(--rail-primary) minmax(0, 1fr) var(--rail);
     padding-top: 1.5rem;
     padding-bottom: 1.5rem;
   }
 
-  @media (max-width: 768px) {
-    /* On small screens let the page scroll naturally as a column */
+  @media (max-width: 1000px) {
+    /* Below this, even the clamped rail leaves too little room for the
+       center column — let the page scroll naturally as a column instead */
     .page-layout {
       grid-template-columns: minmax(0, 1fr);
       padding-bottom: 2rem;

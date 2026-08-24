@@ -218,7 +218,7 @@
         <SourceGrid {geo} {paginationDone} {onselect} onopentopic={openTopic} />
         <!-- Every result on one axis, under the sources that hold them. The band
              and the grid are the same set read two ways. -->
-        <TimelineBand {hits} rise={280} fade={64} {onselect} />
+        <!-- <TimelineBand {hits} rise={280} fade={64} {onselect} /> -->
       </div>
     {:else}
       <TopicPlot
@@ -258,18 +258,16 @@
     grid-template-rows: minmax(0, 1fr);
   }
 
-  /* Split horizontally: the sources above, every result on one time axis below.
-     The band takes 30% — it is one axis and reads at a glance, so the rest belongs
-     to the grid, which scrolls inside its share. No gap between them — the band's
-     fade is what separates the two, and it needs the grid's clipped edge to land
-     where it is already solid.
+  /* The TimelineBand that used to share this row is disabled (see the commented-out
+     usage above), so the grid gets the full height. Re-add a second row here
+     (e.g. minmax(0, 7fr) minmax(0, 3fr)) if it comes back.
 
-     The children carry min-h-0 and are stretched by the grid; they must NOT set
+     The child carries min-h-0 and is stretched by the grid; it must NOT set
      height:100%, which resolves against the track and reintroduces the same
      content-driven growth min-h-0 exists to prevent. */
   .gm-sources {
     @apply grid min-h-0;
-    grid-template-rows: minmax(0, 7fr) minmax(0, 3fr);
+    grid-template-rows: minmax(0, 1fr);
   }
 
   .gm-loading { @apply absolute inset-0 z-40 flex flex-col items-center justify-center gap-2 text-[12px] text-black/60 italic; background: rgba(240, 233, 218, 0.82); }
