@@ -247,12 +247,12 @@
     ]
   },
   {
-    "uid": "state_legislature_debates_ls",
+    "uid": "parliamentary_debates_ls",
     "collection": "Parliament",
     "stateCode": "LS",
     "state": null,
     "label": "Lok Sabha",
-    "annotation": "Lower house of Parliament. Filed under a state_legislature_debates_* uid despite being national. Index exists but holds no documents yet.",
+    "annotation": "Lower house of Parliament.",
     "searchField": "__discussions",
     "titleField": "title_en",
     "metaFields": [
