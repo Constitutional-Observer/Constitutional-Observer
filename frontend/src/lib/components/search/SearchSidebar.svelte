@@ -85,7 +85,13 @@
             placeholder="Ask a question"
             bind:value={searchBox.query}
             disabled={searching}
-          />
+            onkeydown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey && !e.isComposing) {
+                e.preventDefault();
+                e.currentTarget.form?.requestSubmit();
+              }
+            }}
+          ></textarea>
           {#if searching}
             <span class="search-ellipsis"></span>
           {/if}
