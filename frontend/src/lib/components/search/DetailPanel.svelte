@@ -91,7 +91,13 @@
     allHits = [],
     scopedHits = [],
     onOpenDoc,
+    permalink,
   } = $props();
+
+  function copyLink(chunk = null, id = "link") {
+    panel.focusChunk = chunk;
+    panel.copyText(permalink(chunk), id);
+  }
 
   const related = new RelatedSearch();
   let relatedHits = $derived(related.tab === "all" ? allHits : scopedHits);
@@ -136,8 +142,7 @@
   });
 
   function closeDetail() {
-    panel.selectedHitIndex = null;
-    panel.closeBookmark();
+    panel.close();
     related.close();
   }
 
@@ -173,6 +178,18 @@
       </div>
     </div>
   {/if}
+{/snippet}
+
+{#snippet linkButton()}
+  <button class="link-btn" title="Copy a link to this document and search" onclick={() => copyLink(panel.focusChunk ?? panel.topChunk(selectedHit))}>
+    {panel.copiedId === "link" ? "Link copied" : "🔗 Copy link"}
+  </button>
+{/snippet}
+
+{#snippet chunkLink(chunkId, id)}
+  <button class="chunk-id chunk-link" title="Copy a link to this section" onclick={() => copyLink(chunkId, id)}>
+    {panel.copiedId === id ? "link copied" : `#${chunkId}`}
+  </button>
 {/snippet}
 
 <!-- Bookmarks modal -->
@@ -236,7 +253,7 @@
     >
       <header class="modal-header">
         {#if panel.openedBookmark}
-          <span class="detail-summary-label">Bookmark</span>
+          <span class="detail-summary-label">{bookmarks.has(panel.openedBookmark.meta) ? "Bookmark" : "Document"}</span>
           <span class="modal-title">{panel.openedBookmark.meta.title}</span>
         {:else if selectedHit}
           <span class="detail-summary-label">Selected</span>
@@ -255,9 +272,10 @@
         {#if panel.openedBookmark}
           {@const ob = panel.openedBookmark}
           <div class="detail-header">
+            <div class="detail-actions">{@render linkButton()}</div>
             <h3 class="detail-title">{ob.meta.title}</h3>
             <div class="result-head">
-              <span class="state-badge">{ob.meta.state}</span>
+              {#if ob.meta.state}<span class="state-badge">{ob.meta.state}</span>{/if}
               {#if ob.meta.date}<span class="date-badge">{ob.meta.date}</span>{/if}
             </div>
             {#if ob.meta.docId}<p class="doc-id-line">ID: <span class="doc-id-badge">{ob.meta.docId}</span></p>{/if}
@@ -270,10 +288,12 @@
               <p class="doc-info">{ob.chunks.length} chunks in document</p>
               {#each ob.chunks as chunk, ci (chunk.chunk_id ?? ci)}
                 <div
+                  id="chunk-{ob.meta.key}-{chunk.chunk_id}"
                   class="doc-chunk"
                   class:doc-chunk-highlight={chunk.isHighlighted}
+                  class:doc-chunk-focus={chunk.chunk_id === panel.focusChunk}
                 >
-                  <span class="chunk-id">#{chunk.chunk_id}</span>
+                  {@render chunkLink(chunk.chunk_id, `bc-${chunk.chunk_id}`)}
                   <p use:related.action>{@html renderDocChunk(chunk.text)}</p>
                 </div>
               {/each}
@@ -284,6 +304,7 @@
         {:else if selectedHit}
           <div class="detail-header">
             <div class="detail-actions">
+              {@render linkButton()}
               <button
                 class="bookmark-btn"
                 class:bookmarked={bookmarks.has(selectedHit)}
@@ -327,11 +348,25 @@
                 : ""}
             </p>
             {#each selectedHit._matchedChunks as mc, mci (mc.chunk_id ?? mci)}
-              <div class="matched-chunk">
+              <div
+                id="mc-{panel.docKey(selectedHit)}-{mc.chunk_id}"
+                class="matched-chunk"
+                class:doc-chunk-focus={mc.chunk_id === panel.focusChunk}
+              >
                 <div class="chunk-header">
                   <span class="chunk-id"
                     >#{mc.chunk_id} &middot; {mc.score?.toFixed(3) || ""}</span
                   >
+                  <span class="chunk-actions">
+                  <button
+                    class="copy-btn"
+                    title="Copy a link to this section"
+                    onclick={() => copyLink(mc.chunk_id, `ml-${selectedHit.id}-${mc.chunk_id}`)}
+                  >
+                    {panel.copiedId === `ml-${selectedHit.id}-${mc.chunk_id}`
+                      ? "Link copied"
+                      : "Link"}
+                  </button>
                   <button
                     class="copy-btn"
                     onclick={() =>
@@ -341,6 +376,7 @@
                       ? "Copied"
                       : "Copy"}
                   </button>
+                  </span>
                 </div>
                 <p class="result-excerpt" use:related.action>{@html renderHighlight(mc.textHL)}</p>
               </div>
@@ -366,8 +402,9 @@
                   id="chunk-{panel.docKey(selectedHit)}-{chunk.chunk_id}"
                   class="doc-chunk"
                   class:doc-chunk-highlight={chunk.isHighlighted}
+                  class:doc-chunk-focus={chunk.chunk_id === panel.focusChunk}
                 >
-                  <span class="chunk-id">#{chunk.chunk_id}</span>
+                  {@render chunkLink(chunk.chunk_id, `fc-${chunk.chunk_id}`)}
                   <p use:related.action>{@html renderDocChunk(chunk.text)}</p>
                 </div>
               {/each}
@@ -587,7 +624,25 @@
     @apply text-black/80;
   }
   .detail-actions {
-    @apply flex justify-end mb-1;
+    @apply flex justify-end gap-1 mb-1;
+  }
+  .link-btn {
+    @apply text-[11px] px-2 py-0.5 rounded border border-primary/40 bg-white/60 text-black/70 cursor-pointer transition hover:bg-primary/20;
+  }
+  .link-btn::after {
+    content: "";
+  }
+  .chunk-actions {
+    @apply flex gap-1;
+  }
+  .chunk-link {
+    @apply bg-transparent border-0 p-0 cursor-pointer hover:text-black/70 hover:underline;
+  }
+  .chunk-link::after {
+    content: "";
+  }
+  .doc-chunk-focus {
+    @apply outline outline-2 outline-blue-400 outline-offset-2;
   }
   .bookmark-btn {
     @apply text-[11px] px-2 py-0.5 rounded border border-primary/40 bg-white/60 text-black/70 cursor-pointer transition hover:bg-primary/20;

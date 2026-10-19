@@ -30,6 +30,8 @@
     ];
 
     selectedHitIndex = $state(null);
+    linkedHit = $state(null);
+    focusChunk = $state(null);
     copiedId = $state(null);
     fullDocs = $state({});
     // A bookmark opened by id — { loading, meta:{...}, chunks } — takes over the
@@ -57,12 +59,58 @@
     }
 
     toggleSelect(i) {
-      this.openedBookmark = null;
+      this.#clearOpen();
       this.selectedHitIndex = this.selectedHitIndex === i ? null : i;
     }
     select(i) {
-      this.openedBookmark = null;
+      this.#clearOpen();
       this.selectedHitIndex = i;
+    }
+    close() {
+      this.#clearOpen();
+      this.selectedHitIndex = null;
+    }
+    #clearOpen() {
+      this.openedBookmark = null;
+      this.linkedHit = null;
+      this.focusChunk = null;
+    }
+
+    openDoc(selectedHit) {
+      if (this.openedBookmark) {
+        const m = this.openedBookmark.meta;
+        return { docId: m.docId || m.key, index: m.index };
+      }
+      if (selectedHit) return { docId: this.docId(selectedHit), index: selectedHit._index };
+      return null;
+    }
+
+    openLink({ docId, index, chunk }, docs) {
+      const hit = docs.find((d) => docKeyOf(d) === docId && (!index || d._index === index));
+      if (!hit) {
+        this.openById({ key: docId, docId, index }, chunk);
+        return;
+      }
+      this.close();
+      this.linkedHit = hit;
+      this.focusChunk = chunk;
+      if (chunk == null) return;
+      if (hit._matchedChunks?.some((c) => c.chunk_id === chunk))
+        tick().then(() => this.scrollToChunk(`mc-${this.docKey(hit)}`, chunk));
+      else this.loadFullDocument(hit);
+    }
+
+    topChunk(hit) {
+      let best = null;
+      for (const c of hit?._matchedChunks || [])
+        if (c.chunk_id != null && (best == null || (c.score || 0) > (best.score || 0))) best = c;
+      return best?.chunk_id ?? null;
+    }
+
+    scrollToChunk(prefix, chunkId) {
+      document
+        .getElementById(`${prefix}-${chunkId}`)
+        ?.scrollIntoView({ behavior: "smooth", block: "center" });
     }
 
     // Open a document in the reader (used by the related-documents section).
@@ -86,34 +134,43 @@
       });
     }
     reset() {
-      this.selectedHitIndex = null;
+      this.close();
       this.fullDocs = {};
-      this.openedBookmark = null;
-    }
-
-    closeBookmark() {
-      this.openedBookmark = null;
     }
 
     // Open the exact document for a saved bookmark — fetched from Meilisearch by
     // id (the document API resolves the file_name and returns every chunk).
-    async openById(bm) {
-      this.selectedHitIndex = null;
-      this.openedBookmark = { loading: true, meta: { ...bm }, chunks: [] };
+    async openById(bm, chunk = null) {
+      this.close();
+      this.focusChunk = chunk;
+      const opened = { loading: true, meta: { ...bm }, chunks: [] };
+      this.openedBookmark = opened;
       try {
         const did = bm.docId || docKeyOf(bm);
         const params = new URLSearchParams({ index: bm.index });
         if (did) params.set("doc_id", did);
         else params.set("file_name", bm.file_name);
+        if (chunk != null) params.set("highlight_chunks", String(chunk));
         const resp = await fetch(`/api/document?${params}`);
         const d = await resp.json();
+        if (this.openedBookmark?.meta.key !== opened.meta.key) return;
         this.openedBookmark = {
           loading: false,
-          meta: { ...bm, file_name: d.file_name || bm.file_name, docId: d.doc_id || did },
+          meta: {
+            ...bm,
+            title: bm.title || d.title_en || "Untitled",
+            file_name: d.file_name || bm.file_name,
+            docId: d.doc_id || did,
+          },
           chunks: d.chunks || [],
         };
       } catch {
+        if (this.openedBookmark?.meta.key !== opened.meta.key) return;
         this.openedBookmark = { loading: false, meta: { ...bm }, chunks: [] };
+      }
+      if (chunk != null) {
+        await tick();
+        this.scrollToChunk(`chunk-${bm.key}`, chunk);
       }
     }
     docKey(hit) {
@@ -180,12 +237,8 @@
       }
 
       await tick();
-      const firstChunkId = hit._matchedChunks?.[0]?.chunk_id;
-      if (firstChunkId != null) {
-        document
-          .getElementById(`chunk-${key}-${firstChunkId}`)
-          ?.scrollIntoView({ behavior: "smooth", block: "center" });
-      }
+      const target = this.focusChunk ?? hit._matchedChunks?.[0]?.chunk_id;
+      if (target != null) this.scrollToChunk(`chunk-${key}`, target);
     }
   }
 
@@ -503,6 +556,12 @@
 
   onMount(() => bookmarks.load());
 
+  let container;
+  onMount(() => {
+    const sp = page.url.searchParams;
+    if (sp.has("query") || sp.has("doc")) container?.scrollIntoView({ behavior: "instant", block: "start" });
+  });
+
   onMount(() => {
     const sp = page.url.searchParams;
     const states = sp.get("states");
@@ -516,19 +575,46 @@
     if (indices) searchParams.indexIds = new Set(indices.split(","));
   });
 
-   $effect(() => {
+  let pendingLink = $state(readLink(page.url.searchParams));
+
+  function readLink(sp) {
+    const docId = sp.get("doc");
+    if (!docId) return null;
+    const chunk = sp.has("chunk") ? Number(sp.get("chunk")) : NaN;
+    return { docId, index: sp.get("index") || "", chunk: Number.isInteger(chunk) ? chunk : null };
+  }
+
+  function linkParams(chunk = panel.focusChunk ?? panel.topChunk(selectedHit)) {
     const query = resolved.searchParams?.query;
-    if (!query) return;
-    const params = new URLSearchParams({
-      query,
-      hybrid: String(searchParams.hybrid),
-      semanticRatio: String(searchParams.semanticRatio),
-      scoreThreshold: String(searchParams.scoreThreshold),
-    });
+    const doc = panel.openDoc(selectedHit) ?? pendingLink;
+    const params = new URLSearchParams();
+    if (query) {
+      params.set("query", query);
+      params.set("hybrid", String(searchParams.hybrid));
+      params.set("semanticRatio", String(searchParams.semanticRatio));
+      params.set("scoreThreshold", String(searchParams.scoreThreshold));
+    }
     if (searchParams.indexIds.size) params.set("indices", [...searchParams.indexIds].join(","));
     if (filter.selectedStates.size) params.set("states", [...filter.selectedStates].join(","));
     if (filter.yearMin) params.set("yearMin", filter.yearMin);
     if (filter.yearMax) params.set("yearMax", filter.yearMax);
+    if (doc?.docId) {
+      params.set("doc", doc.docId);
+      if (doc.index) params.set("index", doc.index);
+      const c = doc === pendingLink ? pendingLink.chunk : chunk;
+      if (c != null) params.set("chunk", String(c));
+    }
+    return params;
+  }
+
+  function permalink(chunk) {
+    return new URL(`${basePath}?${linkParams(chunk)}`, location.origin).href;
+  }
+
+  $effect(() => {
+    if (!loaded) return;
+    const params = linkParams();
+    if (!params.has("query") && !params.has("doc")) return;
     const url = `${basePath}?${params}`;
     if (browser && url !== `${page.url.pathname}${page.url.search}`) replaceState(url, {});
   });
@@ -547,6 +633,7 @@
     searchParams: {},
   };
   let resolved = $state(EMPTY_SEARCH_DATA);
+  let loaded = $state(false);
 
   // UI state — search bar + loading flag
   let searching = $state(false);
@@ -560,7 +647,9 @@
     searching = true;
     let cancelled = false;
     Promise.resolve(source).then((value) => {
-      if (!cancelled) resolved = value;
+      if (cancelled) return;
+      loaded = true;
+      resolved = value;
     });
     return () => {
       cancelled = true;
@@ -577,6 +666,12 @@
     pager.reset();
     panel.reset();
     searching = false;
+
+    untrack(() => {
+      if (!loaded || !pendingLink) return;
+      panel.openLink(pendingLink, loader.docs);
+      pendingLink = null;
+    });
 
     const query = resolved.searchParams?.query;
     if (query && (resolved.totalEstimated || 0) > (resolved.hitCount || 0)) {
@@ -621,9 +716,10 @@
   // "default to first hit", so the accordion stays closed until the user picks
   // a result, a topic dot, or a bookmark.
   let selectedHit = $derived(
-    panel.selectedHitIndex != null && panel.selectedHitIndex < pager.pageHits.length
-      ? pager.pageHits[panel.selectedHitIndex]
-      : null,
+    panel.linkedHit ??
+      (panel.selectedHitIndex != null && panel.selectedHitIndex < pager.pageHits.length
+        ? pager.pageHits[panel.selectedHitIndex]
+        : null),
   );
 
   // --- Actions ---
@@ -641,7 +737,7 @@
 
 </script>
 
-<div id="container">
+<div id="container" bind:this={container}>
   <div class="page-layout">
     <SearchSidebar
       {searching}
@@ -685,6 +781,7 @@
       allHits={loader.docs}
       scopedHits={pager.rankedHits}
       onOpenDoc={(hit) => panel.openHit(hit)}
+      {permalink}
     />
   </div>
 </div>
