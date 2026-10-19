@@ -612,7 +612,7 @@
   }
 
   $effect(() => {
-    if (!loaded) return;
+    if (!loaded || searching) return;
     const params = linkParams();
     if (!params.has("query") && !params.has("doc")) return;
     const url = `${basePath}?${params}`;
@@ -646,11 +646,18 @@
     const source = data.streamed ?? data;
     searching = true;
     let cancelled = false;
-    Promise.resolve(source).then((value) => {
-      if (cancelled) return;
-      loaded = true;
-      resolved = value;
-    });
+    Promise.resolve(source).then(
+      (value) => {
+        if (cancelled) return;
+        loaded = true;
+        resolved = value;
+      },
+      (err) => {
+        if (cancelled) return;
+        console.error("Search load failed:", err);
+        searching = false;
+      },
+    );
     return () => {
       cancelled = true;
     };

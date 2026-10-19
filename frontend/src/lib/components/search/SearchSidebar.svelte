@@ -84,7 +84,6 @@
             class="p-1 !text-2xl w-full text-xs border border-primary caret-red"
             placeholder="Ask a question"
             bind:value={searchBox.query}
-            disabled={searching}
             onkeydown={(e) => {
               if (e.key === "Enter" && !e.shiftKey && !e.isComposing) {
                 e.preventDefault();
@@ -96,7 +95,7 @@
             <span class="search-ellipsis"></span>
           {/if}
         </div>
-        <button type="submit" class="btn bg-primary text-white px-2 py-0.5 text-xs rounded-md ml-2" disabled={searching}>
+        <button type="submit" class="btn bg-primary text-white px-2 py-0.5 text-xs rounded-md ml-2">
           {searching ? "..." : "Go"}
         </button>
       </div>

@@ -115,7 +115,7 @@ async function loadIndexDetails() {
 // hits. Per-index details decide hybrid eligibility, so they are fetched only
 // for a hybrid search — on a cold cache that is 2 requests per index, and a
 // keyword search would otherwise wait for all of them before querying.
-export async function searchIndices(indexUids, query, params = DEFAULT_SEARCH_PARAMS) {
+export async function searchIndices(indexUids, query, params = DEFAULT_SEARCH_PARAMS, signal) {
   const metaByUid = params.hybrid
     ? Object.fromEntries((await fetchIndicesWithDetails()).map((d) => [d.uid, d]))
     : {};
@@ -140,7 +140,7 @@ export async function searchIndices(indexUids, query, params = DEFAULT_SEARCH_PA
   });
 
   try {
-    const { results } = await client.multiSearch({ queries });
+    const { results } = await client.multiSearch({ queries }, signal ? { signal } : undefined);
     const totalOf = (r) => r.estimatedTotalHits ?? r.totalHits ?? 0;
     const totalEstimated = results.reduce((sum, r) => sum + totalOf(r), 0);
     console.log(`multiSearch: ${results.length} indices, totalEstimated=${totalEstimated}, per-index: [${results.map((r) => `${r.indexUid}:${totalOf(r)}`).join(", ")}]`);
