@@ -280,7 +280,7 @@
     "state": null,
     "label": "Rajya Sabha",
     "annotation": "Upper house of Parliament. Filed under a state_legislature_debates_* uid despite being national.",
-    "searchField": "__discussions_v2",
+    "searchField": "__discussions",
     "titleField": "title_en",
     "metaFields": [
       "id",
