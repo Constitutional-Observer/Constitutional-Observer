@@ -336,6 +336,31 @@
       "state_code"
     ]
   },
+    {
+    "uid": "constituent_assembly_debates",
+    "collection": "Pre-Independance",
+    "stateCode": "CA",
+    "state": null,
+    "label": "Constituent Assembly",
+    "annotation": "",
+    "searchField": "__discussions",
+    "titleField": "title_en",
+    "embedders": [],
+    "metaFields": [
+      "id",
+      "chunk_id",
+      "file_name",
+      "archive_link",
+      "year",
+      "month",
+      "day",
+      "house",
+      "session",
+      "term_number",
+      "languages",
+      "state_code"
+    ]
+  },
   {
     "uid": "parivesh_agenda_mom",
     "collection": "central_institution",
