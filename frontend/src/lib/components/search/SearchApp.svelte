@@ -332,13 +332,13 @@
       this.estimated = serverData.totalEstimated || 0;
     }
 
-    async fetchRemaining(query, extraParams = {}) {
+    async fetchRemaining(query, extraParams = {}, startOffset = LazyLoader.#BATCH_SIZE) {
       this.cancelBackgroundLoad();
       const controller = new AbortController();
       this.#controller = controller;
       this.loading = true;
 
-      let offset = LazyLoader.#BATCH_SIZE;
+      let offset = startOffset;
       let accumulated = this.hitCount;
       let estimated = this.estimated;
 
@@ -612,11 +612,11 @@
   }
 
   $effect(() => {
-    if (!loaded || searching) return;
+    if (!loaded || searching || loadError) return;
     const params = linkParams();
     if (!params.has("query") && !params.has("doc")) return;
     const url = `${basePath}?${params}`;
-    if (browser && url !== `${page.url.pathname}${page.url.search}`) replaceState(url, {});
+    if (browser && url !== `${location.pathname}${location.search}`) replaceState(url, {});
   });
 
   // `data` comes from the route's SSR load; `basePath` is the route this app
@@ -634,9 +634,13 @@
   };
   let resolved = $state(EMPTY_SEARCH_DATA);
   let loaded = $state(false);
+  let indexDetails = $state([]);
 
   // UI state — search bar + loading flag
   let searching = $state(false);
+  let loadError = $state(null);
+
+  const CLIENT_LOAD_TIMEOUT = 12_000;
 
   // Stale-while-revalidate: keep the previous results rendered while the new
   // search resolves and swap them in one go. Blanking `resolved` here instead
@@ -645,19 +649,39 @@
   $effect(() => {
     const source = data.streamed ?? data;
     searching = true;
+    loadError = null;
     let cancelled = false;
-    Promise.resolve(source).then(
-      (value) => {
-        if (cancelled) return;
-        loaded = true;
-        resolved = value;
-      },
-      (err) => {
-        if (cancelled) return;
-        console.error("Search load failed:", err);
-        searching = false;
-      },
-    );
+    let timer;
+    const timeout = new Promise((_, reject) => {
+      timer = setTimeout(() => reject(new Error("Search timed out")), CLIENT_LOAD_TIMEOUT);
+    });
+    Promise.race([source, timeout])
+      .then(
+        (value) => {
+          if (cancelled) return;
+          loaded = true;
+          resolved = value;
+          searching = false;
+        },
+        (err) => {
+          if (cancelled) return;
+          console.error("Search load failed:", err);
+          loadError = "The search took too long or failed.";
+          searching = false;
+        },
+      )
+      .finally(() => clearTimeout(timer));
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  });
+
+  $effect(() => {
+    let cancelled = false;
+    Promise.resolve(data.indices ?? []).then((value) => {
+      if (!cancelled && Array.isArray(value)) indexDetails = value;
+    });
     return () => {
       cancelled = true;
     };
@@ -672,7 +696,6 @@
     loader.seed(resolved);
     pager.reset();
     panel.reset();
-    searching = false;
 
     untrack(() => {
       if (!loaded || !pendingLink) return;
@@ -690,7 +713,7 @@
           ...(resolved.searchParams?.indices
             ? { indices: resolved.searchParams.indices }
             : {}),
-        }),
+        }, resolved.searchParams?.limit),
       );
     }
   });
@@ -708,7 +731,7 @@
   // --- Derived (only what can't live in a class) ---
 
   let hasQuery = $derived(!!resolved.searchParams?.query);
-  let indices = $derived(resolved.indices || []);
+  let indices = $derived(indexDetails);
 
   let subtitle = $derived(
     `${pager.allRankedHits.length} documents, ${loader.hitCount} results of ~${loader.estimated} total` +
@@ -731,15 +754,25 @@
 
   // --- Actions ---
 
-  function handleSubmit() {
+  function navigateSearch(url) {
     loader.cancelBackgroundLoad();
     panel.reset();
     pager.reset();
+    loadError = null;
     searching = true;
-    goto(`${basePath}?${searchParams.build(searchBox.query).toString()}`, {
-      invalidateAll: true,
-      noScroll: true,
+    goto(url, { invalidateAll: true, noScroll: true }).catch((err) => {
+      console.error("Search navigation failed:", err);
+      loadError = "The search could not be started.";
+      searching = false;
     });
+  }
+
+  function handleSubmit() {
+    navigateSearch(`${basePath}?${searchParams.build(searchBox.query).toString()}`);
+  }
+
+  function retrySearch() {
+    navigateSearch(`${page.url.pathname}${page.url.search}`);
   }
 
 </script>
@@ -768,6 +801,8 @@
       {pager}
       {panel}
       {searching}
+      {loadError}
+      onretry={retrySearch}
       query={resolved.searchParams?.query || ""}
       {indices}
       paginationDone={!loader.loading}

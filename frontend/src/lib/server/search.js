@@ -2,7 +2,7 @@ import { MEILI_HOST, MEILI_KEY } from "$env/static/private";
 import { Meilisearch } from "meilisearch";
 import SEARCH_INDICES from "$lib/data/indices.json";
 
-const client = new Meilisearch({ host: MEILI_HOST, apiKey: MEILI_KEY });
+const client = new Meilisearch({ host: MEILI_HOST, apiKey: MEILI_KEY, timeout: 7_000 });
 
 export { SEARCH_INDICES };
 export const INDEX_BY_UID = Object.fromEntries(SEARCH_INDICES.map((i) => [i.uid, i]));
@@ -161,19 +161,14 @@ export async function searchIndices(indexUids, query, params = DEFAULT_SEARCH_PA
     return { hits, totalEstimated };
   } catch (err) {
     console.error("Multi-search failed:", err.message);
-    return { hits: [], totalEstimated: 0 };
+    throw err;
   }
 }
 
-// Runs the actual index-details fetch + search for the search UI. Shared by
-// the blocking load (below) and the streamed load, which calls this without
-// awaiting it so the page can render before the search resolves.
+// Runs the search for the search UI. Shared by the blocking load (below) and
+// the streamed load, which calls this without awaiting it.
 async function runSearchLoad({ url }, defaultQuery) {
   const query = url.searchParams.get("query") || defaultQuery;
-
-  // Not awaited here: the index list feeds the filter UI, not the query, so it
-  // resolves alongside the search rather than gating it.
-  const indicesPromise = fetchIndicesWithDetails();
 
   if (!query) {
     return {
@@ -181,7 +176,6 @@ async function runSearchLoad({ url }, defaultQuery) {
       hitCount: 0,
       totalEstimated: 0,
       collections: COLLECTIONS,
-      indices: await indicesPromise,
       searchParams: DEFAULT_SEARCH_PARAMS,
     };
   }
@@ -193,10 +187,7 @@ async function runSearchLoad({ url }, defaultQuery) {
 
   console.log(`Search: query="${query}" indices=[${searchUids.join(",")}] hybrid=${activeParams.hybrid} limit=${activeParams.limit}`);
   const searchStart = Date.now();
-  const [indicesWithDetails, { hits, totalEstimated }] = await Promise.all([
-    indicesPromise,
-    searchIndices(searchUids, query, activeParams),
-  ]);
+  const { hits, totalEstimated } = await searchIndices(searchUids, query, activeParams);
   console.log(`Search completed in ${Date.now() - searchStart}ms`);
 
   const { docs, hitCount } = groupHitsIntoDocs(hits, activeParams.scoreThreshold);
@@ -207,19 +198,41 @@ async function runSearchLoad({ url }, defaultQuery) {
     hitCount,
     totalEstimated,
     collections: COLLECTIONS,
-    indices: indicesWithDetails,
     searchParams: { ...activeParams, indexes: SEARCH_INDEX_UIDS.length, query },
   };
 }
 
-// SSR load for the search UI, shared by the home page and /ask. 
-export function makeSearchLoad(defaultQuery = null) {
-  return (event) => runSearchLoad(event, defaultQuery);
+const STREAMED_LOAD_TIMEOUT = 8_000;
+
+function withTimeout(promise, ms, message) {
+  let timer;
+  const timeout = new Promise((_, reject) => {
+    timer = setTimeout(() => reject(new Error(message)), ms);
+  });
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
 }
 
-// Same search, but returned as an unawaited promise under `streamed` so
+// SSR load for the search UI, shared by the home page and /ask.
+export function makeSearchLoad(defaultQuery = null) {
+  return async (event) => {
+    const [result, indices] = await Promise.all([
+      runSearchLoad(event, defaultQuery),
+      fetchIndicesWithDetails(),
+    ]);
+    return { ...result, indices };
+  };
+}
+
+// Same search, but returned as unawaited promises so the page renders before
+// the search resolves.
 export function makeStreamedSearchLoad(defaultQuery = null) {
-  return (event) => ({ streamed: runSearchLoad(event, defaultQuery) });
+  return (event) => ({
+    streamed: withTimeout(runSearchLoad(event, defaultQuery), STREAMED_LOAD_TIMEOUT, "Search timed out"),
+    indices: withTimeout(fetchIndicesWithDetails(), STREAMED_LOAD_TIMEOUT, "Index details timed out").catch((err) => {
+      console.error("Index details failed:", err.message);
+      return [];
+    }),
+  });
 }
 
 /** Merge the chunk-level hits of a document into one result, keyed by doc id. */

@@ -11,6 +11,8 @@
     indices = [],
     paginationDone = true,
     searching = false,
+    loadError = null,
+    onretry,
   } = $props();
 
   // The document's dominant-topic terms, for highlighting in its card.
@@ -54,18 +56,31 @@
   </nav>
 {/snippet}
 
-<main class="results-list-container" class:is-stale={searching}>
+<main class="results-list-container">
+  {#if searching}
+    <div class="search-progress" role="progressbar" aria-label="Searching"><span></span></div>
+  {/if}
+  {#if loadError}
+    <div class="search-error" role="alert">
+      <span>{loadError}</span>
+      <button class="retry-btn" onclick={() => onretry?.()}>Retry</button>
+    </div>
+  {/if}
   <TopicViews
     hits={pager.allRankedHits}
     {query}
     {indices}
     {paginationDone}
+    {searching}
     onselect={(hit) => {
       const i = pager.selectByHit(hit);
       if (i >= 0) panel.select(i);
     }}
   />
-<div class="results-list">
+<div class="results-list" class:is-stale={searching}>
+  {#if searching && !pager.pageHits.length}
+    <div class="results-loading"><span class="gm-spin gm-spin-lg"></span><span>Searching debates…</span></div>
+  {/if}
   <!-- Pagination top -->
   {#if pager.totalPages > 1}{@render pagination(true)}{/if}
 
@@ -206,6 +221,30 @@
   /* Results from the previous query, still shown while the new one loads. */
   .is-stale {
     @apply opacity-40 pointer-events-none;
+  }
+
+  .search-progress {
+    @apply relative h-1 mb-2 overflow-hidden bg-primary/20;
+  }
+  .search-progress span {
+    @apply absolute inset-y-0 bg-primary;
+    width: 35%;
+    animation: search-progress 1.1s ease-in-out infinite;
+  }
+  @keyframes search-progress {
+    from { left: -35%; }
+    to { left: 100%; }
+  }
+
+  .results-loading {
+    @apply flex flex-col items-center justify-center gap-2 py-16 text-sm italic text-black/60;
+  }
+
+  .search-error {
+    @apply flex items-center justify-between gap-3 mb-2 px-3 py-2 text-sm border border-secondary bg-secondary/20;
+  }
+  .retry-btn {
+    @apply px-2 py-0.5 text-xs rounded-md bg-primary text-white cursor-pointer;
   }
 
   .results-list {

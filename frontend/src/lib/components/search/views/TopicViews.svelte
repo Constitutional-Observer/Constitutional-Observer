@@ -26,6 +26,7 @@
     indices = [],
     onselect,
     paginationDone = true,
+    searching = false,
   } = $props();
 
   const geo = new GeoGroups();
@@ -41,7 +42,7 @@
   });
   let selectedClusterTerms = $derived((selectedCluster?.terms || []).map((t) => t.term));
 
-  let loading = $derived(!!navigating.to);
+  let loading = $derived(searching || !!navigating.to);
 
   $effect(() => {
     hits; query; indices; paginationDone;
@@ -234,7 +235,7 @@
     {/if}
 
     {#if loading}
-      <div class="gm-loading"><span class="gm-spin gm-spin-lg"></span><span>Loading results…</span></div>
+      <div class="gm-loading"><span class="gm-spin gm-spin-lg"></span><span>Searching debates…</span></div>
     {/if}
   </div>
 </section>
