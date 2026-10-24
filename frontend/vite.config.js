@@ -10,6 +10,9 @@ export default defineConfig({
     sveltekit({
       adapter: adapter(),
       preprocess: vitePreprocess(),
+      compilerOptions: {
+        warningFilter: (warning) => warning.code !== "css_unused_selector",
+      },
     }),
   ],
   build: {
