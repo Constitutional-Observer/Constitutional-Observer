@@ -1,7 +1,7 @@
 <script>
-  import TimelineSlider from "$lib/components/search/TimelineSlider.svelte";
-  import Breadcrumbs from "$lib/components/search/views/Breadcrumbs.svelte";
-  import { searchBox, searchParams, ui, viewNav } from "$lib/components/search/search-state.svelte.js";
+  import TimelineSlider from "#lib/components/search/TimelineSlider.svelte";
+  import Breadcrumbs from "#lib/components/search/views/Breadcrumbs.svelte";
+  import { searchBox, searchParams, ui, viewNav } from "#lib/components/search/search-state.svelte.js";
 
   let {
     // Search bar

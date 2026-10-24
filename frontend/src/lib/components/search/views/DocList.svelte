@@ -2,7 +2,7 @@
   // Flat list of document titles. The fallback whenever a view cannot plot: a
   // group too small to model, a topic with no dated documents, a pane too narrow
   // to hold a projection.
-  import { docFormat } from "$lib/components/search/search-state.svelte.js";
+  import { docFormat } from "#lib/components/search/search-state.svelte.js";
 
   // Accepts hits, or cluster items ({ hit, idx }).
   let { items = [], onselect } = $props();

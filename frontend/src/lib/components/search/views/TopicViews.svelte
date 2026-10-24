@@ -1,13 +1,13 @@
 <script>
   import { navigating } from "$app/state";
   import { untrack } from "svelte";
-  import TimelineBand from "$lib/components/search/views/TimelineBand.svelte";
-  import SourceGrid from "$lib/components/search/views/SourceGrid.svelte";
-  import TopicPlot from "$lib/components/search/views/TopicPlot.svelte";
-  import { GeoGroups } from "$lib/components/search/views/geo-groups.svelte.js";
-  import { RadvizPlot } from "$lib/components/search/views/radviz.svelte.js";
-  import { docFormat, topicHighlight, topicTerms as termPool, viewNav } from "$lib/components/search/search-state.svelte.js";
-  import { isPhrase, rankTerms } from "$lib/topic-modelling/topic-pipeline.svelte.js";
+  import TimelineBand from "#lib/components/search/views/TimelineBand.svelte";
+  import SourceGrid from "#lib/components/search/views/SourceGrid.svelte";
+  import TopicPlot from "#lib/components/search/views/TopicPlot.svelte";
+  import { GeoGroups } from "#lib/components/search/views/geo-groups.svelte.js";
+  import { RadvizPlot } from "#lib/components/search/views/radviz.svelte.js";
+  import { docFormat, topicHighlight, topicTerms as termPool, viewNav } from "#lib/components/search/search-state.svelte.js";
+  import { isPhrase, rankTerms } from "#lib/topic-modelling/topic-pipeline.svelte.js";
 
   const PHRASES_PER_TOPIC = 8;
   // Per-cluster equivalent of pipeline.clusters, but ranking only multi-word

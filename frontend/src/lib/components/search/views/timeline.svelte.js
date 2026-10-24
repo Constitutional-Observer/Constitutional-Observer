@@ -7,7 +7,7 @@ import { scaleUtc } from "d3-scale";
 import { utcTickInterval, utcYear } from "d3-time";
 import { select } from "d3-selection";
 import { zoom, zoomIdentity } from "d3-zoom";
-import { docFormat } from "$lib/components/search/search-state.svelte.js";
+import { docFormat } from "#lib/components/search/search-state.svelte.js";
 
 const DAY = 86400000;
 

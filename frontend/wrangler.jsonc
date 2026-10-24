@@ -1,0 +1,7 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "constitutional-observer",
+  "pages_build_output_dir": ".svelte-kit/cloudflare",
+  "compatibility_date": "2026-10-24",
+  "compatibility_flags": ["nodejs_compat"]
+}

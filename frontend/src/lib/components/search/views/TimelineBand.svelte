@@ -11,9 +11,9 @@
   // document card. The band itself never moves, so there is nothing to undo when
   // you leave.
   import { untrack } from "svelte";
-  import DocCard from "$lib/components/search/views/DocCard.svelte";
-  import Self from "$lib/components/search/views/TimelineBand.svelte";
-  import { TimelinePlot } from "$lib/components/search/views/timeline.svelte.js";
+  import DocCard from "#lib/components/search/views/DocCard.svelte";
+  import Self from "#lib/components/search/views/TimelineBand.svelte";
+  import { TimelinePlot } from "#lib/components/search/views/timeline.svelte.js";
 
   // `rise` is how far the box above may overhang the top of the band. The band is
   // shorter than it is, so it has to escape its box; the caller knows what sits

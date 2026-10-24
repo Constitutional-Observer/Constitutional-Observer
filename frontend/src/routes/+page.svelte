@@ -1,10 +1,10 @@
 <script>
-  import WarningDialog from "$lib/components/general/WarningDialog.svelte";
-  import Title from "$lib/components/general/Title.svelte";
-  import SearchApp from "$lib/components/search/SearchApp.svelte";
+  import WarningDialog from "#lib/components/general/WarningDialog.svelte";
+  import Title from "#lib/components/general/Title.svelte";
+  import SearchApp from "#lib/components/search/SearchApp.svelte";
   import { goto } from "$app/navigation";
-  import {thematicQuestions} from "$lib/data/text.js";
-  import { searchBox } from "$lib/components/search/search-state.svelte.js";
+  import {thematicQuestions} from "#lib/data/text.js";
+  import { searchBox } from "#lib/components/search/search-state.svelte.js";
 
   let { data } = $props();
 
@@ -31,9 +31,8 @@
   function searchQuery(query) {
     searchBox.query = query;
         goto(`/?query=${encodeURIComponent(query)}`, {
-      invalidateAll: true,
-      noScroll: true,
-      keepFocus: true,
+      refreshAll: true,
+      reset: false,
     });
     const el = document.getElementById("ask-section");
     if (el) slowScrollTo(el, 1800);

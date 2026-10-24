@@ -1,8 +1,8 @@
 <script>
   import "../app.css";
   import { MetaTags } from 'svelte-meta-tags';
-  import Nav from "$lib/components/general/Nav.svelte";
-  import Footer from "$lib/components/general/Footer.svelte";
+  import Nav from "#lib/components/general/Nav.svelte";
+  import Footer from "#lib/components/general/Footer.svelte";
   let { children } = $props();
 </script>
 

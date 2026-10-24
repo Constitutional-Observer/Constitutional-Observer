@@ -7,7 +7,7 @@
  * the bigram detector then catches *emergent* ones not in the list.
  *
  * Use:
- *   import { compileTrie, applyPhrases } from "$lib/phrase-matcher.js";
+ *   import { compileTrie, applyPhrases } from "#lib/phrase-matcher.js";
  *   const trie = compileTrie(["right to information", "fundamental rights", …]);
  *   const out  = applyPhrases(tokens, trie);
  *   // out.tokens     — emitted stream (matched runs joined as "a_b_c")

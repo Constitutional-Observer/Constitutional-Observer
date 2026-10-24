@@ -14,11 +14,11 @@
 //   • Preprocessing     — hits → cleaned token docs (NLP, tokenize, phrases).
 //   • TopicSequentialLDA — token docs → chosen-K sequential-LDA fit.
 //   • TopicLDAViz       — LDA fit → display clusters + LDAvis term ranking.
-import { browser } from "$app/environment";
-import { TOPIC_STOPWORDS } from "$lib/topic-modelling/topic-stopwords.js";
-import { TOPIC_PHRASES, SEED_GROUPS } from "$lib/topic-modelling/topic-phrases.js";
-import { applyPhrases } from "$lib/topic-modelling/phrase-matcher.js";
-import { chunkText } from "$lib/highlight.js";
+import { browser } from "$app/env";
+import { TOPIC_STOPWORDS } from "#lib/topic-modelling/topic-stopwords.js";
+import { TOPIC_PHRASES, SEED_GROUPS } from "#lib/topic-modelling/topic-phrases.js";
+import { applyPhrases } from "#lib/topic-modelling/phrase-matcher.js";
+import { chunkText } from "#lib/highlight.js";
 
 // Multi-topic membership floor. A document belongs to every topic it is more than
 // this composed of (θ > floor) — no forced dominant topic — so it can sit in
@@ -156,7 +156,7 @@ class Preprocessing {
   // tokenized docs → repeated bigram-merge passes →
   // { phrased, bigramsKept, bigramsMerged, phrasesPerPass, phraseExamples }
   static async detectPhrases(tokenized, onProgress) {
-    const { default: detectAndMergeBigrams } = await import("$lib/topic-modelling/bigrams.js");
+    const { default: detectAndMergeBigrams } = await import("#lib/topic-modelling/bigrams.js");
     const NPASSES = 5;
     let phrased = tokenized;
     let bigramsKept = 0, bigramsMerged = 0;
@@ -220,7 +220,7 @@ class TopicSequentialLDA {
   // phrased docs → { K, ldaTopics, theta, vocab, prunedByMax, phi,
   //                  seedMatched, seedTotal, bestRD }
   static async run(phrased, seedGroups, onProgress) {
-    const { default: lda } = await import("$lib/topic-modelling/lda.js");
+    const { default: lda } = await import("#lib/topic-modelling/lda.js");
 
     // Per-group corpora are an order of magnitude smaller than the full
     // result set these defaults were tuned for, so the vocabulary band, topic

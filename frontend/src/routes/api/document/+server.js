@@ -1,6 +1,5 @@
-import { json } from "@sveltejs/kit";
-import { MEILI_HOST, MEILI_KEY } from "$env/static/private";
-import { fieldsOf, baseDocId, INDEX_BY_UID } from "$lib/server/search.js";
+import { MEILI_HOST, MEILI_KEY } from "$app/env/private";
+import { fieldsOf, baseDocId, INDEX_BY_UID } from "#lib/server/search.js";
 
 /**
  * GET /api/document?index=state_legislature_debates_ls&doc_id=LS_lsd_..._pdf&highlight_chunks=3,7
@@ -28,10 +27,10 @@ export async function GET({ url, fetch }) {
       .filter((n) => !Number.isNaN(n)),
   );
 
-  if (!index) return json({ error: "index is required" }, { status: 400 });
-  if (!rawId) return json({ error: "doc_id or id is required" }, { status: 400 });
+  if (!index) return Response.json({ error: "index is required" }, { status: 400 });
+  if (!rawId) return Response.json({ error: "doc_id or id is required" }, { status: 400 });
   // Restrict `index` (from the query string) to registered indices.
-  if (!INDEX_BY_UID[index]) return json({ error: "unknown index" }, { status: 400 });
+  if (!INDEX_BY_UID[index]) return Response.json({ error: "unknown index" }, { status: 400 });
 
   const { searchField, titleField } = fieldsOf(index);
   const FIELDS = ["id", "chunk_id", "file_name", titleField, searchField];
@@ -55,7 +54,7 @@ export async function GET({ url, fetch }) {
     if (!resp.ok) {
       const err = await resp.text();
       console.error("Meilisearch doc fetch error:", err);
-      return json({ error: "Failed to fetch document" }, { status: 502 });
+      return Response.json({ error: "Failed to fetch document" }, { status: 502 });
     }
     const data = await resp.json();
     const batch = data.results || [];
@@ -82,7 +81,7 @@ export async function GET({ url, fetch }) {
     }));
 
   const first = results[0] || {};
-  return json({
+  return Response.json({
     chunks,
     total: chunks.length,
     doc_id: baseId,

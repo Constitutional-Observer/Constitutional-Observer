@@ -1,7 +1,7 @@
 <script>
-  import TopicViews from "$lib/components/search/views/TopicViews.svelte";
-  import { topicHighlight } from "$lib/components/search/search-state.svelte.js";
-  import { renderHighlight, chunkText, chunkSnippet } from "$lib/highlight.js";
+  import TopicViews from "#lib/components/search/views/TopicViews.svelte";
+  import { topicHighlight } from "#lib/components/search/search-state.svelte.js";
+  import { renderHighlight, chunkText, chunkSnippet } from "#lib/highlight.js";
   
 
   let {

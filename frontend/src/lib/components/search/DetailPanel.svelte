@@ -4,8 +4,8 @@
   // clicking a result (or opening a bookmark) opens the detail modal. Reactive
   // state lives on the `panel` (DocPanel) and `bookmarks` (Bookmarks) class
   // instances passed in as props.
-  import { renderHighlight as renderHL, chunkText, markQuery } from "$lib/highlight.js";
-  import { ui, searchBox, topicHighlight } from "$lib/components/search/search-state.svelte.js";
+  import { renderHighlight as renderHL, chunkText, markQuery } from "#lib/highlight.js";
+  import { ui, searchBox, topicHighlight } from "#lib/components/search/search-state.svelte.js";
   
 
   // ── RelatedSearch ────────────────────────────────────────────────────────────

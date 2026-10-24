@@ -9,8 +9,8 @@
   // differently in two places. `inline` carries no background or border of its own
   // — it inherits the surface it sits on, which is how the lens popup keeps the
   // band's colour while still showing a real card.
-  import { renderHighlight } from "$lib/highlight.js";
-  import { docFormat } from "$lib/components/search/search-state.svelte.js";
+  import { renderHighlight } from "#lib/highlight.js";
+  import { docFormat } from "#lib/components/search/search-state.svelte.js";
 
   let {
     hit,

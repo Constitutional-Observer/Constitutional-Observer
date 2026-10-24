@@ -1,6 +1,6 @@
-import { MEILI_HOST, MEILI_KEY } from "$env/static/private";
+import { MEILI_HOST, MEILI_KEY } from "$app/env/private";
 import { Meilisearch } from "meilisearch";
-import SEARCH_INDICES from "$lib/data/indices.json";
+import SEARCH_INDICES from "#lib/data/indices.json";
 
 const client = new Meilisearch({ host: MEILI_HOST, apiKey: MEILI_KEY, timeout: 7_000 });
 

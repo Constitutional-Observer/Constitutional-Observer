@@ -1,7 +1,7 @@
 <script>
   // @ts-nocheck
   import { onMount } from "svelte";
-  import TitleWithNav from "$lib/components/general/TitleWithNav.svelte";
+  import TitleWithNav from "#lib/components/general/TitleWithNav.svelte";
 
   let stateLegSource =
     "https://raw.githubusercontent.com/Constitutional-Observer/India-State-Legislature-Archives/refs/heads/main/assembly_mirror_tracker.csv";

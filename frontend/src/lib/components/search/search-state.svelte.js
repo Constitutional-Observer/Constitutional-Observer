@@ -11,7 +11,7 @@
 // Only ever written in the browser (topic modelling and navigation are both
 // client-only), so these stay at their defaults during SSR — no cross-request leak.
 
-import { chunkText, chunkSnippet } from "$lib/highlight.js";
+import { chunkText, chunkSnippet } from "#lib/highlight.js";
 
 export const searchBox = $state({ query: "" });
 export const ui = $state({ showBookmarks: false });

@@ -1,7 +1,7 @@
 <script>
   import { marked } from "marked";
-  import source from "$lib/data/about.md?raw";
-  import TitleWithNav from "$lib/components/general/TitleWithNav.svelte";
+  import source from "#lib/data/about.md?raw";
+  import TitleWithNav from "#lib/components/general/TitleWithNav.svelte";
 </script>
 
 <svelte:head>

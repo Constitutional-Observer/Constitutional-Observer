@@ -1,5 +1,5 @@
 <script>
-import {headlines} from "$lib/data/text.js"
+import {headlines} from "#lib/data/text.js"
 import {fade} from "svelte/transition"
 import {onMount} from "svelte"
 

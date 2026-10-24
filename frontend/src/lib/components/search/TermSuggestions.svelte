@@ -1,5 +1,5 @@
 <script>
-  import { searchBox, topicTerms } from "$lib/components/search/search-state.svelte.js";
+  import { searchBox, topicTerms } from "#lib/components/search/search-state.svelte.js";
 
   let { query = "", searching = false, onsearch } = $props();
 

@@ -1,5 +1,5 @@
 <script>
-  import SearchApp from "$lib/components/search/SearchApp.svelte";
+  import SearchApp from "#lib/components/search/SearchApp.svelte";
 
   let { data } = $props();
 </script>

@@ -1,13 +1,13 @@
 <script>
-  import ResultsList from "$lib/components/search/ResultsList.svelte";
-  import SearchSidebar from "$lib/components/search/SearchSidebar.svelte";
-  import TermSuggestions from "$lib/components/search/TermSuggestions.svelte";
-  import DetailPanel from "$lib/components/search/DetailPanel.svelte";
+  import ResultsList from "#lib/components/search/ResultsList.svelte";
+  import SearchSidebar from "#lib/components/search/SearchSidebar.svelte";
+  import TermSuggestions from "#lib/components/search/TermSuggestions.svelte";
+  import DetailPanel from "#lib/components/search/DetailPanel.svelte";
   
-  import { searchBox, searchParams, ui, docFormat, topicHighlight } from "$lib/components/search/search-state.svelte.js";
-  import { goto, replaceState } from "$app/navigation";
+  import { searchBox, searchParams, ui, docFormat, topicHighlight } from "#lib/components/search/search-state.svelte.js";
+  import { goto } from "$app/navigation";
   import { page } from "$app/state";
-  import { browser } from "$app/environment";
+  import { browser } from "$app/env";
   import { tick, untrack, onMount } from "svelte";
 
   // Per-document key and date come from docFormat, so the result cards, the map
@@ -616,7 +616,7 @@
     const params = linkParams();
     if (!params.has("query") && !params.has("doc")) return;
     const url = `${basePath}?${params}`;
-    if (browser && url !== `${location.pathname}${location.search}`) replaceState(url, {});
+    if (browser && url !== `${location.pathname}${location.search}`) goto(url, { shallow: true, replace: true });
   });
 
   // `data` comes from the route's SSR load; `basePath` is the route this app
@@ -760,7 +760,7 @@
     pager.reset();
     loadError = null;
     searching = true;
-    goto(url, { invalidateAll: true, noScroll: true }).catch((err) => {
+    goto(url, { refreshAll: true, reset: false }).catch((err) => {
       console.error("Search navigation failed:", err);
       loadError = "The search could not be started.";
       searching = false;

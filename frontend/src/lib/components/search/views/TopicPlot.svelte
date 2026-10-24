@@ -3,10 +3,10 @@
   // Every other topic is a named anchor on the ring; the opened topic has no
   // anchor, so it pulls to the origin. Distance from centre is therefore the
   // share of a document that is about something else, and direction says which.
-  import DocCard from "$lib/components/search/views/DocCard.svelte";
-  import TimelineBand from "$lib/components/search/views/TimelineBand.svelte";
-  import { docFormat } from "$lib/components/search/search-state.svelte.js";
-  import DocList from "$lib/components/search/views/DocList.svelte";
+  import DocCard from "#lib/components/search/views/DocCard.svelte";
+  import TimelineBand from "#lib/components/search/views/TimelineBand.svelte";
+  import { docFormat } from "#lib/components/search/search-state.svelte.js";
+  import DocList from "#lib/components/search/views/DocList.svelte";
 
   let {
     plot,

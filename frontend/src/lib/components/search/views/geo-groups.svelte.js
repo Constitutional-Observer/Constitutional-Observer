@@ -4,7 +4,7 @@
 // accordion overflow. Past MAIN_CAP non-empty groups, the lowest-scored of those
 // overflow into the same accordion instead of growing the grid.
 
-import { TopicPipeline } from "$lib/topic-modelling/topic-pipeline.svelte.js";
+import { TopicPipeline } from "#lib/topic-modelling/topic-pipeline.svelte.js";
 
 export const MIN_GROUP_DOCS = 4;
 

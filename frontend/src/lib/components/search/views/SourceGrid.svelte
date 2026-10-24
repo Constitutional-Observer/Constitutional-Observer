@@ -2,9 +2,9 @@
   // Level 1 — one cell per source index. Hovering a cell opens (and grows) it;
   // it closes on mouseleave of the grid. Clicking a topic inside a cell descends
   // to that topic's views.
-  import DocList from "$lib/components/search/views/DocList.svelte";
-  import { MIN_GROUP_DOCS } from "$lib/components/search/views/geo-groups.svelte.js";
-  import { docFormat, viewNav } from "$lib/components/search/search-state.svelte.js";
+  import DocList from "#lib/components/search/views/DocList.svelte";
+  import { MIN_GROUP_DOCS } from "#lib/components/search/views/geo-groups.svelte.js";
+  import { docFormat, viewNav } from "#lib/components/search/search-state.svelte.js";
   
 
   // `columns` is the wide-screen column count. It is a prop rather than a media

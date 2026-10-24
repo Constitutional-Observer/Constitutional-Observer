@@ -16,7 +16,7 @@
 
 // ── Constitutional / Legal ──
 
-import { compileTrie } from "$lib/topic-modelling/phrase-matcher.js";
+import { compileTrie } from "#lib/topic-modelling/phrase-matcher.js";
 
 const CONSTITUTIONAL = [
   "right to information", "right to education", "right to food",
