@@ -59,10 +59,10 @@ export function resolveSearchUids(url) {
   return uids.length ? uids : SEARCH_INDEX_UIDS;
 }
 
-// Doc counts and embedder info for every registry entry, cached for the TTL.
-// The in-flight promise is cached, so concurrent callers share one fetch and a
-// failure is not cached. An index that is missing or errors is returned flagged
-// `missing` with zero documents rather than dropped.
+// Doc counts for every registry entry from Meilisearch's global stats, with
+// embedders taken from the registry, cached for the TTL. The in-flight promise
+// is cached, so concurrent callers share one fetch and a failure is not cached.
+// An index absent from the stats is returned flagged `missing`.
 const INDEX_DETAILS_TTL = 60_000;
 let indexDetailsCache = null;
 
@@ -80,49 +80,28 @@ export function fetchIndicesWithDetails({ force = false } = {}) {
 }
 
 async function loadIndexDetails() {
-  return await Promise.all(
-    SEARCH_INDICES.map(async (reg) => {
-      const base = {
-        ...reg,
-        numberOfDocuments: 0,
-        isIndexing: false,
-        semanticSearch: false,
-        embedders: [],
-        missing: false,
-      };
-      try {
-        const [embedders, stats] = await Promise.all([
-          client.index(reg.uid).getEmbedders(),
-          client.index(reg.uid).getStats(),
-        ]);
-        const embedderEntries = embedders && typeof embedders === "object" ? Object.keys(embedders) : [];
-        return {
-          ...base,
-          numberOfDocuments: stats?.numberOfDocuments || 0,
-          isIndexing: stats?.isIndexing || false,
-          semanticSearch: embedderEntries.length > 0,
-          embedders: embedderEntries,
-        };
-      } catch (err) {
-        console.error(`Index ${reg.uid} unavailable:`, err.message);
-        return { ...base, missing: true };
-      }
-    })
-  );
+  const { indexes = {} } = await client.getStats();
+  return SEARCH_INDICES.map((reg) => {
+    const stats = indexes[reg.uid];
+    const embedders = reg.embedders || [];
+    if (!stats) console.error(`Index ${reg.uid} missing from Meilisearch stats`);
+    return {
+      ...reg,
+      numberOfDocuments: stats?.numberOfDocuments || 0,
+      isIndexing: stats?.isIndexing || false,
+      semanticSearch: embedders.length > 0,
+      embedders,
+      missing: !stats,
+    };
+  });
 }
 
 // Run one multi-search across the given indices and return flattened, annotated
-// hits. Per-index details decide hybrid eligibility, so they are fetched only
-// for a hybrid search — on a cold cache that is 2 requests per index, and a
-// keyword search would otherwise wait for all of them before querying.
+// hits. Hybrid search is only used for indices whose registry entry lists the
+// requested embedder.
 export async function searchIndices(indexUids, query, params = DEFAULT_SEARCH_PARAMS, signal) {
-  const metaByUid = params.hybrid
-    ? Object.fromEntries((await fetchIndicesWithDetails()).map((d) => [d.uid, d]))
-    : {};
-
   const queries = indexUids.map((uid) => {
-    const meta = metaByUid[uid];
-    const canHybrid = params.hybrid && meta?.semanticSearch && meta.embedders?.includes(params.embedder);
+    const canHybrid = params.hybrid && INDEX_BY_UID[uid]?.embedders?.includes(params.embedder);
     const { searchField, titleField, metaFields } = fieldsOf(uid);
     return {
       indexUid: uid,

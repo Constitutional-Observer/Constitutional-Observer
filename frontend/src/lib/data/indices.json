@@ -8,6 +8,7 @@
     "annotation": "Andhra Pradesh Legislative Assembly proceedings, chunked by discussion.",
     "searchField": "__discussions",
     "titleField": "title_en",
+    "embedders": [],
     "metaFields": [
       "id",
       "chunk_id",
@@ -34,6 +35,7 @@
     "annotation": "Assam Legislative Assembly proceedings, chunked by discussion.",
     "searchField": "__discussions",
     "titleField": "title_en",
+    "embedders": [],
     "metaFields": [
       "id",
       "chunk_id",
@@ -55,6 +57,7 @@
     "annotation": "Karnataka Legislative Assembly proceedings, chunked by discussion. Carries Kannada-language fields alongside English.",
     "searchField": "__discussions",
     "titleField": "title_en",
+    "embedders": [],
     "metaFields": [
       "id",
       "chunk_id",
@@ -82,6 +85,7 @@
     "annotation": "Meghalaya Legislative Assembly proceedings, chunked by discussion.",
     "searchField": "__discussions",
     "titleField": "title_en",
+    "embedders": [],
     "metaFields": [
       "id",
       "chunk_id",
@@ -106,6 +110,7 @@
     "annotation": "Puducherry Legislative Assembly proceedings, chunked by discussion.",
     "searchField": "__discussions",
     "titleField": "title_en",
+    "embedders": [],
     "metaFields": [
       "id",
       "chunk_id",
@@ -130,6 +135,7 @@
     "annotation": "Rajasthan Legislative Assembly proceedings. Index exists but holds no documents yet.",
     "searchField": "__discussions",
     "titleField": "title_en",
+    "embedders": [],
     "metaFields": [
       "id",
       "chunk_id",
@@ -154,6 +160,7 @@
     "annotation": "Tamil Nadu Legislative Assembly proceedings, chunked by discussion.",
     "searchField": "__discussions",
     "titleField": "title_en",
+    "embedders": [],
     "metaFields": [
       "id",
       "chunk_id",
@@ -181,6 +188,7 @@
     "annotation": "Uttar Pradesh Legislative Assembly proceedings. Index exists but holds no documents yet.",
     "searchField": "__discussions",
     "titleField": "title_en",
+    "embedders": [],
     "metaFields": [
       "id",
       "chunk_id",
@@ -207,6 +215,7 @@
     "annotation": "West Bengal Legislative Assembly proceedings. Index exists but holds no documents yet.",
     "searchField": "__discussions",
     "titleField": "title_en",
+    "embedders": [],
     "metaFields": [
       "id",
       "chunk_id",
@@ -234,6 +243,7 @@
     "annotation": "Keralam Legislative Assembly proceedings. Index exists but holds no documents yet.",
     "searchField": "__discussions",
     "titleField": "title_en",
+    "embedders": [],
     "metaFields": [
       "id",
       "chunk_id",
@@ -255,6 +265,7 @@
     "annotation": "Lower house of Parliament.",
     "searchField": "__discussions",
     "titleField": "title_en",
+    "embedders": [],
     "metaFields": [
       "id",
       "chunk_id",
@@ -282,6 +293,7 @@
     "annotation": "Upper house of Parliament. Filed under a state_legislature_debates_* uid despite being national.",
     "searchField": "__discussions",
     "titleField": "title_en",
+    "embedders": [],
     "metaFields": [
       "id",
       "chunk_id",
@@ -306,6 +318,7 @@
     "annotation": "",
     "searchField": "content",
     "titleField": "date",
+    "embedders": [],
     "metaFields": [
       "id",
       "chunk_id",
