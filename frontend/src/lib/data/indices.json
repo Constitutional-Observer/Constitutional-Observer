@@ -257,6 +257,33 @@
     ]
   },
   {
+    "uid": "state_legislature_debates_tg",
+    "collection": "State Legislatures",
+    "stateCode": "TG",
+    "state": "Telangana",
+    "label": "Telangana Assembly",
+    "annotation": "Telangana Legislative Assembly proceedings, chunked by discussion.",
+    "searchField": "__discussions",
+    "titleField": "title_en",
+    "embedders": [],
+    "metaFields": [
+      "id",
+      "chunk_id",
+      "file_name",
+      "archive_link",
+      "year",
+      "month",
+      "day",
+      "house",
+      "session",
+      "term_number",
+      "term_start",
+      "term_end",
+      "languages",
+      "state_code"
+    ]
+  },
+  {
     "uid": "parliamentary_debates_ls",
     "collection": "Parliament",
     "stateCode": "LS",
